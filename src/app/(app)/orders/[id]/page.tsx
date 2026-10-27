@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { requirePermission } from "@/lib/auth";
 import { Badge, Card, CommandBar, CommandLink, FormField, PageTitle } from "@/components/ui";
 import { all } from "@/lib/db";
 import {
@@ -29,7 +30,7 @@ export default async function OrderDetailPage(props: {
 }) {
   const params = await props.params;
   const orderId = Number(params.id);
-  const order = getOrder(orderId);
+  const order = getOrder(orderId, await requirePermission('order.read'));
 
   if (!order) {
     notFound();

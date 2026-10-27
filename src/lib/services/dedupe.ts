@@ -163,9 +163,12 @@ export function approveLeadMerge(actor: Actor, approvalId: number, decisionComme
     entity_id: number;
     status: string;
     payload_json: string | null;
+    requested_by: number|null;
   }>("SELECT * FROM approvals WHERE id = ?", approvalId);
 
   assert(approval, "Không tìm thấy yêu cầu duyệt hợp nhất");
+  assert(actor.type === 'USER' && actor.role === 'SALES_MANAGER','Chỉ Quản lý kinh doanh được duyệt hợp nhất');
+  assert(actor.id !== approval.requested_by,'Người đề nghị không được tự duyệt hợp nhất');
   assert(approval.kind === "MERGE", "Yêu cầu không phải là duyệt hợp nhất");
   assert(approval.status === "PENDING", "Yêu cầu đã được xử lý");
   assert(approval.payload_json, "Dữ liệu hợp nhất không hợp lệ");
@@ -177,6 +180,16 @@ export function approveLeadMerge(actor: Actor, approvalId: number, decisionComme
 
   return tx(() => {
     // 1. Chuyển các hoạt động tương tác từ source sang target
+    for(const table of ['email_messages','ai_suggestions','ai_runs','assignments','tasks']) {
+      run(`UPDATE ${table} SET entity_id=? WHERE entity_type='lead' AND entity_id=?`,targetLeadId,sourceLeadId);
+    }
+    run('UPDATE lead_assessments SET lead_id=? WHERE lead_id=?',targetLeadId,sourceLeadId);
+    run("UPDATE OR IGNORE document_links SET entity_id=? WHERE entity_type='lead' AND entity_id=?",targetLeadId,sourceLeadId);
+    const sourceOpp=get<{id:number}>('SELECT id FROM opportunities WHERE lead_id=?',sourceLeadId);
+    if(sourceOpp) {
+      assert(!get('SELECT id FROM opportunities WHERE lead_id=?',targetLeadId),'Hai hồ sơ đều có cơ hội, cần xử lý liên kết trước khi hợp nhất');
+      run('UPDATE opportunities SET lead_id=? WHERE id=?',targetLeadId,sourceOpp.id);
+    }
     run(
       "UPDATE activities SET entity_id = ? WHERE entity_type = 'lead' AND entity_id = ?",
       targetLeadId,
@@ -191,10 +204,8 @@ export function approveLeadMerge(actor: Actor, approvalId: number, decisionComme
 
     // 3. Đánh dấu source lead là đã gộp và loại bỏ
     run(
-      `UPDATE leads SET merged_into_lead_id = ?, status = 'DISQUALIFIED',
-         disqualify_reason = ?, updated_at = datetime('now') WHERE id = ?`,
+      `UPDATE leads SET merged_into_lead_id = ?, updated_at = datetime('now') WHERE id = ?`,
       targetLeadId,
-      `Hợp nhất vào Lead #${targetLeadId}`,
       sourceLeadId,
     );
 
@@ -212,7 +223,6 @@ export function approveLeadMerge(actor: Actor, approvalId: number, decisionComme
       details: { sourceLeadId, approvalId },
     });
     audit(actor, "lead", sourceLeadId, "MERGED", {
-      to: "DISQUALIFIED",
       details: { targetLeadId, approvalId },
     });
 

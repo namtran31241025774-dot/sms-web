@@ -83,6 +83,7 @@ describe("WP-08: AI Agent (FR-06, FR-19, FR-20, FR-32, FR-36, FR-44, FR-88, FR-8
     it("BUG-002: Chặn NVKD A duyệt hồ sơ thuộc phạm vi của NVKD B ở nhóm khác (Scope check)", () => {
       run("INSERT OR IGNORE INTO teams (id, code, name) VALUES (99, 'TEAM-99', 'Team 99')");
 
+      run("UPDATE teams SET leader_id=? WHERE id=99",salesManager.id);
       // Lead do Sales B sở hữu, gắn team 99
       const { id: leadId } = run(
         "INSERT INTO leads (company_name, company_norm, contact_name, email, owner_id, team_id, status) VALUES (?, LOWER(?), ?, ?, ?, ?, 'OPEN')",
@@ -147,7 +148,7 @@ describe("WP-08: AI Agent (FR-06, FR-19, FR-20, FR-32, FR-36, FR-44, FR-88, FR-8
 
       // Kiểm tra đề xuất đã được cập nhật
       const sug = getSuggestion(sugId);
-      expect(sug?.status).toBe("APPROVED");
+      expect(sug?.status).toBe("EDITED");
 
       // Kiểm tra bảng email_messages đã được lưu đầy đủ content_snapshot và edited_by_human = 1
       const emailMsg = get<{ status: string; subject: string; edited_by_human: number; approved_by: number }>(
@@ -357,7 +358,7 @@ describe("WP-08: AI Agent (FR-06, FR-19, FR-20, FR-32, FR-36, FR-44, FR-88, FR-8
         },
         risks: [{ category: "TECH_CONSTRAINT", severity: "MEDIUM", description: "Ràng buộc tích hợp" }],
         next_actions: ["Họp kỹ thuật", "Làm rõ nhu cầu"],
-        sources: [{ ref: "opportunity.code", quote: "Mã cơ hội" }],
+        sources: [{ ref: "opportunity.code", quote: "OPP-RES-1" }],
         email_insight_status: "NO_INSIGHT",
       }, []) as { research_id: number; status: string };
 

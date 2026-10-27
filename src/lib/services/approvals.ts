@@ -2,8 +2,9 @@
 import { all, get, run, tx } from "../db";
 import { assert, type Role } from "../domain";
 import { actorUserId, audit, notify, notifyRole, type Actor } from "./core";
-import { getOpportunity, moveStage } from "./opportunities";
+import { advanceStage, gateFingerprint, getOpportunity } from "./opportunities";
 import { applyDiscountDecision, getQuote } from "./quotes";
+import {assertActorAccess} from './access';
 
 export type ApprovalKind = "QUOTE_DISCOUNT" | "OPP_STAGE_GATE" | "LEGAL_REVIEW";
 
@@ -18,6 +19,7 @@ export function requestApproval(actor: Actor, input: { kind: ApprovalKind; entit
     "INSERT INTO approvals (kind, entity_type, entity_id, reason, requested_by) VALUES (?,?,?,?,?)",
     input.kind, input.entityType, input.entityId, input.reason, actorUserId(actor),
   );
+  if(input.kind === 'OPP_STAGE_GATE') run('UPDATE approvals SET payload_json=? WHERE id=?',gateFingerprint(input.entityId),id);
   audit(actor, "approval", id, "REQUEST", { to: "PENDING", reason: input.reason, details: input });
   notifyRole(DECIDER[input.kind], `Yêu cầu mới: ${input.reason}`, "/approvals");
   return id;
@@ -73,8 +75,13 @@ export function decideApproval(actor: Actor, approvalId: number, approved: boole
   );
   assert(a, "Không tìm thấy yêu cầu");
   assert(a.status === "PENDING", "Yêu cầu đã được xử lý");
+  if(a.kind==='OPP_STAGE_GATE') assertActorAccess(actor,'opportunity',a.entity_id);
   assert(actor.role === DECIDER[a.kind], "Vai trò của bạn không duyệt loại yêu cầu này");
   if (!approved) assert(comment?.trim(), "Từ chối cần ghi lý do");
+  if(approved && a.kind === 'OPP_STAGE_GATE') {
+    const saved=get<{payload_json:string|null}>('SELECT payload_json FROM approvals WHERE id=?',a.id)?.payload_json;
+    assert(saved === gateFingerprint(a.entity_id),'Hồ sơ đã thay đổi, cần gửi rà soát lại');
+  }
 
   tx(() => {
     const to = approved ? "APPROVED" : "REJECTED";
@@ -91,7 +98,7 @@ export function decideApproval(actor: Actor, approvalId: number, approved: boole
     } else if (a.kind === "OPP_STAGE_GATE") {
       const o = getOpportunity(a.entity_id);
       if (approved && o?.stage === "DEVELOP") {
-        moveStage(actor, a.entity_id, "PROPOSE", `Sales Manager duyệt gate: ${comment ?? ""}`.trim());
+        advanceStage(actor, a.entity_id);
       }
       notify(o?.owner_id, `${o?.code}: Manager ${approved ? "đã duyệt chuyển Propose" : "yêu cầu xử lý thêm trước khi chuyển Propose"}`, `/opportunities/${a.entity_id}`);
     } else {

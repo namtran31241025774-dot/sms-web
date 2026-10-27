@@ -14,7 +14,7 @@ RUN npm run build
 
 FROM node:24-slim AS run
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 SMS_DB_PATH=/data/sms.db SMS_AI_MODE=mock
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 SMS_DB_PATH=/data/sms.db
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/.next ./.next

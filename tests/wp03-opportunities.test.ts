@@ -51,6 +51,8 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
   let testProductId: number;
 
   beforeEach(() => {
+    db().prepare("INSERT OR IGNORE INTO teams(id,code,name,leader_id) VALUES (991,'TEST-SCOPE','Test Scope',2)").run();
+    for(const user of [1,3,4]) db().prepare("INSERT OR IGNORE INTO team_members(team_id,user_id) VALUES (991,?)").run(user);
     // Thiết lập dữ liệu mẫu
     const acc = db().prepare("SELECT id FROM accounts LIMIT 1").get() as { id: number } | undefined;
     if (acc) {
@@ -90,6 +92,7 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
       VALUES ('Công ty ABC Tech', 'cong ty abc tech', 'Trần Thị B', 'b@abctech.vn', '0912345678', 'OPEN', 1)
     `).run();
     testLeadId = Number(lIns.lastInsertRowid);
+    db().prepare('UPDATE leads SET team_id=991 WHERE id=?').run(testLeadId);
   });
 
   // ===== FR-30: Khảo sát sơ bộ nhu cầu khách hàng =====
@@ -195,8 +198,8 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
     });
 
     it("hỗ trợ chuyển đổi hàng loạt (batchConvertLeads)", () => {
-      const l2 = Number(db().prepare("INSERT INTO leads (company_name, company_norm, contact_name, status, bant_score, bant_authority) VALUES ('Cty XYZ', 'cty xyz', 'Anh C', 'OPEN', 70, 20)").run().lastInsertRowid);
-      const l3 = Number(db().prepare("INSERT INTO leads (company_name, company_norm, contact_name, status, bant_score, bant_authority) VALUES ('Cty DEF', 'cty def', 'Chị D', 'OPEN', 65, 15)").run().lastInsertRowid);
+      const l2 = Number(db().prepare("INSERT INTO leads (company_name, company_norm, contact_name, status, bant_score, bant_authority,owner_id,team_id) VALUES ('Cty XYZ', 'cty xyz', 'Anh C', 'OPEN', 70, 20,1,991)").run().lastInsertRowid);
+      const l3 = Number(db().prepare("INSERT INTO leads (company_name, company_norm, contact_name, status, bant_score, bant_authority,owner_id,team_id) VALUES ('Cty DEF', 'cty def', 'Chị D', 'OPEN', 65, 15,1,991)").run().lastInsertRowid);
 
       const batch = batchConvertLeads(salesActor, [l2, l3]);
       expect(batch.successCount).toBe(2);
@@ -393,7 +396,9 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
       reviewExpertSolution(presalesMgrActor, oppId, "APPROVED", "Phương án thiết kế đạt chuẩn kiến trúc");
       const approvedOpp = getOpportunity(oppId);
       expect(approvedOpp?.expert_review_status).toBe("APPROVED");
-      expect(approvedOpp?.solution_confirmed).toBe(1);
+      expect(approvedOpp?.solution_confirmed).toBe(0);
+      setChecklist(salesActor,oppId,'solution_confirmed',true);
+      expect(getOpportunity(oppId)?.solution_confirmed).toBe(1);
     });
 
     it("FR-43: quản lý rủi ro 4 trạng thái và Cổng HG5 bắt buộc lý do khi bỏ qua (DISMISSED)", () => {

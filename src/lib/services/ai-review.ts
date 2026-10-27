@@ -5,9 +5,10 @@ import { all, get, run, tx } from "../db";
 import { assert, BANT_KEYS, type BantKey } from "../domain";
 import { email } from "../integrations";
 import { can } from "../rbac";
-import { canSee } from "../scope";
+import { recordVisible } from "./access";
 import { actorUserId, addActivity, audit, type Actor } from "./core";
-import { disqualifyLead, getLead, updateBant } from "./leads";
+import { getLead } from "./leads";
+import { scoreBant, disqualifyLeadWithReason } from "./qualification";
 import { getOpportunity } from "./opportunities";
 
 export type Suggestion = {
@@ -131,12 +132,12 @@ function assertReviewPermissionAndScope(actor: Actor, s: Suggestion) {
   if (s.entity_type === "lead") {
     const lead = getLead(s.entity_id);
     assert(lead, "Không tìm thấy Lead");
-    const allowed = canSee(actor, { owner_id: lead.owner_id, team_id: (lead as Record<string, unknown>).team_id as number | undefined });
+    const allowed = recordVisible(actor,'lead',lead.id);
     assert(allowed, "Bạn không có quyền thao tác trên Lead ngoài phạm vi quản lý");
   } else if (s.entity_type === "opportunity") {
     const opp = getOpportunity(s.entity_id);
     assert(opp, "Không tìm thấy cơ hội");
-    const allowed = canSee(actor, { owner_id: opp.owner_id, team_id: (opp as Record<string, unknown>).team_id as number | undefined });
+    const allowed = recordVisible(actor,'opportunity',opp.id);
     assert(allowed, "Bạn không có quyền thao tác trên cơ hội ngoài phạm vi quản lý");
   }
 }
@@ -155,7 +156,12 @@ export function approveSuggestion(actor: Actor, id: number, edits: Record<string
 
   const payload = JSON.parse(s.payload_json);
   let result = "";
-  const isEdited = Object.keys(edits).length > 0;
+  const editable=s.kind==='EMAIL_DRAFT' ? ['to','subject','body'] : s.kind==='BANT_SCORE' ? ['bant_budget','bant_authority','bant_need','bant_timeline','rationale'] : s.kind==='DISQUALIFY' ? ['reason','note'] : [];
+  const isEdited = Object.entries(edits).some(([key,value])=>{
+    if(!editable.includes(key)) return false;
+    if(key.startsWith('bant_')) return Number(value)!==Number(payload.scores?.[key.slice(5)]);
+    return value!==String(payload[key] ?? '');
+  });
   const emailHolder: { current: EmailToSend | null } = { current: null };
 
   tx(() => {
@@ -185,7 +191,7 @@ export function approveSuggestion(actor: Actor, id: number, edits: Record<string
         const scores = Object.fromEntries(
           BANT_KEYS.map((k) => [k, edits[`bant_${k}`] !== undefined ? Number(edits[`bant_${k}`]) : p.scores[k]]),
         ) as Record<BantKey, number>;
-        const total = updateBant(actor, s.entity_id, scores, edits.rationale ?? p.rationale);
+        const {totalScore:total} = scoreBant(actor,s.entity_id,{...scores,notes:edits.rationale ?? p.rationale});
         result = `Đã cập nhật BANT = ${total}/100`;
         break;
       }
@@ -205,7 +211,7 @@ export function approveSuggestion(actor: Actor, id: number, edits: Record<string
         break;
       }
       case "DISQUALIFY": {
-        disqualifyLead(actor, s.entity_id, edits.reason ?? (payload as DisqualifyPayload).reason);
+        disqualifyLeadWithReason(actor, s.entity_id, edits.reason ?? (payload as DisqualifyPayload).reason,edits.note);
         result = "Đã loại Lead theo đề xuất";
         break;
       }
@@ -215,7 +221,7 @@ export function approveSuggestion(actor: Actor, id: number, edits: Record<string
       }
     }
 
-    const finalStatus = isEdited ? "APPROVED" : "APPROVED";
+    const finalStatus = isEdited ? "EDITED" : "APPROVED";
     run(
       "UPDATE ai_suggestions SET status=?, reviewed_by=?, reviewed_at=datetime('now'), review_note=?, edited_payload_json=? WHERE id=?",
       finalStatus,

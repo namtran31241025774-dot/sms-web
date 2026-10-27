@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { requirePermission } from "@/lib/auth";
 import { Badge, CommandBar, CommandLink, PageTitle, StatusBadge } from "@/components/ui";
 import { all } from "@/lib/db";
 import { INVOICE_STATUS } from "@/lib/domain";
@@ -20,7 +21,7 @@ export default async function InvoiceDetailPage(props: {
 }) {
   const params = await props.params;
   const invoiceId = Number(params.id);
-  const invoice = getInvoice(invoiceId);
+  const invoice = getInvoice(invoiceId, await requirePermission('invoice.read'));
 
   if (!invoice) {
     notFound();

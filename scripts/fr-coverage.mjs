@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { testCodes } from './test-codes.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -45,7 +46,7 @@ for (const f of testFiles) {
   const relPath = path.relative(rootDir, f);
 
   // Check FR-xx
-  const frMatches = content.match(/FR-\d{2,3}/g) || [];
+  const frMatches = testCodes(content).filter(code=>code.startsWith('FR-'));
   for (const m of frMatches) {
     if (frMap.has(m)) {
       if (!frMap.get(m).includes(relPath)) frMap.get(m).push(relPath);
@@ -53,7 +54,7 @@ for (const f of testFiles) {
   }
 
   // Check HGx
-  const hgMatches = content.match(/HG[1-8]/g) || [];
+  const hgMatches = testCodes(content).filter(code=>code.startsWith('HG'));
   for (const m of hgMatches) {
     if (hgMap.has(m)) {
       if (!hgMap.get(m).includes(relPath)) hgMap.get(m).push(relPath);

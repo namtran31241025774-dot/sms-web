@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requirePermission } from "@/lib/auth";
 import { Badge, CommandBar, CommandLink, PageTitle } from "@/components/ui";
 import { QUOTE_STATUS } from "@/lib/domain";
 import { checkExpiredQuotes, listQuotes } from "@/lib/services/quotes";
@@ -7,6 +8,7 @@ export default async function QuotesPage(props: {
   searchParams: Promise<{ q?: string; status?: string; expiredOnly?: string }>;
 }) {
   const searchParams = await props.searchParams;
+  const user = await requirePermission('quote.read');
   const q = searchParams.q?.trim() || "";
   const status = searchParams.status?.trim() || "";
   const expiredOnly = searchParams.expiredOnly === "1";
@@ -15,6 +17,7 @@ export default async function QuotesPage(props: {
   checkExpiredQuotes();
 
   const quotes = listQuotes({
+    user,
     search: q,
     status: status || undefined,
     expiredOnly,

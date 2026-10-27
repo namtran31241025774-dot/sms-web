@@ -90,4 +90,14 @@ Mở http://localhost:3000. Muốn chạy giống môi trường test: `docker b
 
 ## Chưa kiểm
 
+### Lưu ý sửa lỗi 27/10/2026 (BUG-015, BUG-030, BUG-039)
+
+- Không dùng filesystem tạm thời của Render Free để lưu SQLite. Môi trường được hỗ trợ phải gắn volume lưu bền tại `/data`, đặt `SMS_DB_PATH=/data/sms.db`, và xác minh dữ liệu còn sau khi khởi động lại. Nếu chưa có volume thì chỉ dùng bản đó để demo bỏ dữ liệu; không coi là môi trường lưu trữ ổn định. Phiên sửa này **không mua dịch vụ, không cấu hình hay deploy lại bản public**.
+- Container không ghi cứng `SMS_AI_MODE`. Đặt `mock` để test không tốn phí. Chạy thật cần API key, `llm_allowed_models` và phiên bản cấu hình hợp lệ; không tự chạy trả phí trong phiên sửa lỗi.
+- `SMS_DEMO_LOGIN` mặc định tắt. Chỉ đặt `true` khi chủ động demo local; không bật trên bản public. Mật khẩu và tài khoản không được in trên trang đăng nhập.
+- Bốn API POST: `/api/integrations/web-leads`, `/email`, `/payments`, `/accounting`. Mỗi yêu cầu cần `x-api-key: INTEGRATION_API_KEY`, `idempotency-key` và JSON đúng schema trong route. Cùng khóa/cùng dữ liệu trả lại kết quả cũ; cùng khóa/khác dữ liệu trả 409. Không gửi khóa trong URL.
+- Cron: `/api/cron/agents` (GET/POST) dùng `x-api-key: CRON_API_KEY`, mặc định từ chối nếu chưa cấu hình. Đặt cùng khóa trong server và tiến trình `node scripts/cron.mjs --watch`; script gọi mỗi phút, không chồng lần đang chạy. Chạy một lượt bằng `node scripts/cron.mjs`.
+- Trigger được đăng ký qua instrumentation của Next.js; tác vụ bắt đầu sau commit. Rollback không tạo lần chạy. Sửa trường trọng yếu đặt thời điểm làm mới sau 2 phút; scheduler xử lý khi đến hạn và làm mới định kỳ theo `opp_refresh_hours`.
+- Kết quả cổng thanh toán chỉ ghi giao dịch chờ đối soát. Chỉ kế toán hoặc callback ERP đã xác thực mới phân bổ; không tự đổi hóa đơn thành đã trả khi cổng báo thành công.
+
 Lệnh `docker build` và cấu hình Railway chưa được chạy thử trên máy này (máy chưa có Docker). CI GitHub Actions dùng đúng các lệnh `tsc`, `eslint`, `next build` đã chạy qua trên máy ngày 19/10/2026.

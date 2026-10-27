@@ -69,11 +69,7 @@ export async function authenticateWithPassword(email: string, password: string):
   }
 
   // Xác thực mật khẩu qua scrypt
-  if (row.password_hash) {
-    if (!verifyPassword(password, row.password_hash)) {
-      return null;
-    }
-  }
+  if (!row.password_hash || !verifyPassword(password, row.password_hash)) return null;
 
   return {
     id: row.id,

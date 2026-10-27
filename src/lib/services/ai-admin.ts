@@ -83,9 +83,9 @@ export type AiFeedbackRecord = {
  * - Tỷ lệ con người chỉnh sửa (BR-26)
  */
 export function getAiMonitoringStats() {
-  const dailyBudget = settingNumber("ai_daily_token_budget") || 200000;
-  const alertThresholdPct = settingNumber("ai_alert_failure_rate_pct") || 20;
-  const minRunsForAlert = settingNumber("ai_alert_min_runs") || 5;
+  const dailyBudget = settingNumber("ai_daily_token_budget");
+  const alertThresholdPct = settingNumber("ai_alert_failure_rate_pct");
+  const minRunsForAlert = settingNumber("ai_alert_min_runs");
 
   // 1. Token tiêu thụ trong ngày hôm nay (cộng input + output)
   const tokenUsage = get<{ total_tokens: number; qual_tokens: number; opp_tokens: number }>(`
@@ -222,7 +222,7 @@ export function getAiRunDetail(runId: number) {
  * Chuyển trạng thái RUNNING -> FAILED với lỗi "Quá thời gian" (BR-23, FR-94)
  */
 export function cleanTimedOutRuns() {
-  const timeoutSec = settingNumber("ai_run_timeout_sec") || 300;
+  const timeoutSec = settingNumber("ai_run_timeout_sec");
 
   const timedOut = all<{ id: number; agent: string }>(`
     SELECT id, agent FROM ai_runs
@@ -306,7 +306,7 @@ export function createConfigDraft(
   assert(can(actor.role, "ai.config.write"), "Chỉ AI_MANAGER được tạo cấu hình kỹ thuật Agent");
 
   // Kiểm tra model có trong danh sách được phép không (BR-25)
-  const allowedModels = (setting("llm_allowed_models") || "gpt-4o-2024-08-06,gpt-4o-mini-2024-07-18")
+  const allowedModels = setting("llm_allowed_models")
     .split(",")
     .map((m) => m.trim());
   assert(allowedModels.includes(input.modelReference), `Model '${input.modelReference}' không nằm trong danh mục cho phép (BR-25)`);
@@ -415,6 +415,10 @@ export function setAiEmergencyStatus(actor: Actor, status: "ACTIVE" | "PAUSED") 
  * - Cảnh báo khi đạt 80% hoặc 100% (BR-23)
  */
 export function checkPreRunConstraints(agent: "QUALIFICATION" | "OPPORTUNITY"): { ok: boolean; reason?: string } {
+  const warnOnce = (threshold: string) => {
+    const message = `[Cảnh báo AI] ${agent} chạm ${threshold}% ngân sách ngày`;
+    if (!get("SELECT id FROM notifications WHERE message=? AND date(created_at)=date('now')",message)) notifyRole("AI_MANAGER",message);
+  };
   // 1. Kiểm tra Kill switch
   const aiStatus = setting("ai_status");
   if (aiStatus === "PAUSED" || setting("ai_emergency_kill") === "true") {
@@ -422,8 +426,8 @@ export function checkPreRunConstraints(agent: "QUALIFICATION" | "OPPORTUNITY"): 
   }
 
   // 2. Kiểm tra ngân sách token trong ngày
-  const dailyBudget = settingNumber("ai_daily_token_budget") || 200000;
-  const warnPct = settingNumber("ai_budget_warn_pct") || 80;
+  const dailyBudget = settingNumber("ai_daily_token_budget");
+  const warnPct = settingNumber("ai_budget_warn_pct");
 
   const usage = get<{ total: number }>(`
     SELECT COALESCE(SUM(input_tokens + output_tokens), 0) AS total
@@ -433,13 +437,13 @@ export function checkPreRunConstraints(agent: "QUALIFICATION" | "OPPORTUNITY"): 
 
   if (usage >= dailyBudget) {
     // Đã đạt 100%: chặn lần chạy mới
-    notifyRole("AI_MANAGER", `[Cảnh báo AI] ${agent} đã chạm 100% ngân sách ngày (${usage}/${dailyBudget} tokens). Chặn lần chạy mới!`);
+    warnOnce("100");
     return { ok: false, reason: `Đã hết ngân sách token hàng ngày của ${agent} (${usage}/${dailyBudget} tokens)` };
   }
 
   if (usage >= (dailyBudget * warnPct) / 100) {
     // Đạt 80%: cảnh báo nhưng vẫn cho chạy
-    notifyRole("AI_MANAGER", `[Cảnh báo AI] ${agent} đã tiêu thụ ${Math.round((usage / dailyBudget) * 100)}% ngân sách token ngày (${usage}/${dailyBudget})`);
+    warnOnce(String(warnPct));
   }
 
   return { ok: true };
@@ -492,7 +496,8 @@ export function getAiEffectivenessReport() {
       COUNT(*) AS total_approved,
       SUM(CASE WHEN edited_by_human = 1 THEN 1 ELSE 0 END) AS edited_by_human
     FROM email_messages
-    WHERE suggestion_id IS NOT NULL
+    WHERE suggestion_id IS NOT NULL AND status IN ('APPROVED','SENT','FAILED')
+      AND date(approved_at)>=date('now','weekday 0','-6 days')
   `) ?? { total_approved: 0, edited_by_human: 0 };
 
   const emailEditRate = emailStats.total_approved > 0
@@ -506,6 +511,7 @@ export function getAiEffectivenessReport() {
       COUNT(*) AS total,
       SUM(CASE WHEN status='REJECTED' THEN 1 ELSE 0 END) AS rejected
     FROM ai_suggestions
+    WHERE status IN ('APPROVED','EDITED','REJECTED') AND date(reviewed_at)>=date('now','weekday 0','-6 days')
     GROUP BY kind
   `);
 

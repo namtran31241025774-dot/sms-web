@@ -296,8 +296,12 @@ describe("WP-06: Theo dõi Hóa đơn & Thanh toán (FR-64 → FR-74, HG8)", () 
       expect(cb.success).toBe(true);
 
       const updatedInv = getInvoice(invId);
-      expect(updatedInv?.paid_amount).toBe(8000000);
-      expect(updatedInv?.status).toBe("PAID");
+      expect(updatedInv?.paid_amount).toBe(0);
+      expect(updatedInv?.status).toBe("ISSUED");
+      const gatewayPayment = db().prepare("SELECT id,reconciliation_status FROM payments WHERE reference=?").get(`GATEWAY-${req.paymentCode}`) as {id:number;reconciliation_status:string};
+      expect(gatewayPayment.reconciliation_status).toBe("UNMATCHED");
+      allocatePayment(financeActor,gatewayPayment.id,[{invoiceId:invId,amount:8000000}]);
+      expect(getInvoice(invId)?.status).toBe("PAID");
     });
   });
 

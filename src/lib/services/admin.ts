@@ -131,7 +131,8 @@ export function createUser(
   }
 
   // Khởi tạo mật khẩu
-  const rawPassword = data.password?.trim() || "Password123!";
+  // No shared default. An administrator can issue a one-time reset token via FR-97.
+  const rawPassword = data.password?.trim() || crypto.randomBytes(32).toString("base64url");
   const passwordHash = hashPassword(rawPassword);
 
   const teamId = data.team_id ?? null;

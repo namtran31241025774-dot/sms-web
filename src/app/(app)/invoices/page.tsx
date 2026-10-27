@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { requirePermission } from "@/lib/auth";
+import { recordVisible } from "@/lib/services/access";
 import { CommandBar, CommandLink, PageTitle, StatusBadge } from "@/components/ui";
 import { INVOICE_STATUS } from "@/lib/domain";
 import { getDunningReport, isOverdueInvoice, listInvoices } from "@/lib/services/invoices";
@@ -8,15 +10,17 @@ export default async function InvoicesPage(props: {
   searchParams: Promise<{ q?: string; status?: string }>;
 }) {
   const searchParams = await props.searchParams;
+  const user = await requirePermission('invoice.read');
   const q = searchParams.q?.trim() || "";
   const status = searchParams.status?.trim() || "";
 
   const invoices = listInvoices({
+    user,
     search: q,
     status: status || undefined,
   });
 
-  const dunningReports = getDunningReport();
+  const dunningReports = getDunningReport().filter(r=>recordVisible(user,'invoice',r.invoice.id));
 
   const statusFilters = [
     { label: "Tất cả", value: "" },

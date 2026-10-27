@@ -3,7 +3,7 @@
 import { all, get, run, tx } from "../db";
 import { assert } from "../domain";
 import { erp, paymentGateway } from "../integrations";
-import { actorUserId, audit, notify, type Actor } from "./core";
+import { actorUserId, audit, notifyRole, type Actor } from "./core";
 import { getInvoice } from "./invoices";
 
 export type PaymentMethod = "BANK_TRANSFER" | "CASH" | "GATEWAY";
@@ -127,6 +127,7 @@ export function recordPayment(
   input: {
     accountId: number;
     amount: number;
+    currency?: string;
     paidAt: string;
     method?: PaymentMethod | string;
     reference?: string | null;
@@ -149,18 +150,15 @@ export function recordPayment(
   }
 
   return tx(() => {
-    const targetInvoiceId =
-      input.invoiceAllocations?.[0]?.invoiceId ||
-      get<{ id: number }>("SELECT id FROM invoices WHERE account_id = ? ORDER BY id DESC LIMIT 1", input.accountId)?.id ||
-      1;
+    assert(get("SELECT id FROM accounts WHERE id=?",input.accountId), "Không tìm thấy doanh nghiệp");
 
     const paymentId = run(
       `INSERT INTO payments (
         account_id, invoice_id, amount, paid_at, method, reference,
-        external_transaction_id, source, recorded_by, reconciliation_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'UNMATCHED')`,
+        external_transaction_id, source, recorded_by, reconciliation_status, currency
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'UNMATCHED', ?)`,
       input.accountId,
-      targetInvoiceId,
+      null,
       input.amount,
       input.paidAt,
       input.method || "BANK_TRANSFER",
@@ -168,6 +166,7 @@ export function recordPayment(
       input.externalTransactionId || null,
       input.source || "USER",
       actorUserId(actor),
+      input.currency || "VND",
     ).id;
 
     audit(actor, "payment", paymentId, "RECORD", {
@@ -196,6 +195,7 @@ export function allocatePayment(
   paymentId: number,
   allocations: Array<{ invoiceId: number; amount: number }>,
 ): void {
+  assert((actor.type === "USER" && actor.role === "FINANCE") || (actor.type==='INTEGRATION' && actor.name==='ERP'), "Chỉ Tài chính – Kế toán hoặc kết quả đối soát ERP được xác nhận phân bổ");
   const p = getPayment(paymentId);
   assert(p, "Không tìm thấy khoản thanh toán");
   assert(allocations && allocations.length > 0, "Danh sách phân bổ không được rỗng");
@@ -203,12 +203,19 @@ export function allocatePayment(
   const unallocatedAmount = p.amount - p.allocated_amount;
   let totalRequestedAllocation = 0;
 
+  const requestedByInvoice = new Map<number, number>();
   for (const alloc of allocations) {
     assert(alloc.amount > 0, "Số tiền phân bổ phải lớn hơn 0");
     totalRequestedAllocation += alloc.amount;
 
     const inv = getInvoice(alloc.invoiceId);
     assert(inv, `Không tìm thấy hóa đơn ID #${alloc.invoiceId}`);
+    assert(inv.account_id === p.account_id, "Hóa đơn và thanh toán phải cùng doanh nghiệp");
+    const currency = get<{currency:string}>("SELECT currency FROM orders WHERE id=?",inv.order_id)?.currency;
+    assert(currency === p.currency, "Hóa đơn và thanh toán phải cùng loại tiền");
+    const requested = (requestedByInvoice.get(inv.id) ?? 0) + alloc.amount;
+    requestedByInvoice.set(inv.id, requested);
+    assert(requested <= inv.amount - inv.paid_amount, "Tổng phân bổ lặp vượt số dư hóa đơn");
     assert(inv.status === "ISSUED" || inv.status === "PARTIALLY_PAID", `Hóa đơn ${inv.code} chưa phát hành hoặc đã thanh toán đủ`);
     const unpaid = inv.amount - inv.paid_amount;
     assert(alloc.amount <= unpaid, `Số tiền phân bổ (${alloc.amount.toLocaleString("vi-VN")} ₫) vượt quá số dư còn phải thu của hóa đơn ${inv.code} (${unpaid.toLocaleString("vi-VN")} ₫)`);
@@ -356,6 +363,8 @@ export function handleOnlinePaymentCallback(
     code,
   );
   assert(req, `Không tìm thấy yêu cầu thanh toán với mã ${code}`);
+  if (req.status === "SUCCESS") return { success: true, message: "Giao dịch đã được ghi nhận, chờ đối soát" };
+  assert(req.status === "PENDING", "Yêu cầu thanh toán đã kết thúc");
 
   return tx(() => {
     paymentGateway.simulateCallback(code, status);
@@ -380,11 +389,12 @@ export function handleOnlinePaymentCallback(
         method: "GATEWAY",
         reference: `GATEWAY-${code}`,
         externalTransactionId: `TXN-${code}`,
-        source: "ERP",
-        invoiceAllocations: [{ invoiceId: req.invoice_id, amount: req.amount }],
+        source: "GATEWAY",
+        currency: get<{currency:string}>("SELECT currency FROM orders WHERE id=?",inv.order_id)?.currency,
       });
+      run("UPDATE payments SET gateway_status='SUCCESS' WHERE id=?",payId);
 
-      notify(null, `Cổng thanh toán online đã ghi nhận thành công ${req.amount.toLocaleString("vi-VN")} VND cho hóa đơn ${inv.code}`, `/invoices/${inv.id}`);
+      notifyRole("FINANCE", `Cổng thanh toán ghi nhận giao dịch cho hóa đơn ${inv.code}; cần đối soát trước khi phân bổ`, `/invoices/${inv.id}`);
       return { success: true, message: `Thanh toán thành công ${req.amount.toLocaleString("vi-VN")} VND (Mã GD: ${payId})` };
     }
 

@@ -276,7 +276,7 @@ describe("WP-09: Quản trị hệ thống & Phân quyền (FR-96 → FR-100)", 
       const salesFilter = scopeFilterSql(salesUser);
       expect(salesFilter.sql).toContain("owner_id = ?");
       expect(salesFilter.sql).toContain("team_id IN (?)");
-      expect(salesFilter.params).toEqual([1, 1, 10]);
+      expect(salesFilter.params).toEqual([1, 10]);
 
       const adminFilter = scopeFilterSql({ id: 8, role: "ADMIN" });
       expect(adminFilter.sql).toBe("1=1");

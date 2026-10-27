@@ -17,13 +17,15 @@ export class OpenAiProvider implements LlmProvider {
       model?: string;
       maxTokens?: number;
       temperature?: number;
+      timeoutMs?: number;
     },
   ): Promise<LlmResponse> {
     if (!this.apiKey) {
       throw new Error("OPENAI_API_KEY chưa được cấu hình");
     }
 
-    const model = options?.model || "gpt-4o-2024-08-06";
+    const model = options?.model;
+    if (!model) throw new Error("Chưa chọn model được phép");
     const body: Record<string, unknown> = {
       model,
       messages: messages.map((m) => ({
@@ -43,6 +45,7 @@ export class OpenAiProvider implements LlmProvider {
     }
 
     const res = await fetch(`${this.baseUrl}/chat/completions`, {
+      signal: AbortSignal.timeout(Math.max(1,Math.floor(options?.timeoutMs ?? 300000))),
       method: "POST",
       headers: {
         "Content-Type": "application/json",

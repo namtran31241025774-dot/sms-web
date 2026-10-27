@@ -32,30 +32,25 @@ export function canSee(
 
   // Quản lý kinh doanh (SALES_MANAGER): thấy nếu trong nhóm quản lý hoặc nếu là quản lý chung
   if (user.role === "SALES_MANAGER") {
-    if (managedTeamIds.length === 0) return true; // Quản lý chung
-    if (record.team_id && managedTeamIds.includes(record.team_id)) return true;
-    if (record.owner_id === user.id || record.created_by === user.id) return true;
-    return true;
+    return Boolean(record.team_id && (managedTeamIds.length ? managedTeamIds : user.teamIds ?? []).includes(record.team_id));
   }
 
   // Chuyên viên tư vấn (PRESALES / PRESALES_MANAGER)
   if (user.role === "PRESALES" || user.role === "PRESALES_MANAGER") {
     if (record.presales_id && record.presales_id === user.id) return true;
-    if (record.owner_id === user.id || record.created_by === user.id) return true;
-    return true;
+    if (record.team_id && user.teamIds?.includes(record.team_id)) return true;
+    return record.owner_id === user.id;
   }
 
   // Nhân viên kinh doanh (SALES): hồ sơ mình phụ trách, tạo, hoặc cùng Sale Pod
   if (user.role === "SALES") {
     if (record.owner_id && record.owner_id === user.id) return true;
-    if (record.created_by && record.created_by === user.id) return true;
     if (record.team_id && user.teamIds && user.teamIds.includes(record.team_id)) return true;
     // Nếu hồ sơ chưa gán phụ trách
-    if (!record.owner_id && !record.team_id) return true;
     return false;
   }
 
-  return true;
+  return false;
 }
 
 /**
@@ -67,28 +62,28 @@ export function scopeFilterSql(
 ): { sql: string; params: (number | string)[] } {
   const prefix = tablePrefix ? `${tablePrefix}.` : "";
 
-  if (user.role === "ADMIN" || user.role === "FINANCE" || user.role === "SALES_MANAGER") {
+  if (user.role === "ADMIN" || user.role === "FINANCE") {
     return { sql: "1=1", params: [] };
   }
 
   if (user.role === "PRESALES" || user.role === "PRESALES_MANAGER") {
     return {
-      sql: `(${prefix}presales_id = ? OR ${prefix}owner_id = ? OR ${prefix}created_by = ? OR 1=1)`,
-      params: [user.id, user.id, user.id],
+      sql: `(${prefix}presales_id = ? OR ${prefix}owner_id = ?)`,
+      params: [user.id, user.id],
     };
   }
 
-  if (user.role === "SALES") {
+  if (user.role === "SALES" || user.role === "SALES_MANAGER") {
     const teamClause = user.teamIds && user.teamIds.length > 0
       ? ` OR ${prefix}team_id IN (${user.teamIds.map(() => "?").join(",")})`
       : "";
     const teamParams = user.teamIds ?? [];
 
     return {
-      sql: `(${prefix}owner_id = ? OR ${prefix}created_by = ?${teamClause} OR ${prefix}owner_id IS NULL)`,
-      params: [user.id, user.id, ...teamParams],
+      sql: user.role === "SALES" ? `(${prefix}owner_id = ?${teamClause})` : (teamClause ? `(${prefix}team_id IN (${teamParams.map(()=>'?').join(',')}))` : '0=1'),
+      params: user.role === "SALES" ? [user.id,...teamParams] : teamParams,
     };
   }
 
-  return { sql: "1=1", params: [] };
+  return { sql: "0=1", params: [] };
 }

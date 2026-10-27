@@ -41,11 +41,11 @@ const MATRIX = {
   "order.create": ["SALES", "SALES_MANAGER"],
   "order.create_direct": ["SALES_MANAGER"],
   "order.write": ["SALES", "SALES_MANAGER"],
-  "fulfillment.update": ["DELIVERY", "SALES"],
+  "fulfillment.update": ["SALES", "SALES_MANAGER"],
 
   // 5.0 Hoá đơn & Thanh toán
   "invoice.read": ["SALES", "SALES_MANAGER", "FINANCE"],
-  "invoice.create": ["SALES", "FINANCE"],
+  "invoice.create": ["FINANCE"],
   "invoice.write": ["FINANCE"],
   "invoice.finance": ["FINANCE"],
   "payment.read": ["SALES", "SALES_MANAGER", "FINANCE"],

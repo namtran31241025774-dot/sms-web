@@ -1,3 +1,4 @@
+import { assertActorAccess } from "./access";
 // Quản lý rủi ro cơ hội (FR-43, HG5)
 import { all, get, run, tx } from "../db";
 import { assert } from "../domain";
@@ -57,6 +58,7 @@ export function addRisk(
   opportunityId: number,
   input: { description: string; severity?: RiskSeverity; source?: "USER" | "AI" },
 ): { id: number } {
+  assertActorAccess(actor, "opportunity", opportunityId);
   assert(input.description?.trim(), "Mô tả rủi ro không được để trống");
   const severity: RiskSeverity = input.severity ?? "MEDIUM";
   const source = input.source ?? "USER";
@@ -85,6 +87,7 @@ export function updateRiskStatus(
   status: RiskStatus,
   opts?: { resolution?: string; dismiss_reason?: string },
 ): void {
+  assertActorAccess(actor, "opportunity", opportunityId);
   const risk = getRisk(riskId);
   assert(risk, "Không tìm thấy rủi ro");
   assert(risk.opportunity_id === opportunityId, "Rủi ro không thuộc cơ hội này");

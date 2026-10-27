@@ -1,12 +1,37 @@
 // Chế độ mô phỏng (không cần API key): Agent đi theo kịch bản cố định, dùng ĐÚNG các công cụ
 // và kiểm tra quyền như khi chạy bằng Claude, nên luồng kiểm duyệt/log giống hệt bản thật.
 import { stripAccents } from "../domain";
+import { get } from "../db";
 import { invokeTool, type ToolCallLog, type ToolContext } from "./tools";
 
 type Research = { untrusted_data: true; data: { title: string; snippet: string; source: string }[] };
 type Wrapped<T> = { data: T };
 
 const has = (text: string, ...words: string[]) => words.some((w) => text.includes(w));
+
+// Mock fixtures cite actual source excerpts, never a paraphrase presented as a quotation.
+function groundedMockInput(ctx: ToolContext, input: unknown): unknown {
+  if (Array.isArray(input)) return input.map(v=>groundedMockInput(ctx,v));
+  if (!input || typeof input !== 'object') return input;
+  const data = Object.fromEntries(Object.entries(input).map(([k,v])=>[k,groundedMockInput(ctx,v)]));
+  if (typeof data.ref === 'string') {
+    if (data.ref === 'web_research') data.ref = ctx.entityType === 'lead' ? 'lead.company_name' : 'opportunity.name';
+    const ref = data.ref as string;
+    let content = '';
+    if (ref.startsWith(ctx.entityType+'.')) {
+      const row=get<Record<string,unknown>>(`SELECT * FROM ${ctx.entityType === 'lead' ? 'leads' : 'opportunities'} WHERE id=?`,ctx.entityId);
+      content=String(row?.[ref.slice(ctx.entityType.length+1)] ?? '');
+    } else if (ref.startsWith('activity:')) {
+      const row=get<{subject:string;body:string}>('SELECT subject,body FROM activities WHERE id=?',Number(ref.slice(9)));
+      content=`${row?.subject ?? ''}\n${row?.body ?? ''}`;
+    } else {
+      const source=ctx.webSources?.find(s=>s.source === ref);
+      content=source ? `${source.title}\n${source.snippet}` : '';
+    }
+    data.quote=content.slice(0,180);
+  }
+  return data;
+}
 
 function industryFrom(text: string): string | null {
   if (has(text, "thep")) return "Sản xuất – Thép";
@@ -17,7 +42,7 @@ function industryFrom(text: string): string | null {
 }
 
 export function mockQualificationAgent(ctx: ToolContext, log: ToolCallLog[]): string {
-  const call = (name: string, input: unknown = {}) => invokeTool(ctx, name, input, log);
+  const call = (name: string, input: unknown = {}) => invokeTool(ctx, name, groundedMockInput(ctx,input), log);
 
   const lead = call("get_lead") as {
     company_name: string; contact_title: string | null; email: string | null; industry: string | null;
@@ -143,7 +168,7 @@ export function mockQualificationAgent(ctx: ToolContext, log: ToolCallLog[]): st
 }
 
 export function mockOpportunityAgent(ctx: ToolContext, log: ToolCallLog[]): string {
-  const call = (name: string, input: unknown = {}) => invokeTool(ctx, name, input, log);
+  const call = (name: string, input: unknown = {}) => invokeTool(ctx, name, groundedMockInput(ctx,input), log);
 
   const o = call("get_opportunity") as {
     code: string; account: string; stage: string; amount_vnd: number; close_date: string | null;

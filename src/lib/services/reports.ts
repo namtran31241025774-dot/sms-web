@@ -1,5 +1,6 @@
 import { all } from "../db";
 import { OPP_STAGE } from "../domain";
+import { settingNumber } from "./core";
 
 export interface StageSummary {
   stage: string;
@@ -65,6 +66,8 @@ export const STAGE_PROBABILITIES: Record<string, number> = {
  * Tổng hợp báo cáo phễu cơ hội và dự báo doanh số theo BR-14 (FR-99).
  */
 export function getPipelineFunnelReport(filter?: PipelineFilter): PipelineReport {
+  const probabilities: Record<string,number> = {...STAGE_PROBABILITIES,
+    DEVELOP:settingNumber('forecast_prob_develop'),PROPOSE:settingNumber('forecast_prob_propose'),CLOSE:settingNumber('forecast_prob_close')};
   const where: string[] = ["1=1"];
   const params: (string | number)[] = [];
 
@@ -107,7 +110,7 @@ export function getPipelineFunnelReport(filter?: PipelineFilter): PipelineReport
     const found = rawStages.find((s) => s.stage === stageKey);
     const count = found?.count ?? 0;
     const totalAmount = found?.total_amount ?? 0;
-    const probabilityPct = STAGE_PROBABILITIES[stageKey] ?? 0;
+    const probabilityPct = probabilities[stageKey] ?? 0;
     const weightedAmount = Math.round((totalAmount * probabilityPct) / 100);
 
     return {

@@ -1,5 +1,6 @@
 import { all, get, run, tx } from "@/lib/db";
 import { settingNumber, audit, type Actor } from "./core";
+import { assert } from "../domain";
 
 function makeActor(userId?: number): Actor {
   if (userId) {
@@ -226,16 +227,23 @@ export function getPerformanceSummary(params: {
   const target = get<SalesTarget>(targetSql, ...targetParams);
   const targetAmount = target?.target_amount ?? 0;
   const targetDeals = target?.target_deals ?? 0;
+  const match=/^(\d{4})(?:-(?:Q([1-4])|(0[1-9]|1[0-2])))?$/.exec(params.periodName);
+  assert(match,'Kỳ chỉ tiêu không hợp lệ');
+  const year=Number(match[1]), month=match[2] ? (Number(match[2])-1)*3 : match[3] ? Number(match[3])-1 : 0;
+  const months=match[2] ? 3 : match[3] ? 1 : 12;
+  const start=new Date(Date.UTC(year,month,1)).toISOString().slice(0,10);
+  const end=new Date(Date.UTC(year,month+months,1)).toISOString().slice(0,10);
 
   // 2. Doanh số thực tế từ cơ hội thắng (WON) hoặc đơn hàng
   let wonSql = `
     SELECT
-      COALESCE(SUM(o.amount), 0) as actual_revenue,
+      COALESCE(SUM(ord.value), 0) as actual_revenue,
       COUNT(o.id) as actual_deals
     FROM opportunities o
-    WHERE o.stage = 'WON'
+    JOIN (SELECT opportunity_id,SUM(COALESCE(NULLIF(grand_total,0),total)) value FROM orders WHERE status!='CANCELLED' GROUP BY opportunity_id) ord ON ord.opportunity_id=o.id
+    WHERE o.stage = 'WON' AND date(o.closed_at)>=? AND date(o.closed_at)<?
   `;
-  const wonParams: (string | number)[] = [];
+  const wonParams: (string | number)[] = [start,end];
 
   if (params.userId) {
     wonSql += " AND o.owner_id = ?";
@@ -255,9 +263,9 @@ export function getPerformanceSummary(params: {
   const dealsCompletionPct = targetDeals > 0 ? (actualWonDeals / targetDeals) * 100 : 0;
 
   // 3. Tính dự báo doanh số bán hàng (BR-14)
-  const probDevelop = (settingNumber("forecast_prob_develop") || 20) / 100;
-  const probPropose = (settingNumber("forecast_prob_propose") || 50) / 100;
-  const probClose = (settingNumber("forecast_prob_close") || 80) / 100;
+  const probDevelop = (settingNumber("forecast_prob_develop")) / 100;
+  const probPropose = (settingNumber("forecast_prob_propose")) / 100;
+  const probClose = (settingNumber("forecast_prob_close")) / 100;
 
   let openSql = `
     SELECT stage, amount

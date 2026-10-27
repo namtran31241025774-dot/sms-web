@@ -32,8 +32,9 @@ export async function passwordLoginAction(_prevState: LoginState | undefined, fd
  * Đăng nhập demo nhanh (chọn tài khoản đại diện vai trò).
  */
 export async function loginAction(fd: FormData) {
+  if (process.env.SMS_DEMO_LOGIN !== "true") redirect("/login");
   const id = Number(fd.get("userId"));
-  if (!get("SELECT id FROM users WHERE id = ? AND active = 1", id)) redirect("/login");
+  if (!get("SELECT id FROM users WHERE id = ? AND active = 1 AND status = 'ACTIVE'", id)) redirect("/login");
   await signIn(id);
   redirect("/");
 }

@@ -1,3 +1,4 @@
+import { assertActorAccess } from "./access";
 import { get, nextCode, run, tx } from "../db";
 import { assert, type Role } from "../domain";
 import { actorUserId, audit, settingBool, settingNumber, type Actor } from "./core";
@@ -77,6 +78,7 @@ export function calculateLeadRating(
  * Ghi nhận kết quả khảo sát sơ bộ nhu cầu khách hàng (FR-30).
  */
 export function recordSurvey(actor: Actor, leadId: number, data: SurveyInput) {
+  assertActorAccess(actor, "lead", leadId);
   const lead = get<{ id: number; status: string }>("SELECT id, status FROM leads WHERE id = ?", leadId);
   assert(lead, "Không tìm thấy khách hàng tiềm năng (Lead)");
   assert(lead.status !== "CONVERTED" && lead.status !== "DISQUALIFIED", "Lead đã đóng hoặc đã chuyển đổi");
@@ -122,6 +124,7 @@ export function recordSurvey(actor: Actor, leadId: number, data: SurveyInput) {
  * Đánh giá sàng lọc theo tiêu chí BANT (FR-31, BR-01, BR-02).
  */
 export function scoreBant(actor: Actor, leadId: number, input: BantScoresInput): { totalScore: number; rating: LeadRating } {
+  assertActorAccess(actor, "lead", leadId);
   const lead = get<{ id: number; status: string }>("SELECT id, status FROM leads WHERE id = ?", leadId);
   assert(lead, "Không tìm thấy khách hàng tiềm năng");
   assert(lead.status !== "CONVERTED" && lead.status !== "DISQUALIFIED", "Lead đã đóng");
@@ -133,8 +136,8 @@ export function scoreBant(actor: Actor, leadId: number, input: BantScoresInput):
   const t = clamp(input.timeline);
   const totalScore = b + a + n + t;
 
-  const threshold = settingNumber("bant_threshold") || 60;
-  const warmMin = settingNumber("lead_rating_warm_min") || 40;
+  const threshold = settingNumber("bant_threshold");
+  const warmMin = settingNumber("lead_rating_warm_min");
   const frame = input.timeline_frame || "UNKNOWN";
   const rating = calculateLeadRating(totalScore, a, frame, threshold, warmMin);
 
@@ -240,6 +243,7 @@ export function convertLeadToOpportunity(
   leadId: number,
   input: ConvertOpportunityInput,
 ): { opportunityId: number; opportunity_id: number; accountId: number; account_id: number; contactId: number; contact_id: number; code: string } {
+  assertActorAccess(actor, "lead", leadId);
   // Cổng HG3: Kiểm tra quyền kích hoạt chuyển đổi của con người
   if (actor.type === "AI") {
     assert(settingBool("ai_auto_convert"), "DEC-03: AI Agent không được phép tự động chuyển đổi Lead thành Cơ hội khi chưa có phê duyệt của con người");
@@ -261,9 +265,10 @@ export function convertLeadToOpportunity(
 
   assert(lead, "Không tìm thấy khách hàng tiềm năng");
   assert(lead.status === "OPEN" || lead.status === "WORKING", "Lead không ở trạng thái mở");
+  assert(lead.bant_authority > 0, "Chưa xác định người quyết định: Authority phải lớn hơn 0 để chuyển đổi");
 
   // Kiểm tra ngưỡng BANT
-  const threshold = settingNumber("bant_threshold") || 60;
+  const threshold = settingNumber("bant_threshold");
   assert(
     lead.bant_score >= threshold,
     `Lead có điểm BANT ${lead.bant_score} chưa đạt ngưỡng tối thiểu ${threshold} điểm để chuyển đổi`,
@@ -273,7 +278,7 @@ export function convertLeadToOpportunity(
 
   // Xác thực nhân viên kinh doanh nhận cơ hội
   const owner = get<{ id: number; role: Role }>(
-    "SELECT id, role FROM users WHERE id = ? AND active = 1 AND role IN ('SALES', 'SALES_MANAGER', 'ADMIN')",
+    "SELECT id, role FROM users WHERE id = ? AND active = 1 AND role IN ('SALES', 'SALES_MANAGER')",
     ownerId,
   );
   assert(owner, "Nhân viên kinh doanh nhận cơ hội không hợp lệ");
@@ -413,6 +418,7 @@ export function batchConvertLeads(
  * - Đề xuất loại từ Agent chỉ có hiệu lực sau khi con người xác nhận.
  */
 export function disqualifyLeadWithReason(actor: Actor, leadId: number, reason: string, note?: string) {
+  assertActorAccess(actor, "lead", leadId);
   assert(actor.type === "USER", "Chỉ con người mới có quyền xác nhận loại khách hàng (Cổng HG2)");
   assert(reason?.trim(), "Bắt buộc phải nhập lý do loại khách hàng");
 
@@ -444,6 +450,7 @@ export function disqualifyLeadWithReason(actor: Actor, leadId: number, reason: s
  * Giữ nguyên lịch sử, không tự khôi phục hồ sơ đã xóa.
  */
 export function reactivateDisqualifiedLead(actor: Actor, leadId: number, reason: string = "Tái kích hoạt khách hàng tiềm năng") {
+  assertActorAccess(actor, "lead", leadId);
   assert(reason?.trim(), "Bắt buộc phải nhập lý do tái kích hoạt khách hàng");
 
   const lead = get<{ id: number; status: string; deleted_at: string | null }>(

@@ -477,7 +477,7 @@ Công ty Lỗi Không Tên,,loi@test.com,,Thiếu tên`;
 
       // Kiểm tra lead nguồn bị đóng và gộp
       const sourceAfter = getLead(leadSource);
-      expect(sourceAfter?.status).toBe("DISQUALIFIED");
+      expect(sourceAfter?.status).toBe("OPEN");
       expect(sourceAfter?.merged_into_lead_id).toBe(leadTarget);
 
       // Kiểm tra interaction đã được chuyển sang leadTarget

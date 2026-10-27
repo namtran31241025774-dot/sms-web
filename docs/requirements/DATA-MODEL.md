@@ -107,6 +107,7 @@ Nguồn: mục 2.4.3 và tab *Phụ lục ERD* (mã Mermaid đầy đủ, 61 th�
 |---|---|
 | `settings` | Siêu dữ liệu: giá trị BR (BUSINESS-RULES) |
 | `notifications` | Thông báo trong ứng dụng; nhóm có thể bổ sung vào ERD nếu muốn |
+| `integration_requests` | Sổ kỹ thuật idempotency cho webhook (hash đầu vào và kết quả, không lưu khóa API); không phải thực thể Sales mới. Migration `wp10_001`. |
 | `fulfillment_tasks` | Bỏ dần, thay bằng `handovers`, `handover_items` (WP-05) |
 
 ## Phạm vi demo

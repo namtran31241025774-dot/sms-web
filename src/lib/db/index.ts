@@ -109,21 +109,29 @@ export function run(sql: string, ...params: Param[]): { id: number; changes: num
 }
 
 let depth = 0;
+let committedJobs: Array<()=>void> = [];
+export function afterCommit(job:()=>void) {
+  if(depth>0) committedJobs.push(job); else job();
+}
 export function tx<T>(fn: () => T): T {
   const d = db();
   if (depth > 0) return fn();
   depth++;
   d.exec("BEGIN IMMEDIATE");
+  let out:T;
   try {
-    const out = fn();
+    out = fn();
     d.exec("COMMIT");
-    return out;
   } catch (e) {
+    committedJobs=[];
     d.exec("ROLLBACK");
     throw e;
   } finally {
     depth--;
   }
+  const jobs=committedJobs; committedJobs=[];
+  for(const job of jobs) {try{job();}catch(e){console.error('After-commit callback failed',e);}}
+  return out;
 }
 
 /** Sinh mã nghiệp vụ dạng PREFIX-YYYY-0001 */

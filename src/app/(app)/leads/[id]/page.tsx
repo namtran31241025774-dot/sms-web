@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { BANT_KEYS, BANT_LABEL, DISQUALIFY_REASONS, formatDate, LEAD_SOURCE, LEAD_STATUS } from "@/lib/domain";
 import { can } from "@/lib/rbac";
 import { listRuns, listSuggestions } from "@/lib/services/ai-review";
@@ -31,15 +31,15 @@ import {
 } from "../actions";
 
 export async function generateMetadata({ params }: PageProps<"/leads/[id]">): Promise<Metadata> {
-  const lead = getLead(Number((await params).id));
+  const lead = getLead(Number((await params).id), await requirePermission('lead.read'));
   return { title: lead?.company_name ?? "Lead" };
 }
 
 export default async function LeadPage({ params, searchParams }: PageProps<"/leads/[id]">) {
-  const user = await requireUser();
+  const user = await requirePermission('lead.read');
   const leadId = Number((await params).id);
   const sp = (await searchParams) as { tab?: string; ok?: string; error?: string };
-  const lead = getLead(leadId);
+  const lead = getLead(leadId, user);
   if (!lead) notFound();
 
   const tab = sp.tab ?? "summary";

@@ -2,15 +2,15 @@
 // kết nối qua interface LlmProvider (OpenAI mặc định theo DEC-12) hoặc chế độ mock,
 // ghi lại mọi lần gọi công cụ, token, latency, chi phí và kết quả (BR-16, BR-24, DEC-27).
 import { get, run } from "../db";
+import { z } from "zod";
 import { DomainError } from "../domain";
 import { getLlmProvider, type LlmMessage, type LlmToolDefinition } from "../llm";
-import { settingBool, settingNumber } from "../services/core";
+import { setting, settingBool, settingNumber } from "../services/core";
 import { checkPreRunConstraints, getActiveAgentConfig } from "../services/ai-admin";
 import { invokeTool, TOOLS, toolsFor, type AgentName, type ToolCallLog, type ToolContext } from "./tools";
 import { mockOpportunityAgent, mockQualificationAgent } from "./mock";
 import { OPPORTUNITY_SYSTEM, QUALIFICATION_SYSTEM } from "./prompts";
 
-export const DEFAULT_OPENAI_MODEL = "gpt-4o-2024-08-06";
 
 export function agentMode(): "llm" | "mock" {
   if (process.env.SMS_AI_MODE === "mock") return "mock";
@@ -26,6 +26,13 @@ export async function runAgent(
   trigger: string,
   triggeredBy: number | null,
 ): Promise<RunResult> {
+  if((agent==='QUALIFICATION') !== (entity.type==='lead')) throw new DomainError('Agent không phù hợp loại hồ sơ');
+  const constraints=checkPreRunConstraints(agent);
+  if(!constraints.ok) throw new DomainError(constraints.reason || 'Không đủ điều kiện chạy Agent');
+  const running=get<{id:number}>("SELECT id FROM ai_runs WHERE agent=? AND entity_type=? AND entity_id=? AND status='RUNNING'",agent,entity.type,entity.id);
+  if(running) throw new DomainError('Hồ sơ đang có lần chạy Agent chưa hoàn thành');
+  const recent=get<{id:number;status:'SUCCEEDED'|'FAILED';summary:string|null}>("SELECT id,status,summary FROM ai_runs WHERE agent=? AND entity_type=? AND entity_id=? AND status IN ('SUCCEEDED','FAILED') AND started_at>=datetime('now','-60 seconds') ORDER BY id DESC LIMIT 1",agent,entity.type,entity.id);
+  if(recent && !trigger.startsWith('RETRY')) return {runId:recent.id,status:recent.status,summary:recent.summary ?? ''};
   const enabledKey = agent === "QUALIFICATION" ? "agent_qualification_enabled" : "agent_opportunity_enabled";
   if (!settingBool(enabledKey)) throw new DomainError("Agent đang bị Admin tắt");
 
@@ -40,16 +47,18 @@ export async function runAgent(
     if (!l || (l.status !== "OPEN" && l.status !== "WORKING")) throw new DomainError("Chỉ chạy Qualification Agent cho Lead đang mở");
   } else {
     const o = get<{ stage: string }>("SELECT stage FROM opportunities WHERE id = ?", entity.id);
-    if (!o || o.stage === "WON" || o.stage === "LOST") throw new DomainError("Chỉ chạy Opportunity Agent cho Opportunity đang mở");
+    if (!o || !['DEVELOP','PROPOSE'].includes(o.stage)) throw new DomainError("Chỉ chạy Opportunity Agent ở DEVELOP hoặc PROPOSE");
   }
 
   // Lấy cấu hình phiên bản hiện hành (DEC-27)
   const activeConfig = getActiveAgentConfig(agent);
   const configId = activeConfig?.id ?? null;
-  const modelToUse = activeConfig?.model_reference || DEFAULT_OPENAI_MODEL;
+  const allowedModels = setting("llm_allowed_models").split(",").map(m=>m.trim()).filter(Boolean);
+  const modelToUse = activeConfig?.model_reference || allowedModels[0] || "";
   const instructions = activeConfig?.instructions || (agent === "QUALIFICATION" ? QUALIFICATION_SYSTEM : OPPORTUNITY_SYSTEM);
 
   const mode = agentMode();
+  if (mode === "llm" && (!modelToUse || !allowedModels.includes(modelToUse))) throw new DomainError("Chưa cấu hình mô hình (model) được phép chạy thật");
   const startTime = Date.now();
 
   const { id: runId } = run(
@@ -70,7 +79,9 @@ export async function runAgent(
     let stopReason: string;
 
     if (mode === "llm") {
-      const res = await runWithLlm(ctx, trigger, instructions, modelToUse, log);
+      const res = await runWithLlm(ctx, trigger, instructions, modelToUse, log, usage => {
+        inputTokens = usage.prompt_tokens; outputTokens = usage.completion_tokens;
+      });
       summary = res.summary;
       stopReason = res.stopReason;
       inputTokens = res.usage?.prompt_tokens ?? 0;
@@ -81,15 +92,15 @@ export async function runAgent(
         : mockOpportunityAgent(ctx, log);
       stopReason = "end_turn";
       // Ước lượng token và lượt tìm web cho mock
-      inputTokens = 1200;
-      outputTokens = 450;
+      inputTokens = 0;
+      outputTokens = 0;
     }
 
     webSearchCalls = log.filter((l) => l.tool === "web_research" && l.ok).length;
     const latencyMs = Date.now() - startTime;
 
     // Tính chi phí theo BR-24 nếu có cấu hình đơn giá
-    const cost = calculateCost(inputTokens, outputTokens, webSearchCalls);
+    const cost = mode === 'mock' ? 0 : calculateCost(inputTokens, outputTokens, webSearchCalls);
 
     run(
       `UPDATE ai_runs
@@ -103,6 +114,7 @@ export async function runAgent(
     );
     return { runId, status: "SUCCEEDED", summary };
   } catch (e) {
+    webSearchCalls = log.filter(l=>l.tool === "web_research").length;
     const latencyMs = Date.now() - startTime;
     const message = e instanceof Error ? e.message : String(e);
 
@@ -136,9 +148,10 @@ async function runWithLlm(
   systemPrompt: string,
   model: string,
   log: ToolCallLog[],
+  onUsage: (usage: {prompt_tokens:number;completion_tokens:number})=>void,
 ) {
   const provider = getLlmProvider();
-  const maxIterations = settingNumber("ai_max_iterations") || 15;
+  const maxIterations = settingNumber("ai_max_iterations");
 
   const toolDefs: LlmToolDefinition[] = toolsFor(ctx.agent).map((name) => {
     const def = TOOLS[name];
@@ -147,7 +160,7 @@ async function runWithLlm(
       function: {
         name,
         description: def.description,
-        parameters: { type: "object" },
+        parameters: z.toJSONSchema(def.input),
       },
     };
   });
@@ -163,13 +176,19 @@ async function runWithLlm(
   const totalUsage = { prompt_tokens: 0, completion_tokens: 0 };
   let stopReason = "unknown";
   let summary = "";
+  let completed = false;
+  const deadline = Date.now() + settingNumber("ai_run_timeout_sec") * 1000;
 
   for (let iter = 0; iter < maxIterations; iter++) {
-    const res = await provider.chat(messages, toolDefs, { model });
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new DomainError("Quá thời gian thực thi Agent");
+    const res = await provider.chat(messages, toolDefs, { model, timeoutMs:remaining });
     if (res.usage) {
       totalUsage.prompt_tokens += res.usage.prompt_tokens;
       totalUsage.completion_tokens += res.usage.completion_tokens;
+      onUsage(totalUsage);
     }
+    if (totalUsage.prompt_tokens + totalUsage.completion_tokens > settingNumber("ai_max_tokens_per_run")) throw new DomainError("Vượt giới hạn token mỗi lần chạy (BR-24)");
     stopReason = res.stop_reason || "unknown";
 
     if (res.tool_calls && res.tool_calls.length > 0) {
@@ -180,6 +199,7 @@ async function runWithLlm(
       });
 
       for (const tc of res.tool_calls) {
+        if (tc.function.name === "web_research" && log.filter(l=>l.tool === "web_research").length >= settingNumber("ai_max_web_searches_per_run")) throw new DomainError("Vượt giới hạn lượt tìm web (BR-24)");
         let toolResult: unknown;
         try {
           const parsedArgs = tc.function.arguments ? JSON.parse(tc.function.arguments) : {};
@@ -196,9 +216,11 @@ async function runWithLlm(
       }
     } else {
       summary = res.content || "(không có nội dung phản hồi)";
+      completed = true;
       break;
     }
   }
 
+  if (!completed) throw new DomainError("Vượt giới hạn số vòng gọi công cụ (BR-24)");
   return { summary, stopReason, usage: totalUsage };
 }

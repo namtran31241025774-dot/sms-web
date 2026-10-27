@@ -21,9 +21,10 @@ const ROLE_DESC: Record<Role, string> = {
 };
 
 export default function LoginPage() {
-  const users = all<{ id: number; name: string; email: string; role: Role; title: string | null }>(
+  const demoLogin = process.env.SMS_DEMO_LOGIN === "true";
+  const users = demoLogin ? all<{ id: number; name: string; email: string; role: Role; title: string | null }>(
     "SELECT id, name, email, role, title FROM users WHERE active = 1 ORDER BY id",
-  );
+  ) : [];
 
   return (
     <div className="flex min-h-full items-center justify-center bg-[linear-gradient(135deg,#e8f1fb_0%,#f5f5f5_55%,#eef6ee_100%)] p-4">
@@ -64,7 +65,6 @@ export default function LoginPage() {
               required
               className="w-full rounded border border-stroke px-3 py-2 text-sm outline-none focus:border-brand"
             />
-            <p className="mt-1 text-[11px] text-ink-3">Mật khẩu demo chung: <code className="bg-[#f0f0f0] px-1 py-0.5 rounded">Password123!</code></p>
           </div>
 
           <button
@@ -76,7 +76,7 @@ export default function LoginPage() {
         </form>
 
         {/* Hoặc đăng nhập nhanh bằng tài khoản demo */}
-        <div className="relative my-6 text-center">
+        {demoLogin && <><div className="relative my-6 text-center">
           <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-stroke"></div></div>
           <span className="relative bg-surface px-2 text-xs font-medium text-ink-3">Hoặc chọn nhanh tài khoản demo</span>
         </div>
@@ -95,7 +95,7 @@ export default function LoginPage() {
               </form>
             </li>
           ))}
-        </ul>
+        </ul></>}
 
         <div className="mt-6 border-t border-stroke pt-4 text-[11px] text-ink-3">
           Đăng nhập sử dụng mã hoá mật khẩu scrypt (DEC-14), phiên được ký HMAC SHA-256. Kiểm quyền RBAC chặt chẽ ở server.

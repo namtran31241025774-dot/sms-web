@@ -24,6 +24,7 @@ export type ToolContext = {
   runId: number;
   entityType: "lead" | "opportunity";
   entityId: number;
+  webSources?: { source: string; title: string; snippet: string }[];
 };
 
 export class AgentPermissionError extends Error {}
@@ -66,8 +67,8 @@ function normalizeRef(r: unknown): Ref {
   if (typeof r === "object" && r !== null) {
     const obj = r as Record<string, unknown>;
     const ref = (obj.ref || obj.source || "") as string;
-    const detail = (obj.detail || obj.quote || "") as string;
-    return { ref, detail, quote: detail };
+    const detail = (obj.detail || "") as string;
+    return { ref, detail, quote: obj.quote as string | undefined };
   }
   return { ref: String(r) };
 }
@@ -145,7 +146,14 @@ export const TOOLS = {
     access: "READ",
     agents: ["QUALIFICATION", "OPPORTUNITY"],
     input: z.object({ query: z.string().min(2).max(200) }),
-    run: (_ctx, input) => untrusted("web_research", webResearch.search(input.query)),
+    run: (ctx, input) => {
+      const results = webResearch.search(input.query);
+      ctx.webSources = [...(ctx.webSources ?? []), ...results];
+      if (get("SELECT id FROM ai_runs WHERE id=?",ctx.runId)) for(const r of results) {
+        run("INSERT INTO ai_evidence(run_id,source_type,ref,quote,verified) VALUES (?,'WEB_SOURCE',?,?,1)",ctx.runId,r.source,`${r.title}\n${r.snippet}`);
+      }
+      return untrusted("web_research", results);
+    },
   }),
   propose_enrichment: tool({
     description: "Đề xuất bổ sung dữ liệu còn trống cho Lead (ngành, địa chỉ chuẩn hóa, chức danh, ghi chú nghiên cứu). Không ghi đè dữ liệu nhập tay — chờ người duyệt.",
@@ -183,7 +191,8 @@ export const TOOLS = {
     input: BantProposalSchema,
     run: (ctx, input) => {
       leadOf(ctx);
-      const normEvidence = normalizeRefs(input.evidence);
+      const nestedEvidence=[input.budget,input.authority,input.need,input.timeline].flatMap(value=>typeof value==='number' ? [] : value.evidence ?? []);
+      const normEvidence = normalizeRefs([...(input.evidence ?? []),...nestedEvidence]);
       // BUG-006 & BUG-007: Bắt buộc >= 1 căn cứ hợp lệ được xác thực ở server
       const verifiedEvidence = validateEvidence(ctx, normEvidence, { min: 1, required: true });
 
@@ -368,7 +377,7 @@ export const TOOLS = {
     input: empty,
     run: (ctx) => {
       const o = oppOf(ctx);
-      const days = settingNumber("email_window_days") || 30;
+      const days = settingNumber("email_window_days");
 
       // BUG-004: Chỉ trả email IN có người gửi khớp contact đã liên kết; không có thì trả email_insight_status = NO_INSIGHT
       const linkedContacts = all<{ id: number; email: string }>(
@@ -488,7 +497,9 @@ export const TOOLS = {
       const o = oppOf(ctx);
 
       // Validate sources
-      const normSources = normalizeRefs(input.sources);
+      const insightSources=Object.values(input.insights ?? {}).flatMap(item=>item && 'sources' in item ? item.sources ?? [] : []);
+      const riskSources=input.risks.flatMap(r=>r.sources ?? []);
+      const normSources = normalizeRefs([...input.sources,...insightSources,...riskSources]);
       const verifiedSources = validateEvidence(ctx, normSources);
 
       // Chỉ giữ một bản nghiên cứu chờ duyệt mới nhất
@@ -552,6 +563,7 @@ export type ToolCallLog = { tool: string; input: unknown; ok: boolean; outcome?:
  */
 function redactSensitive(data: unknown): unknown {
   if (data === null || data === undefined) return data;
+  if (typeof data === "string") return data.replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g,"[EMAIL]").replace(/\b(?:\+?84|0)\d{8,10}\b/g,"[PHONE]");
   if (typeof data !== "object") return data;
 
   if (Array.isArray(data)) {
@@ -563,7 +575,7 @@ function redactSensitive(data: unknown): unknown {
     const lk = k.toLowerCase();
     if (lk.includes("password") || lk.includes("secret") || lk.includes("key") || lk.includes("token")) {
       obj[k] = "[REDACTED]";
-    } else if (typeof obj[k] === "object") {
+    } else {
       obj[k] = redactSensitive(obj[k]);
     }
   }
@@ -601,7 +613,7 @@ export function invokeTool(ctx: ToolContext, name: string, rawInput: unknown, lo
     const out = def.run(ctx, input);
 
     const durationMs = Date.now() - startTime;
-    log.push({ tool: name, input: rawInput, ok: true, outcome: "OK", at });
+    log.push({ tool: name, input: redactSensitive(rawInput), ok: true, outcome: "OK", at });
 
     // Ghi nhận vào bảng tool_calls
     try {
@@ -615,7 +627,7 @@ export function invokeTool(ctx: ToolContext, name: string, rawInput: unknown, lo
           validRunId,
           name,
           JSON.stringify(redactSensitive(rawInput)),
-          typeof out === "object" ? JSON.stringify(out).slice(0, 500) : String(out).slice(0, 500),
+          JSON.stringify(redactSensitive(out)).slice(0,500),
           durationMs,
           JSON.stringify({ agent: ctx.agent, entityType: ctx.entityType, entityId: ctx.entityId }),
         );
@@ -635,7 +647,8 @@ export function invokeTool(ctx: ToolContext, name: string, rawInput: unknown, lo
       : e instanceof Error ? e.message : String(e);
 
     const durationMs = Date.now() - startTime;
-    log.push({ tool: name, input: rawInput, ok: false, outcome, error: errorMsg, at });
+    errorMsg = String(redactSensitive(errorMsg));
+    log.push({ tool: name, input: redactSensitive(rawInput), ok: false, outcome, error: errorMsg, at });
 
     // Ghi nhận tool_calls lỗi/bị chặn vào DB
     try {

@@ -45,6 +45,7 @@ export interface LlmProvider {
       model?: string;
       maxTokens?: number;
       temperature?: number;
+      timeoutMs?: number;
     },
   ): Promise<LlmResponse>;
 }

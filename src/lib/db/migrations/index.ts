@@ -10,6 +10,9 @@ import { wp08_001_ai_management } from "./wp08_001_ai_management";
 import { wp04_001_quotes_versions } from "./wp04_001_quotes_versions";
 import { wp05_001_orders_handover } from "./wp05_001_orders_handover";
 import { wp06_001_invoices_payments } from "./wp06_001_invoices_payments";
+import { wp06_002_payment_invoice_safety } from "./wp06_002_payment_invoice_safety";
+import { wp08_002_edit_and_refresh } from "./wp08_002_edit_and_refresh";
+import {wp10_001_integration_requests} from './wp10_001_integration_requests';
 
 export const MIGRATIONS: readonly Migration[] = [
   wp00_001_shared_schema,
@@ -22,6 +25,9 @@ export const MIGRATIONS: readonly Migration[] = [
   wp04_001_quotes_versions,
   wp05_001_orders_handover,
   wp06_001_invoices_payments,
+  wp06_002_payment_invoice_safety,
+  wp08_002_edit_and_refresh,
+  wp10_001_integration_requests,
 ] as const;
 
 /**

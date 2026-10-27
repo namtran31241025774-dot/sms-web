@@ -105,6 +105,8 @@ describe("WP-04: Đề xuất giải pháp & Báo giá (FR-48 → FR-55, HG7)", 
       VALUES (?, 'Dự án Chuyển đổi số Sao Mai', ?, ?, ?, 'PROPOSE', 'Yêu cầu CRM kết nối ERP và báo cáo thông minh', 1)
     `).run(oppCode, testAccountId, testContactId, testPriceListId);
     testOppId = Number(oppIns.lastInsertRowid);
+    db().prepare("INSERT OR IGNORE INTO teams(id,code,name,leader_id) VALUES (994,'QUOTE-REVIEW','Quote review',2)").run();
+    db().prepare('UPDATE opportunities SET team_id=994 WHERE id=?').run(testOppId);
 
     // Giải pháp nội bộ đi kèm cơ hội (WP-03)
     db().prepare(`

@@ -135,11 +135,11 @@ describe("WP-05: Quản lý Đơn hàng (FR-56 → FR-63, HG8)", () => {
       expect(lines.some((l) => l.product_id === prodSaaSId)).toBe(true);
       expect(lines.some((l) => l.product_id === prodServiceId)).toBe(true);
 
-      // Tự động sinh lịch thanh toán và bàn giao kỹ thuật
+      // Không tự đặt điều khoản thanh toán; NVKD xác nhận lịch riêng (BUG-023).
       const milestones = billingMilestones(orderId);
-      expect(milestones.length).toBe(2);
-      const sumMilestones = milestones.reduce((sum, m) => sum + m.amount, 0);
-      expect(sumMilestones).toBe(order?.grand_total);
+      expect(milestones.length).toBe(0);
+      setBillingMilestones(salesActor,orderId,[{name:'Theo hợp đồng',amount:order!.grand_total}]);
+      expect(billingMilestones(orderId).reduce((sum,m)=>sum+m.amount,0)).toBe(order?.grand_total);
 
       const handovers = orderHandovers(orderId);
       expect(handovers.length).toBe(1);
@@ -373,6 +373,9 @@ describe("WP-05: Quản lý Đơn hàng (FR-56 → FR-63, HG8)", () => {
     it("hoàn thành đơn hàng, lưu đầu mối sau bán và không làm thay đổi trạng thái thanh toán", () => {
       const { versionId } = createAndAcceptQuote();
       const orderId = createOrderFromQuote(salesActor, versionId);
+      for(const handover of orderHandovers(orderId)) for(const item of handoverItems(handover.id)) {
+        updateHandoverItem(salesActor,handover.id,item.id,{status:'ACCEPTED',acceptanceNotes:'Đã nghiệm thu'});
+      }
 
       completeOrderAndTransitionPostSales(salesActor, orderId, {
         postSalesAssigneeId: postSalesActor.id,
@@ -402,7 +405,7 @@ describe("WP-05: Quản lý Đơn hàng (FR-56 → FR-63, HG8)", () => {
       const contract = getOrderForInvoice(orderId);
       expect(contract.order.id).toBe(orderId);
       expect(contract.lines.length).toBeGreaterThan(0);
-      expect(contract.milestones.length).toBeGreaterThan(0);
+      expect(contract.milestones.length).toBe(0);
       expect(contract.account.id).toBe(testAccountId);
     });
   });

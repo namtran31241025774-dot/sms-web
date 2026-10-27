@@ -1,10 +1,14 @@
+import { DomainError } from "../domain";
+import { assertActorAccess } from "./access";
 // Module 6.0: Hóa đơn và Lịch thanh toán (FR-64 → FR-68, FR-71, FR-73, FR-74, HG8)
 // Tuân thủ kiến trúc 3 lớp, BR-12, BR-13, DEC-08, DEC-09, DEC-23.
 import { all, get, nextCode, run, tx } from "../db";
 import { assert } from "../domain";
 import { email, erp } from "../integrations";
-import { actorUserId, audit, notifyRole, settingNumber, type Actor } from "./core";
+import { actorUserId, audit, notifyRole, settingBool, settingNumber, type Actor } from "./core";
 import { getOrderForInvoice, orderLines } from "./orders";
+import type { UserScope } from "../scope";
+import { recordVisible } from "./access";
 
 export type InvoiceStatus = "DRAFT" | "REVIEWED" | "ISSUED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
 
@@ -94,6 +98,7 @@ export function listInvoices(filter: {
   orderId?: number;
   accountId?: number;
   search?: string;
+  user?:UserScope;
 } = {}): Invoice[] {
   const clauses: string[] = [];
   const params: (string | number)[] = [];
@@ -117,10 +122,11 @@ export function listInvoices(filter: {
   }
 
   const where = clauses.length > 0 ? ` WHERE ${clauses.join(" AND ")}` : "";
-  return all<Invoice>(`${SELECT}${where} ORDER BY i.id DESC`, ...params);
+  return all<Invoice>(`${SELECT}${where} ORDER BY i.id DESC`, ...params).filter(r=>!filter.user || recordVisible(filter.user,'invoice',r.id));
 }
 
-export function getInvoice(id: number): Invoice | undefined {
+export function getInvoice(id: number, user?:UserScope): Invoice | undefined {
+  if(user && !recordVisible(user,'invoice',id)) return undefined;
   return get<Invoice>(`${SELECT} WHERE i.id = ?`, id);
 }
 
@@ -149,6 +155,7 @@ export function createInvoiceDraftFromOrder(
     notes?: string | null;
   },
 ): number {
+  assertActorAccess(actor, "order", orderId);
   assert(actor.type === "USER", "Chỉ nhân viên được lập hóa đơn");
 
   const contract = getOrderForInvoice(orderId);
@@ -183,14 +190,26 @@ export function createInvoiceDraftFromOrder(
 
   // Kiểm tra BR-12: Không vượt giá trị đơn hàng
   if (existingInvoiced + amount > orderTargetAmount) {
-    throw new Error(
+    throw new DomainError(
       `Tổng giá trị các hóa đơn vượt quá giá trị đơn hàng (còn có thể lập tối đa ${remainingAvailable.toLocaleString("vi-VN")} ₫, yêu cầu lập: ${amount.toLocaleString("vi-VN")} ₫)`,
     );
   }
 
+  const sourceLines=orderLines(orderId);
+  const weights=sourceLines.map(l=>l.line_total*(1+(l.tax_pct ?? settingNumber('default_vat_pct'))/100));
+  const weightTotal=weights.reduce((a,b)=>a+b,0);
+  let allocated=0;
+  const invoiceItems=sourceLines.length ? sourceLines.map((l,index)=>{
+    assert(weightTotal>0,'Giá trị dòng đơn hàng không hợp lệ');
+    const gross=index===sourceLines.length-1 ? amount-allocated : Math.round(amount*weights[index]/weightTotal);
+    allocated+=gross;
+    const taxPct=l.tax_pct ?? settingNumber('default_vat_pct');
+    const base=Math.round(gross/(1+taxPct/100));
+    return {productId:l.product_id,description:l.product_name,quantity:l.quantity,unitPrice:base/l.quantity,taxPct,base};
+  }) : [{productId:null,description:milestoneName,quantity:1,unitPrice:Math.round(amount/(1+settingNumber('default_vat_pct')/100)),taxPct:settingNumber('default_vat_pct'),base:Math.round(amount/(1+settingNumber('default_vat_pct')/100))}];
   return tx(() => {
     const code = nextCode("invoices", "INV");
-    const subtotal = Math.round((amount / 110) * 100);
+    const subtotal = invoiceItems.reduce((sum,l)=>sum+l.base,0);
     const taxAmount = amount - subtotal;
 
     const customerSnapshot = JSON.stringify({
@@ -219,34 +238,10 @@ export function createInvoiceDraftFromOrder(
       actorUserId(actor),
     ).id;
 
-    // Kế thừa các dòng sản phẩm của đơn hàng vào invoice_lines
-    const lines = orderLines(orderId);
-    if (lines.length > 0) {
-      for (const l of lines) {
-        run(
-          `INSERT INTO invoice_lines (
-            invoice_id, product_id, description, quantity, unit_price, tax_pct, line_total
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          invoiceId,
-          l.product_id,
-          l.product_name,
-          l.quantity,
-          l.unit_price,
-          l.tax_pct,
-          l.line_total,
-        );
-      }
-    } else {
-      run(
-        `INSERT INTO invoice_lines (
-          invoice_id, description, quantity, unit_price, tax_pct, line_total
-        ) VALUES (?, ?, 1, ?, 10, ?)`,
-        invoiceId,
-        milestoneName,
-        subtotal,
-        subtotal,
-      );
-    }
+    for(const item of invoiceItems) run(
+      'INSERT INTO invoice_lines(invoice_id,product_id,description,quantity,unit_price,tax_pct,line_total) VALUES (?,?,?,?,?,?,?)',
+      invoiceId,item.productId,item.description,item.quantity,item.unitPrice,item.taxPct,item.base,
+    );
 
     // Cập nhật trạng thái mốc thanh toán nếu có
     if (input.milestoneId) {
@@ -280,6 +275,7 @@ export function setupInvoiceSchedule(
   invoiceId: number,
   input: { dueDate: string; notes?: string },
 ): void {
+  assertActorAccess(actor, "invoice", invoiceId);
   const inv = getInvoice(invoiceId);
   assert(inv, "Không tìm thấy hóa đơn");
   assert(inv.status === "DRAFT" || inv.status === "REVIEWED", "Hóa đơn đã phát hành, không thể đổi lịch");
@@ -308,13 +304,17 @@ export function reviewInvoiceDraft(
   invoiceId: number,
   notes?: string,
 ): void {
+  assertActorAccess(actor, "invoice", invoiceId);
   const inv = getInvoice(invoiceId);
   assert(inv, "Không tìm thấy hóa đơn");
   assert(inv.status === "DRAFT", "Chỉ có thể kiểm tra hóa đơn ở trạng thái Nháp (DRAFT)");
+  assert(actor.type === "USER" && actor.role === "FINANCE", "Chỉ kế toán được kiểm tra hóa đơn");
+  assert(!settingBool("invoice_independent_review") || inv.created_by !== actor.id, "Kiểm tra độc lập: người kiểm tra phải khác người lập");
 
   tx(() => {
     run(
       `UPDATE invoices SET
+        status = 'REVIEWED',
         reviewed_by = ?,
         reviewed_at = datetime('now'),
         notes = COALESCE(?, notes)
@@ -344,38 +344,31 @@ export function issueInvoice(
   invoiceId: number,
   options: { recipientEmail?: string; sendEmail?: boolean } = {},
 ): { erpRef: string; mailRef: string } {
+  assertActorAccess(actor, "invoice", invoiceId);
   const inv = getInvoice(invoiceId);
   assert(inv, "Không tìm thấy hóa đơn");
   assert(
     inv.status === "DRAFT" || inv.status === "REVIEWED",
     "Chỉ có thể phát hành hóa đơn ở trạng thái Nháp hoặc Đã kiểm tra",
   );
+  assert(actor.type === "USER" && actor.role === "FINANCE", "Chỉ kế toán được phát hành hóa đơn");
+  if (settingBool("invoice_independent_review")) {
+    assert(inv.status === "REVIEWED" && inv.reviewed_by !== null && inv.reviewed_by !== inv.created_by, "Hóa đơn cần được kiểm tra độc lập trước khi phát hành");
+  }
+  const emailTarget = options.recipientEmail?.trim() || get<{email:string}>(
+    `SELECT c.email FROM contacts c JOIN opportunities op ON op.primary_contact_id=c.id
+     JOIN orders o ON o.opportunity_id=op.id WHERE o.id=? AND c.email IS NOT NULL LIMIT 1`, inv.order_id,
+  )?.email?.trim();
+  assert(options.sendEmail === false || (emailTarget && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTarget)), "Thiếu email hợp lệ của người nhận hóa đơn");
 
-  return tx(() => {
+  // External issuance is not reversible; commit its reference before attempting email delivery.
+  const { erpRef } = erp.pushInvoice({code:inv.code, amount:inv.amount, orderCode:inv.order_code});
+  assert(erpRef, "ERP chưa trả số hóa đơn chính thức");
+
+  tx(() => {
     // 1. Đẩy sang hệ thống kế toán ERP để phát hành hóa đơn chính thức (DEC-08)
-    const { erpRef } = erp.pushInvoice({
-      code: inv.code,
-      amount: inv.amount,
-      orderCode: inv.order_code,
-    });
 
     // 2. Gửi hóa đơn qua email adapter cho khách hàng (FR-67)
-    const emailTarget =
-      options.recipientEmail ||
-      get<{ email: string }>(
-        `SELECT c.email FROM contacts c
-         JOIN opportunities op ON op.primary_contact_id = c.id
-         JOIN orders o ON o.opportunity_id = op.id
-         WHERE o.id = ? AND c.email IS NOT NULL LIMIT 1`,
-        inv.order_id,
-      )?.email ||
-      "ke-toan@khachhang.vn";
-
-    const { providerRef: mailRef } = email.send({
-      to: emailTarget,
-      subject: `Hóa đơn điện tử ${erpRef} (${inv.code}) – Đơn hàng ${inv.order_code}`,
-      body: `Kính gửi Quý khách hàng,\n\nHệ thống xin gửi hóa đơn điện tử chính thức số ${erpRef} cho đợt thanh toán "${inv.milestone}".\nSố tiền: ${inv.amount.toLocaleString("vi-VN")} VND.\nHạn thanh toán: ${inv.due_date || "Theo thỏa thuận"}.\n\nTrân trọng.`,
-    });
 
     // 3. Cập nhật trạng thái hóa đơn ISSUED trong SMS
     run(
@@ -403,11 +396,19 @@ export function issueInvoice(
     audit(actor, "invoice", invoiceId, "ISSUE_HG8", {
       from: inv.status,
       to: "ISSUED",
-      details: { erpRef, recipientEmail: emailTarget, mailRef },
+      details: { erpRef, recipientEmail: emailTarget },
     });
 
-    return { erpRef, mailRef };
   });
+  if (options.sendEmail === false) return { erpRef, mailRef: "" };
+  try {
+    const {providerRef:mailRef} = email.send({to:emailTarget!, subject:`Hóa đơn điện tử ${erpRef} (${inv.code}) – Đơn hàng ${inv.order_code}`, body:`Hóa đơn ${erpRef}, đợt ${inv.milestone}, số tiền ${inv.amount}. Hạn thanh toán: ${inv.due_date || 'Theo thỏa thuận'}.`});
+    audit(actor,"invoice",invoiceId,"EMAIL_SENT",{details:{mailRef}});
+    return {erpRef,mailRef};
+  } catch(e) {
+    audit(actor,"invoice",invoiceId,"EMAIL_FAILED",{reason:e instanceof Error ? e.message : 'Gửi email thất bại'});
+    throw e;
+  }
 }
 
 /**
@@ -460,6 +461,7 @@ export function sendPaymentReminder(
   invoiceId: number,
   input: { note?: string } = {},
 ): { remindedAt: string; recipientEmail: string } {
+  assertActorAccess(actor, "invoice", invoiceId);
   const inv = getInvoice(invoiceId);
   assert(inv, "Không tìm thấy hóa đơn");
   assert(inv.status === "ISSUED" || inv.status === "PARTIALLY_PAID", "Chỉ gửi nhắc thanh toán cho hóa đơn đã phát hành và chưa tất toán");
@@ -478,7 +480,7 @@ export function sendPaymentReminder(
     const nextAllowedTime = lastTime + reminderWindowDays * 86400000;
     if (Date.now() < nextAllowedTime) {
       const waitDays = Math.ceil((nextAllowedTime - Date.now()) / 86400000);
-      throw new Error(`Đã gửi nhắc thanh toán gần đây; vui lòng đợi ${waitDays} ngày nữa theo quy định giãn cách nhắc nợ (${reminderWindowDays} ngày/lần)`);
+      throw new DomainError(`Đã gửi nhắc thanh toán gần đây; vui lòng đợi ${waitDays} ngày nữa theo quy định giãn cách nhắc nợ (${reminderWindowDays} ngày/lần)`);
     }
   }
 
@@ -519,6 +521,7 @@ export function requestInvoiceChange(
   invoiceId: number,
   input: { type: "ADJUSTMENT" | "CANCELLATION"; reason: string },
 ): number {
+  assertActorAccess(actor, "invoice", invoiceId);
   const inv = getInvoice(invoiceId);
   assert(inv, "Không tìm thấy hóa đơn");
   assert(input.reason?.trim(), "Vui lòng nhập lý do đề nghị điều chỉnh / hủy hóa đơn");

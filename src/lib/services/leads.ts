@@ -1,9 +1,9 @@
+import { scoreBant, disqualifyLeadWithReason, convertLeadToOpportunity } from "./qualification";
+import { assertActorAccess } from "./access";
 // Giai đoạn QUALIFY: tạo/chuẩn hóa Lead, kiểm tra trùng, BANT, chuyển đổi hoặc loại có lý do (WP-01 & WP-03).
-import { all, get, nextCode, run, tx } from "../db";
+import { all, get, run, tx } from "../db";
 import {
   assert,
-  bantScore,
-  clampBant,
   emailDomain,
   normalizeCompany,
   normalizeEmail,
@@ -11,11 +11,13 @@ import {
   type BantKey,
 } from "../domain";
 import { maps } from "../integrations";
-import { actorUserId, addActivity, audit, notify, settingBool, settingNumber, type Actor } from "./core";
+import { actorUserId, audit, settingNumber, type Actor } from "./core";
 import { findDuplicates, type DuplicateHit } from "./dedupe";
 import { findOrCreateAccount } from "./accounts";
 import { findOrCreateContact } from "./contacts";
 import { emitEvent } from "../events";
+import type { UserScope } from "../scope";
+import { recordVisible } from "./access";
 
 export type { DuplicateHit };
 export { findDuplicates, findOrCreateAccount, findOrCreateContact };
@@ -101,8 +103,8 @@ export function calculateLeadRating(lead: {
   const timeline = lead.bant_timeline ?? 0;
   const need = lead.bant_need ?? 0;
 
-  const threshold = settingNumber("bant_threshold") || 60;
-  const warmMin = settingNumber("lead_rating_warm_min") || 40;
+  const threshold = settingNumber("bant_threshold");
+  const warmMin = settingNumber("lead_rating_warm_min");
 
   if (score >= threshold && authority > 0 && timeline >= 18) {
     return "HOT";
@@ -126,6 +128,7 @@ export function listLeads(filter: {
   tag_id?: number;
   q?: string;
   view?: string; // "trash" để xem hồ sơ đã xoá mềm
+  user?: UserScope;
 } = {}) {
   const where: string[] = [];
   const params: (string | number)[] = [];
@@ -171,10 +174,11 @@ export function listLeads(filter: {
     ...params,
   );
 
-  return leads;
+  return leads.filter(r=>!filter.user || recordVisible(filter.user,'lead',r.id));
 }
 
-export function getLead(id: number): Lead | undefined {
+export function getLead(id: number, user?: UserScope): Lead | undefined {
+  if(user && !recordVisible(user,'lead',id)) return undefined;
   const lead = get<Lead>(
     "SELECT l.*, u.name AS owner_name FROM leads l LEFT JOIN users u ON u.id = l.owner_id WHERE l.id = ?",
     id,
@@ -281,6 +285,7 @@ export function createLead(actor: Actor, input: LeadInput): number {
     }
 
     audit(actor, "lead", id, "CREATE", { to: "OPEN", details: { duplicates: dups } });
+    emitEvent('lead.created',{leadId:id,actorUserId:actorUserId(actor)});
     return id;
   });
 }
@@ -302,6 +307,7 @@ const EDITABLE = [
 ] as const;
 
 export function updateLead(actor: Actor, id: number, input: Partial<LeadInput>) {
+  assertActorAccess(actor, "lead", id);
   const lead = getLead(id);
   assert(lead, "Không tìm thấy Lead");
   assert(lead.status !== "CONVERTED", "Lead đã chuyển đổi, không sửa được");
@@ -348,6 +354,7 @@ export function updateLead(actor: Actor, id: number, input: Partial<LeadInput>) 
  * FR-05: Xoá mềm Lead (chuyển sang trạng thái Đã xoá).
  */
 export function softDeleteLead(actor: Actor, id: number) {
+  assertActorAccess(actor, "lead", id);
   const lead = getLead(id);
   assert(lead, "Không tìm thấy Lead");
   assert(!lead.deleted_at, "Lead này đã nằm trong thùng rác");
@@ -362,6 +369,7 @@ export function softDeleteLead(actor: Actor, id: number) {
  * FR-18: Khôi phục Lead đã xoá mềm.
  */
 export function restoreLead(actor: Actor, id: number) {
+  assertActorAccess(actor, "lead", id);
   const lead = getLead(id);
   assert(lead, "Không tìm thấy Lead");
   assert(lead.deleted_at, "Lead này không nằm trong thùng rác");
@@ -519,58 +527,15 @@ export function executeLeadImport(actor: Actor, validRows: LeadInput[]): { impor
 }
 
 export function updateBant(actor: Actor, id: number, scores: Record<BantKey, number>, notes: string | null) {
-  const lead = getLead(id);
-  assert(lead, "Không tìm thấy Lead");
-  assert(lead.status === "OPEN" || lead.status === "WORKING", "Chỉ cập nhật BANT cho Lead đang mở");
-  const s = {
-    budget: clampBant(scores.budget),
-    authority: clampBant(scores.authority),
-    need: clampBant(scores.need),
-    timeline: clampBant(scores.timeline),
-  };
-  const total = bantScore(s);
-  const rating = calculateLeadRating({
-    bant_score: total,
-    bant_authority: s.authority,
-    bant_timeline: s.timeline,
-    bant_need: s.need,
-  });
-
-  tx(() => {
-    run(
-      `UPDATE leads SET bant_budget=?, bant_authority=?, bant_need=?, bant_timeline=?, bant_score=?, bant_notes=?,
-         rating = ?, status = CASE WHEN status = 'OPEN' THEN 'WORKING' ELSE status END, updated_at = datetime('now') WHERE id = ?`,
-      s.budget,
-      s.authority,
-      s.need,
-      s.timeline,
-      total,
-      notes,
-      rating,
-      id,
-    );
-    audit(actor, "lead", id, "BANT_UPDATE", {
-      from: lead.status,
-      to: lead.status === "OPEN" ? "WORKING" : lead.status,
-      details: { ...s, total, rating },
-    });
-  });
-  return total;
+  return scoreBant(actor,id,{...scores,notes:notes ?? undefined}).totalScore;
 }
 
 export function disqualifyLead(actor: Actor, id: number, reason: string) {
-  assert(actor.type === "USER", "Chỉ nhân viên mới được loại Lead");
-  assert(reason?.trim(), "Phải nhập lý do loại Lead");
-  const lead = getLead(id);
-  assert(lead, "Không tìm thấy Lead");
-  assert(lead.status === "OPEN" || lead.status === "WORKING", "Lead không ở trạng thái mở");
-  tx(() => {
-    run("UPDATE leads SET status='DISQUALIFIED', disqualify_reason=?, updated_at=datetime('now') WHERE id=?", reason.trim(), id);
-    audit(actor, "lead", id, "DISQUALIFY", { from: lead.status, to: "DISQUALIFIED", reason });
-  });
+  return disqualifyLeadWithReason(actor,id,reason);
 }
 
 export function reactivateLead(actor: Actor, id: number, reason: string) {
+  assertActorAccess(actor, "lead", id);
   const lead = getLead(id);
   assert(lead, "Không tìm thấy Lead");
   assert(lead.status === "DISQUALIFIED", "Chỉ tái kích hoạt Lead đã loại");
@@ -611,75 +576,7 @@ export type ConvertInput = {
 };
 
 export function convertLead(actor: Actor, id: number, input: ConvertInput) {
-  if (actor.type === "AI") assert(settingBool("ai_auto_convert"), "AI không được tự chuyển đổi Lead (ADR-03)");
-  const lead = getLead(id);
-  assert(lead, "Không tìm thấy Lead");
-  assert(lead.status === "OPEN" || lead.status === "WORKING", "Lead không ở trạng thái mở");
-  const threshold = settingNumber("bant_threshold") || 60;
-  assert(lead.bant_score >= threshold, `Điểm BANT ${lead.bant_score} chưa đạt ngưỡng ${threshold}`);
-  assert(get("SELECT id FROM users WHERE id = ? AND role IN ('SALES','SALES_MANAGER')", input.ownerId), "AE nhận Opportunity không hợp lệ");
-
-  return tx(() => {
-    let accountId = input.accountId ?? null;
-    if (accountId) {
-      assert(get("SELECT id FROM accounts WHERE id = ?", accountId), "Account không tồn tại");
-    } else {
-      accountId = findOrCreateAccount(lead, input.ownerId);
-      audit(actor, "account", accountId, "CREATE", { reason: `Chuyển đổi từ Lead #${id}` });
-    }
-
-    let contactId = input.contactId ?? null;
-    if (contactId) {
-      const c = get<{ account_id: number }>("SELECT account_id FROM contacts WHERE id = ?", contactId);
-      assert(c && c.account_id === accountId, "Contact không thuộc Account đã chọn");
-    } else {
-      contactId = findOrCreateContact(lead, accountId);
-    }
-
-    const priceList = get<{ id: number }>("SELECT id FROM price_lists WHERE active = 1 ORDER BY id LIMIT 1");
-    const code = nextCode("opportunities", "OPP");
-    const oppId = run(
-      `INSERT INTO opportunities (code, name, account_id, primary_contact_id, owner_id, lead_id, stage, amount, close_date, price_list_id, customer_need)
-       VALUES (?,?,?,?,?,?, 'DEVELOP', ?,?,?,?)`,
-      code,
-      input.opportunityName?.trim() || `${lead.company_name} – Sales Cloud`,
-      accountId,
-      contactId,
-      input.ownerId,
-      id,
-      input.amount ?? 0,
-      input.closeDate ?? null,
-      priceList?.id ?? null,
-      lead.bant_notes,
-    ).id;
-
-    run(
-      `UPDATE leads SET status='CONVERTED', converted_account_id=?, converted_contact_id=?, converted_opportunity_id=?,
-         converted_at=datetime('now'), updated_at=datetime('now') WHERE id=?`,
-      accountId,
-      contactId,
-      oppId,
-      id,
-    );
-
-    addActivity({
-      entityType: "opportunity",
-      entityId: oppId,
-      type: "NOTE",
-      subject: `Bàn giao từ Lead #${id} (BANT ${lead.bant_score}/100)`,
-      body: lead.bant_notes,
-      createdBy: actorUserId(actor),
-    });
-
-    audit(actor, "lead", id, "CONVERT", {
-      from: lead.status,
-      to: "CONVERTED",
-      details: { accountId, contactId, opportunityId: oppId },
-    });
-    audit(actor, "opportunity", oppId, "CREATE", { to: "DEVELOP", reason: `Chuyển đổi từ Lead #${id}` });
-    notify(input.ownerId, `Bạn được giao Opportunity ${code} (${lead.company_name})`, `/opportunities/${oppId}`);
-    return { accountId, contactId, opportunityId: oppId };
-  });
+  return convertLeadToOpportunity(actor,id,input);
 }
 
 export function bulkConvert(actor: Actor, ids: number[], ownerId: number) {

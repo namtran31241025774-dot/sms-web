@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, Card, CommandBar, CommandLink, PageTitle } from "@/components/ui";
-import { currentUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { all } from "@/lib/db";
 import { QUOTE_STATUS, SIGNATURE_STATUS } from "@/lib/domain";
 import { can } from "@/lib/rbac";
@@ -33,12 +33,12 @@ export default async function QuoteDetailPage(props: {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ v?: string }>;
 }) {
-  const user = await currentUser();
+  const user = await requirePermission('quote.read');
   const params = await props.params;
   const searchParams = await props.searchParams;
 
   const quoteId = Number(params.id);
-  const quote = getQuote(quoteId);
+  const quote = getQuote(quoteId, user);
   if (!quote) notFound();
 
   const versions = quoteVersions(quoteId);
@@ -46,7 +46,7 @@ export default async function QuoteDetailPage(props: {
     ? getQuoteVersion(Number(searchParams.v)) || getLatestQuoteVersion(quoteId)
     : getLatestQuoteVersion(quoteId);
 
-  if (!activeVersion) notFound();
+  if (!activeVersion || activeVersion.quote_id !== quoteId) notFound();
 
   const lines = quoteLines(activeVersion.id);
   const responses = quoteResponses(activeVersion.id);

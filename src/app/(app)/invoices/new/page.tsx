@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requirePermission } from "@/lib/auth";
 import { CommandBar, CommandLink, FormField, PageTitle } from "@/components/ui";
 import { billingMilestones, getOrder, listOrders } from "@/lib/services/orders";
 import { getDefaultDueDate, listInvoices } from "@/lib/services/invoices";
@@ -8,15 +9,16 @@ export default async function NewInvoicePage(props: {
   searchParams: Promise<{ orderId?: string; milestoneId?: string }>;
 }) {
   const searchParams = await props.searchParams;
+  const user = await requirePermission('invoice.create');
   const selectedOrderId = searchParams.orderId ? Number(searchParams.orderId) : undefined;
   const selectedMilestoneId = searchParams.milestoneId ? Number(searchParams.milestoneId) : undefined;
 
-  const orders = listOrders();
-  const currentOrder = selectedOrderId ? getOrder(selectedOrderId) : undefined;
+  const orders = listOrders({user});
+  const currentOrder = selectedOrderId ? getOrder(selectedOrderId,user) : undefined;
 
   // Lấy các mốc thanh toán của đơn hàng nếu có
-  const milestones = selectedOrderId ? billingMilestones(selectedOrderId) : [];
-  const existingInvoices = selectedOrderId ? listInvoices({ orderId: selectedOrderId }) : [];
+  const milestones = currentOrder ? billingMilestones(currentOrder.id) : [];
+  const existingInvoices = currentOrder ? listInvoices({ orderId: currentOrder.id,user }) : [];
 
   const existingInvoicedTotal = existingInvoices
     .filter((i) => i.status !== "CANCELLED")

@@ -24,6 +24,12 @@ Trạng thái:
 | WP-06 | Hoá đơn và thanh toán | FR-64 → FR-74 | 5 | WP-05, WP-10 | Xong | Antigravity | 25/10/2026 | Hoàn tất lập hồ sơ hóa đơn nháp từ đơn hàng (FR-64, BR-12), thiết lập lịch lập hóa đơn (FR-65), kiểm tra nháp (DEC-09, FR-66), phát hành qua ERP & gửi khách (HG8, DEC-08, FR-67), tra cứu trạng thái (FR-68), ghi nhận thanh toán & phân bổ theo Account (FR-69, DEC-23), thanh toán online qua cổng (DEC-13, FR-70), báo cáo công nợ & nhắc nợ cửa sổ 7 ngày (FR-71, BR-13), đồng bộ dữ liệu kế toán ERP (FR-72), đề xuất & phê duyệt điều chỉnh/hủy hóa đơn (FR-73), lưu & tra cứu lịch sử chứng từ (FR-74). 15/15 tests pass |
 | WP-11 | Kiểm thử và đánh giá | 10 cổng, NFR | liên tục | WP-00 | Sẵn sàng | | 25/10/2026 | Bắt đầu ngay sau WP-00. Sửa BUG-011 → BUG-013 |
 
+## Review BUG-014 trở đi — 27/10/2026
+
+- Nhánh `review/doi-chieu-bai-27-10`; người dùng giao sửa xuyên WP; **chờ review**, chưa merge/deploy.
+- BUG-014–038, 040–041 đã sửa: 194 test, typecheck/lint xanh; build thành công. BUG-039 còn xác minh volume trên Render.
+- Bàn giao: `docs/handoff/REVIEW-27-10.md`; BUG-012/013 vẫn thuộc WP-11.
+
 ## Quyết định cần nhóm chốt (ảnh hưởng code)
 
 Xem `docs/requirements/DECISIONS.md`, mục *Việc nhóm cần sửa trong bài*. Các mục **Mặc định** quan trọng nhất:

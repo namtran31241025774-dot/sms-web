@@ -1,7 +1,11 @@
+import { DomainError } from "../domain";
+import { assertActorAccess } from "./access";
 // Giai đoạn PROPOSE: Báo giá, kiểm tra chiết khấu, phê duyệt khi vượt thẩm quyền,
 // thương lượng phiên bản (DEC-22), xuất PDF, gửi email, tra cứu hiệu lực (BR-09), ký điện tử (FR-55).
 import { all, get, nextCode, run, tx } from "../db";
 import { assert, lineTotal } from "../domain";
+import type { UserScope } from "../scope";
+import { recordVisible } from "./access";
 import { email, esign } from "../integrations";
 import { generateQuotePdf } from "../pdf";
 import { requestApproval } from "./approvals";
@@ -133,7 +137,8 @@ const SELECT_VERSION = `
   LEFT JOIN users u2 ON u2.id = qv.approved_by
 `;
 
-export function getQuote(id: number): Quote | undefined {
+export function getQuote(id: number, user?:UserScope): Quote | undefined {
+  if(user && !recordVisible(user,'quote',id)) return undefined;
   return get<Quote>(`${SELECT_QUOTE} WHERE q.id = ?`, id);
 }
 
@@ -207,6 +212,7 @@ export function listQuotes(filter: {
   opportunityId?: number;
   accountId?: number;
   expiredOnly?: boolean;
+  user?:UserScope;
 } = {}): Quote[] {
   const conds: string[] = [];
   const params: (string | number | null)[] = [];
@@ -233,7 +239,7 @@ export function listQuotes(filter: {
   }
 
   const whereClause = conds.length > 0 ? `WHERE ${conds.join(" AND ")}` : "";
-  return all<Quote>(`${SELECT_QUOTE} ${whereClause} ORDER BY q.id DESC`, ...params);
+  return all<Quote>(`${SELECT_QUOTE} ${whereClause} ORDER BY q.id DESC`, ...params).filter(r=>!filter.user || recordVisible(filter.user,'quote',r.id));
 }
 
 // ===== Tiện ích kiểm tra và tính toán =====
@@ -299,9 +305,10 @@ export function createQuote(
   oppId: number,
   options: { notes?: string; validDays?: number; priceListId?: number } = {},
 ): { quoteId: number; versionId: number } {
+  assertActorAccess(actor, "opportunity", oppId);
   const o = getOpportunity(oppId);
   assert(o, "Không tìm thấy cơ hội");
-  assert(o.stage === "PROPOSE" || o.stage === "DEVELOP", "Chỉ lập báo giá ở giai đoạn Đề xuất giải pháp hoặc Phát triển cơ hội");
+  assert(o.stage === "PROPOSE", "Chỉ lập báo giá ở giai đoạn Đề xuất giải pháp (PROPOSE)");
 
   const priceListId = options.priceListId || o.price_list_id;
   assert(priceListId, "Cơ hội chưa được chọn bảng giá áp dụng");
@@ -366,6 +373,7 @@ export function addLine(
   discountPct: number,
   options: { taxPct?: number; licenseCount?: number; termMonths?: number } = {},
 ) {
+  assertActorAccess(actor, "quote_version", versionId);
   const v = mustDraftVersion(versionId);
   assert(Number.isInteger(quantity) && quantity > 0, "Số lượng phải là số nguyên dương");
   assert(discountPct >= 0 && discountPct <= 100, "Chiết khấu phải từ 0% đến 100%");
@@ -412,6 +420,7 @@ export function updateLine(
   discountPct: number,
   options: { taxPct?: number; licenseCount?: number; termMonths?: number } = {},
 ) {
+  assertActorAccess(actor, "quote_version", versionId);
   mustDraftVersion(versionId);
   assert(Number.isInteger(quantity) && quantity > 0, "Số lượng phải là số nguyên dương");
   assert(discountPct >= 0 && discountPct <= 100, "Chiết khấu phải từ 0% đến 100%");
@@ -452,6 +461,7 @@ export function updateLine(
  * Xóa dòng báo giá.
  */
 export function removeLine(actor: Actor, versionId: number, lineId: number) {
+  assertActorAccess(actor, "quote_version", versionId);
   mustDraftVersion(versionId);
   tx(() => {
     run("DELETE FROM quote_lines WHERE id = ? AND (quote_version_id = ? OR quote_id = ?)", lineId, versionId, versionId);
@@ -468,6 +478,7 @@ export function updateQuoteDetails(
   versionId: number,
   input: { notes?: string | null; validUntil?: string | null },
 ) {
+  assertActorAccess(actor, "quote_version", versionId);
   const v = mustDraftVersion(versionId);
   run(
     "UPDATE quote_versions SET notes = ?, valid_until = ?, updated_at = datetime('now') WHERE id = ?",
@@ -550,6 +561,7 @@ export function validateQuoteConfiguration(versionId: number): QuoteConfigValida
  * - Chiết khấu > 30%: Bị chặn hoàn toàn.
  */
 export function submitQuote(actor: Actor, versionId: number): { status: QuoteStatus; message: string } {
+  assertActorAccess(actor, "quote_version", versionId);
   const v = mustDraftVersion(versionId);
   const lines = quoteLines(versionId);
   assert(lines.length > 0, "Báo giá chưa có dòng sản phẩm nào");
@@ -638,6 +650,8 @@ export function applyDiscountDecision(
     }
   }
   assert(v && v.status === "PENDING_APPROVAL", "Phiên bản báo giá không ở trạng thái chờ duyệt");
+  assert(actor.type==='USER' && actor.role==='SALES_MANAGER','Chỉ Quản lý kinh doanh được duyệt chiết khấu');
+  assertActorAccess(actor,'quote_version',v.id);
 
   const to: QuoteStatus = approved ? "APPROVED" : "REJECTED";
   const versionId = v.id;
@@ -676,6 +690,7 @@ export function applyDiscountDecision(
  * FR-52: Xuất đề xuất & báo giá ra tệp PDF và gửi cho khách hàng qua email; khóa báo giá đã gửi.
  */
 export function sendQuote(actor: Actor, versionId: number): { providerRef: string; pdfBuffer: Buffer } {
+  assertActorAccess(actor, "quote_version", versionId);
   assert(actor.type === "USER", "Chỉ nhân viên được gửi báo giá cho khách hàng");
   const v = getQuoteVersion(versionId);
   assert(v, "Không tìm thấy phiên bản báo giá");
@@ -802,6 +817,7 @@ export function recordCustomerResponse(
   note: string | null = null,
   contactId?: number | null,
 ) {
+  assertActorAccess(actor, "quote_version", versionId);
   assert(actor.type === "USER", "Chỉ nhân viên được ghi nhận phản hồi của khách hàng");
   const v = getQuoteVersion(versionId);
   assert(v, "Không tìm thấy phiên bản báo giá");
@@ -809,7 +825,7 @@ export function recordCustomerResponse(
 
   // Kiểm tra hiệu lực (BR-09): Báo giá hết hạn không nhận chấp thuận mới
   if (responseType === "ACCEPTED" && isQuoteExpired(v)) {
-    throw new Error("Báo giá đã hết hạn hiệu lực, không thể ghi nhận chấp thuận mới");
+    throw new DomainError("Báo giá đã hết hạn hiệu lực, không thể ghi nhận chấp thuận mới");
   }
 
   return tx(() => {
@@ -888,6 +904,7 @@ export function recordCustomerResponse(
  * - Sao chép toàn bộ các dòng sản phẩm sang phiên bản mới.
  */
 export function reviseQuote(actor: Actor, versionId: number, revisionNote: string | null = null): number {
+  assertActorAccess(actor, "quote_version", versionId);
   const v = getQuoteVersion(versionId);
   assert(v, "Không tìm thấy phiên bản báo giá");
   assert(
@@ -972,6 +989,7 @@ export function requestQuoteEsign(
   recipientEmail?: string,
   recipientName?: string,
 ): QuoteSignatureRecord {
+  assertActorAccess(actor, "quote_version", versionId);
   const v = getQuoteVersion(versionId);
   assert(v, "Không tìm thấy phiên bản báo giá");
   assert(
@@ -1065,6 +1083,8 @@ export function getAcceptedQuoteVersion(quoteVersionId: number): AcceptedQuoteVe
   const v = getQuoteVersion(quoteVersionId);
   assert(v, "Không tìm thấy phiên bản báo giá");
   assert(v.status === "ACCEPTED", "Báo giá chưa được khách hàng chấp thuận hợp lệ");
+  const sourceQuote = getQuote(v.quote_id)!;
+  assert(getOpportunity(sourceQuote.opportunity_id)?.stage === "CLOSE", "Chỉ lập đơn khi cơ hội ở giai đoạn Tạo đơn hàng (CLOSE)");
 
   // Kiểm tra cửa sổ thời gian lập đơn (BR-09: accepted_quote_order_window_days)
   if (v.responded_at) {
@@ -1072,7 +1092,7 @@ export function getAcceptedQuoteVersion(quoteVersionId: number): AcceptedQuoteVe
     const respondedTime = new Date(v.responded_at).getTime();
     const expiryTime = respondedTime + windowDays * 86400000;
     if (Date.now() > expiryTime) {
-      throw new Error(`Đã quá hạn ${windowDays} ngày kể từ khi khách chấp thuận; không thể lập đơn hàng mới`);
+      throw new DomainError(`Đã quá hạn ${windowDays} ngày kể từ khi khách chấp thuận; không thể lập đơn hàng mới`);
     }
   }
 

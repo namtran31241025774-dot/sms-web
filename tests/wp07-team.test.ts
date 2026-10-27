@@ -430,6 +430,8 @@ describe("WP-07: Quản lý đội ngũ Sales (FR-75 → FR-87)", () => {
     `).run(testUserId);
 
     // Tạo các cơ hội đang mở ở các giai đoạn:
+    db().prepare("UPDATE opportunities SET closed_at='2027-02-15' WHERE code='OPP-WON-TEST'").run();
+    db().prepare("INSERT INTO orders(code,opportunity_id,account_id,total,grand_total,price_locked_at) SELECT 'SO-KPI-TEST',id,account_id,250000000,250000000,datetime('now') FROM opportunities WHERE code='OPP-WON-TEST'").run();
     // DEVELOP (20%): 100tr -> forecast = 20tr
     // PROPOSE (50%): 200tr -> forecast = 100tr
     // CLOSE (80%): 100tr -> forecast = 80tr

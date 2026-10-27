@@ -1,9 +1,11 @@
+import { assertActorAccess } from "./access";
 // Giai đoạn DEVELOP (và chuyển stage đến PROPOSE/CLOSE, WON, LOST).
 import { all, get, run, tx } from "../db";
 import { assert, DEVELOP_CHECKLIST, type ChecklistKey } from "../domain";
-import { can } from "../rbac";
+import type { UserScope } from "../scope";
+import { recordVisible } from "./access";
 import { requestApproval } from "./approvals";
-import { actorUserId, audit, notify, setting, type Actor } from "./core";
+import { actorUserId, audit, notify, notifyRole, setting, type Actor } from "./core";
 import { listRisks, type OpportunityRisk } from "./risks";
 
 export * from "./risks";
@@ -111,7 +113,7 @@ const SELECT = `SELECT o.*, a.name AS account_name, c.full_name AS contact_name,
   LEFT JOIN users p ON p.id = o.presales_id
   LEFT JOIN price_lists pl ON pl.id = o.price_list_id`;
 
-export function listOpportunities(filter: { stage?: string; ownerId?: number; accountId?: number } = {}) {
+export function listOpportunities(filter: { stage?: string; ownerId?: number; accountId?: number; user?:UserScope } = {}) {
   const where: string[] = [];
   const params: (string | number)[] = [];
   if (filter.stage) {
@@ -126,10 +128,11 @@ export function listOpportunities(filter: { stage?: string; ownerId?: number; ac
     where.push("o.account_id = ?");
     params.push(filter.accountId);
   }
-  return all<Opportunity>(`${SELECT} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY o.updated_at DESC`, ...params);
+  return all<Opportunity>(`${SELECT} ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY o.updated_at DESC`, ...params).filter(r=>!filter.user || recordVisible(filter.user,'opportunity',r.id));
 }
 
-export function getOpportunity(id: number) {
+export function getOpportunity(id: number, user?:UserScope) {
+  if(user && !recordVisible(user,'opportunity',id)) return undefined;
   return get<Opportunity>(`${SELECT} WHERE o.id = ?`, id);
 }
 
@@ -156,6 +159,7 @@ export function updateOpportunity(
     importance?: "LOW" | "MEDIUM" | "HIGH" | null;
   },
 ) {
+  assertActorAccess(actor, "opportunity", id);
   assert(actor.type === "USER", "Chỉ nhân viên được cập nhật hồ sơ Cơ hội");
   const o = mustOpen(id);
   const keys = Object.keys(input).filter((k) => input[k as keyof typeof input] !== undefined) as (keyof typeof input)[];
@@ -197,6 +201,7 @@ export function createScopeDocument(
   opportunityId: number,
   input: { title: string; content?: string; deliverables?: string },
 ): { id: number } {
+  assertActorAccess(actor, "opportunity", opportunityId);
   mustOpen(opportunityId);
   assert(input.title?.trim(), "Tiêu đề biên bản phạm vi không được để trống");
   const { id } = run(
@@ -217,6 +222,7 @@ export function updateScopeDocument(
   docId: number,
   input: { title?: string; content?: string; deliverables?: string; status?: "DRAFT" | "SENT" | "CONFIRMED" },
 ) {
+  assertActorAccess(actor, "scope_document", docId);
   const doc = get<ScopeDocument>("SELECT * FROM scope_documents WHERE id = ?", docId);
   assert(doc, "Không tìm thấy biên bản phạm vi");
   mustOpen(doc.opportunity_id);
@@ -239,6 +245,7 @@ export function updateScopeDocument(
 }
 
 export function confirmScopeDocument(actor: Actor, docId: number) {
+  assertActorAccess(actor, "scope_document", docId);
   updateScopeDocument(actor, docId, { status: "CONFIRMED" });
 }
 
@@ -269,6 +276,7 @@ export function addOpportunityItem(
   opportunityId: number,
   input: { product_id: number; quantity: number; unit_price?: number; discount_pct?: number; notes?: string },
 ) {
+  assertActorAccess(actor, "opportunity", opportunityId);
   assert(actor.type === "USER", "Chỉ nhân viên được cấu hình sản phẩm cho cơ hội");
   const o = mustOpen(opportunityId);
   assert(input.quantity > 0, "Số lượng sản phẩm phải lớn hơn 0");
@@ -313,6 +321,7 @@ export function updateOpportunityItem(
   itemId: number,
   input: { quantity?: number; unit_price?: number; discount_pct?: number; notes?: string },
 ) {
+  assertActorAccess(actor, "opportunity_item", itemId);
   assert(actor.type === "USER", "Chỉ nhân viên được cập nhật sản phẩm");
   const item = get<OpportunityItem>("SELECT * FROM opportunity_items WHERE id = ?", itemId);
   assert(item, "Không tìm thấy dòng sản phẩm");
@@ -345,6 +354,7 @@ export function updateOpportunityItem(
 }
 
 export function removeOpportunityItem(actor: Actor, itemId: number) {
+  assertActorAccess(actor, "opportunity_item", itemId);
   assert(actor.type === "USER", "Chỉ nhân viên được xóa sản phẩm");
   const item = get<OpportunityItem>("SELECT * FROM opportunity_items WHERE id = ?", itemId);
   assert(item, "Không tìm thấy dòng sản phẩm");
@@ -391,6 +401,7 @@ export function createSolution(
     risks?: string;
   },
 ): { id: number } {
+  assertActorAccess(actor, "opportunity", opportunityId);
   assert(actor.type === "USER" && (actor.role === "PRESALES" || actor.role === "PRESALES_MANAGER" || actor.role === "SALES_MANAGER" || actor.role === "ADMIN"), "Chỉ Presales có quyền lập phương án kỹ thuật");
   mustOpen(opportunityId);
   assert(input.title?.trim(), "Tiêu đề phương án kỹ thuật không được để trống");
@@ -442,6 +453,7 @@ export function updateSolution(
     risks?: string;
   },
 ) {
+  assertActorAccess(actor, "solution", solutionId);
   assert(actor.type === "USER" && (actor.role === "PRESALES" || actor.role === "PRESALES_MANAGER" || actor.role === "SALES_MANAGER" || actor.role === "ADMIN"), "Chỉ Presales có quyền cập nhật phương án kỹ thuật");
   const sol = getSolution(solutionId);
   assert(sol, "Không tìm thấy hồ sơ giải pháp");
@@ -491,15 +503,12 @@ export function isExpertReviewRequired(opp: Opportunity): { required: boolean; r
     return { required: true, reason: `Giải pháp '${intSol.title}' có yêu cầu tích hợp hệ thống` };
   }
 
-  const heavySol = solutions.find((s) => s.estimated_effort_mandays >= 30);
-  if (heavySol) {
-    return { required: true, reason: `Công sức triển khai giải pháp (${heavySol.estimated_effort_mandays} mandays) >= 30 mandays` };
-  }
 
   return { required: false, reason: "Không thuộc diện bắt buộc duyệt chuyên môn" };
 }
 
 export function submitExpertReview(actor: Actor, opportunityId: number) {
+  assertActorAccess(actor, "opportunity", opportunityId);
   const o = mustOpen(opportunityId);
   const check = isExpertReviewRequired(o);
   assert(check.required, "Cơ hội không thuộc diện cần gửi duyệt chuyên môn: " + check.reason);
@@ -507,7 +516,7 @@ export function submitExpertReview(actor: Actor, opportunityId: number) {
   tx(() => {
     run("UPDATE opportunities SET expert_review_status = 'PENDING', updated_at = datetime('now') WHERE id = ?", opportunityId);
     audit(actor, "opportunity", opportunityId, "EXPERT_REVIEW_SUBMIT", { details: { reason: check.reason } });
-    notify(null, `Cơ hội ${o.code} yêu cầu Quản lý tư vấn giải pháp duyệt chuyên môn (${check.reason})`, `/opportunities/${opportunityId}`);
+    notifyRole("PRESALES_MANAGER", `Cơ hội ${o.code} yêu cầu Quản lý tư vấn giải pháp duyệt chuyên môn (${check.reason})`, `/opportunities/${opportunityId}`);
   });
 }
 
@@ -517,17 +526,17 @@ export function reviewExpertSolution(
   decision: "APPROVED" | "REJECTED",
   note?: string,
 ) {
+  assertActorAccess(actor, "opportunity", opportunityId);
   assert(actor.type === "USER", "Chỉ nhân viên được thực hiện duyệt chuyên môn");
   assert(
-    actor.role === "PRESALES_MANAGER" || actor.role === "ADMIN" || (actor.role && can(actor.role, "opp.expert_review")),
+    actor.role === "PRESALES_MANAGER",
     "Cổng kiểm soát FR-42: Chỉ Quản lý tư vấn giải pháp (PRESALES_MANAGER) mới có quyền duyệt chuyên môn",
   );
   const o = mustOpen(opportunityId);
 
   tx(() => {
     run(
-      "UPDATE opportunities SET expert_review_status = ?, solution_confirmed = CASE WHEN ? = 'APPROVED' THEN 1 ELSE 0 END, updated_at = datetime('now') WHERE id = ?",
-      decision,
+      "UPDATE opportunities SET expert_review_status = ?, updated_at = datetime('now') WHERE id = ?",
       decision,
       opportunityId,
     );
@@ -549,6 +558,7 @@ export function addStakeholder(
   id: number,
   input: { name: string; role: string; notes?: string | null; contact_id?: number | null },
 ) {
+  assertActorAccess(actor, "opportunity", id);
   mustOpen(id);
   assert(input.name?.trim(), "Thiếu tên bên liên quan");
   assert(input.role?.trim(), "Thiếu vai trò bên liên quan");
@@ -565,6 +575,7 @@ export function addStakeholder(
 }
 
 export function removeStakeholder(actor: Actor, id: number, stakeholderId: number) {
+  assertActorAccess(actor, "opportunity", id);
   mustOpen(id);
   run("DELETE FROM stakeholders WHERE id = ? AND opportunity_id = ?", stakeholderId, id);
   if (!stakeholdersOf(id).some((s) => s.role === "DECISION_MAKER")) {
@@ -589,6 +600,7 @@ export function competitorsOf(id: number) {
 }
 
 export function addCompetitor(actor: Actor, id: number, competitorId: number, notes: string | null) {
+  assertActorAccess(actor, "opportunity", id);
   mustOpen(id);
   assert(get("SELECT id FROM competitors WHERE id = ?", competitorId), "Đối thủ không tồn tại");
   run("INSERT OR IGNORE INTO opportunity_competitors (opportunity_id, competitor_id, notes) VALUES (?, ?, ?)", id, competitorId, notes);
@@ -596,6 +608,7 @@ export function addCompetitor(actor: Actor, id: number, competitorId: number, no
 }
 
 export function removeCompetitor(actor: Actor, id: number, linkId: number) {
+  assertActorAccess(actor, "opportunity", id);
   mustOpen(id);
   run("DELETE FROM opportunity_competitors WHERE id = ? AND opportunity_id = ?", linkId, id);
   if (!competitorsOf(id).length) run("UPDATE opportunities SET competitors_confirmed = 0 WHERE id = ?", id);
@@ -613,6 +626,7 @@ export function checklistStatus(o: Opportunity) {
 }
 
 export function setChecklist(actor: Actor, id: number, key: ChecklistKey, value: boolean) {
+  assertActorAccess(actor, "opportunity", id);
   assert(actor.type === "USER", "Agent không được tự hoàn thành mục kiểm soát");
   assert(DEVELOP_CHECKLIST.some((c) => c.key === key), "Mục checklist không hợp lệ");
   const o = mustOpen(id);
@@ -624,7 +638,7 @@ export function setChecklist(actor: Actor, id: number, key: ChecklistKey, value:
     }
     if (key === "solution_confirmed") {
       assert(
-        actor.role === "PRESALES" || actor.role === "PRESALES_MANAGER" || actor.role === "SALES_MANAGER" || actor.role === "ADMIN",
+        actor.role === "SALES" || actor.role === "PRESALES" || actor.role === "PRESALES_MANAGER" || actor.role === "SALES_MANAGER",
         "Chỉ Presales hoặc Quản lý được xác nhận giải pháp",
       );
       assert(o.proposed_solution?.trim() || listSolutions(id).length > 0, "Chưa có đề xuất phương án giải pháp");
@@ -658,16 +672,23 @@ export function managerGate(o: Opportunity): { required: boolean; reasons: strin
 }
 
 function latestGateApproval(id: number) {
-  return get<{ id: number; status: string; created_at: string }>(
-    "SELECT id, status, created_at FROM approvals WHERE kind='OPP_STAGE_GATE' AND entity_id = ? ORDER BY id DESC LIMIT 1",
+  return get<{ id: number; status: string; created_at: string; payload_json:string|null }>(
+    "SELECT id, status, created_at,payload_json FROM approvals WHERE kind='OPP_STAGE_GATE' AND entity_id = ? ORDER BY id DESC LIMIT 1",
     id,
   );
+}
+export function gateFingerprint(id: number): string {
+  const opp=getOpportunity(id);
+  const risks=listRisks(id).map(r=>({id:r.id,status:r.status,severity:r.severity,description:r.description})).sort((a,b)=>a.id-b.id);
+  const reopen=get<{id:number}>("SELECT id FROM opportunity_stage_history WHERE opportunity_id=? AND from_stage IN ('WON','LOST') AND to_stage='DEVELOP' ORDER BY id DESC LIMIT 1",id)?.id ?? 0;
+  const revision=get<{id:number|null}>("SELECT MAX(id) id FROM audit_log WHERE (entity_type='opportunity' AND entity_id=? AND action IN ('UPDATE','RISK_ADD','RISK_STATUS','OPPORTUNITY_REOPEN')) OR (entity_type IN ('risk','opportunity_risk') AND entity_id IN (SELECT id FROM opportunity_risks WHERE opportunity_id=?))",id,id)?.id ?? 0;
+  return JSON.stringify({importance:opp?.importance,mode:setting('manager_gate_mode'),risks,reopen,revision});
 }
 
 export function gateState(o: Opportunity) {
   const gate = managerGate(o);
   const approval = latestGateApproval(o.id);
-  return { ...gate, approval: approval ?? null };
+  return { ...gate, approval: approval?.payload_json === gateFingerprint(o.id) ? approval : null };
 }
 
 export function stageHistoryOf(opportunityId: number): StageHistoryRecord[] {
@@ -682,6 +703,7 @@ export function stageHistoryOf(opportunityId: number): StageHistoryRecord[] {
 }
 
 export function moveStage(actor: Actor, id: number, to: Opportunity["stage"], reason?: string) {
+  assertActorAccess(actor, "opportunity", id);
   const o = getOpportunity(id);
   assert(o, "Không tìm thấy cơ hội");
   tx(() => {
@@ -708,6 +730,7 @@ export function moveStage(actor: Actor, id: number, to: Opportunity["stage"], re
 }
 
 export function advanceStage(actor: Actor, id: number): { moved: boolean; message: string } {
+  assertActorAccess(actor, "opportunity", id);
   assert(actor.type === "USER", "Agent không được tự chuyển giai đoạn");
   const o = mustOpen(id);
 
@@ -762,6 +785,7 @@ export function advanceStage(actor: Actor, id: number): { moved: boolean; messag
 
 // ===== Đóng & Mở lại cơ hội (FR-47, BR-17, BR-27) =====
 export function markLost(actor: Actor, id: number, reasonCode: string, note?: string) {
+  assertActorAccess(actor, "opportunity", id);
   assert(actor.type === "USER", "Agent không được đóng Cơ hội");
   assert(reasonCode?.trim(), "Phải chọn lý do thất bại");
 
@@ -816,9 +840,10 @@ export function markLost(actor: Actor, id: number, reasonCode: string, note?: st
 }
 
 export function reopenOpportunity(actor: Actor, id: number, reason: string) {
+  assertActorAccess(actor, "opportunity", id);
   assert(actor.type === "USER", "Agent không được mở lại cơ hội");
   assert(
-    actor.role === "SALES_MANAGER" || actor.role === "ADMIN" || (actor.role && can(actor.role, "opp.reopen")),
+    actor.role === "SALES_MANAGER",
     "Cổng kiểm soát BR-17: Chỉ Quản lý kinh doanh (SALES_MANAGER) mới có quyền mở lại cơ hội đã đóng",
   );
   assert(reason?.trim(), "Bắt buộc phải ghi rõ lý do mở lại cơ hội theo BR-17");
@@ -914,10 +939,12 @@ export function researchOf(id: number) {
 }
 
 export function setProposedSolution(actor: Actor, id: number, solution: string) {
+  assertActorAccess(actor, "opportunity", id);
   createSolution(actor, id, { title: solution });
 }
 
 export function verifyResearch(actor: Actor, researchId: number, opts: { applyImportance: boolean; riskIndexes: number[] }) {
+  assertActorAccess(actor, "research", researchId);
   assert(actor.type === "USER", "Chỉ nhân viên xác minh nghiên cứu");
   const r = get<{ id: number; opportunity_id: number; importance: string; risks_json: string; status: string }>(
     "SELECT * FROM opportunity_research WHERE id = ?",
@@ -954,6 +981,7 @@ export function verifyResearch(actor: Actor, researchId: number, opts: { applyIm
 }
 
 export function dismissResearch(actor: Actor, researchId: number) {
+  assertActorAccess(actor, "research", researchId);
   run(
     "UPDATE opportunity_research SET status='DISMISSED', reviewed_by=?, reviewed_at=datetime('now') WHERE id=? AND status='PENDING_REVIEW'",
     actorUserId(actor),

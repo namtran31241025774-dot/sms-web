@@ -33,6 +33,9 @@ export function validateEvidence(
   const opp = ctx.entityType === "opportunity"
     ? get<Record<string, unknown>>("SELECT * FROM opportunities WHERE id = ?", ctx.entityId)
     : null;
+  const verifyQuote = (quote: string | undefined, content: unknown) => {
+    if (quote && !String(content).replace(/\s+/g,' ').includes(quote.replace(/\s+/g,' '))) throw new InvalidEvidenceError("Trích dẫn không có trong nội dung nguồn");
+  };
 
   for (const item of refs) {
     const ref = item.ref.trim();
@@ -50,6 +53,7 @@ export function validateEvidence(
       if (val === undefined || val === null || val === "") {
         throw new InvalidEvidenceError(`Trường ${field} của Lead #${ctx.entityId} không tồn tại hoặc không có dữ liệu`);
       }
+      verifyQuote(item.quote, val);
       continue;
     }
 
@@ -63,6 +67,7 @@ export function validateEvidence(
       if (val === undefined || val === null || val === "") {
         throw new InvalidEvidenceError(`Trường ${field} của Opportunity #${ctx.entityId} không tồn tại hoặc không có dữ liệu`);
       }
+      verifyQuote(item.quote, val);
       continue;
     }
 
@@ -73,8 +78,8 @@ export function validateEvidence(
       if (isNaN(actId)) {
         throw new InvalidEvidenceError(`Mã activity không hợp lệ: ${ref}`);
       }
-      const act = get<{ id: number }>(
-        "SELECT id FROM activities WHERE id = ? AND entity_type = ? AND entity_id = ?",
+      const act = get<{ id: number; subject:string; body:string|null }>(
+        "SELECT id,subject,body FROM activities WHERE id = ? AND entity_type = ? AND entity_id = ?",
         actId, ctx.entityType, ctx.entityId,
       );
       if (!act) {
@@ -82,6 +87,7 @@ export function validateEvidence(
           `Hoạt động ${ref} không tồn tại hoặc không thuộc ${ctx.entityType} #${ctx.entityId}`,
         );
       }
+      verifyQuote(item.quote, `${act.subject}\n${act.body ?? ''}`);
       continue;
     }
 
@@ -94,6 +100,10 @@ export function validateEvidence(
       ref === "web_research" ||
       ref.includes("web_research")
     ) {
+      const cached = ctx.webSources?.find(r=>r.source === ref);
+      const saved = get<{quote:string}>("SELECT quote FROM ai_evidence WHERE run_id=? AND source_type='WEB_SOURCE' AND ref=?",ctx.runId,ref);
+      if (!cached && !saved) throw new InvalidEvidenceError("URL không có trong kết quả web của lần chạy hiện tại");
+      verifyQuote(item.quote, cached ? `${cached.title}\n${cached.snippet}` : saved!.quote);
       continue;
     }
 

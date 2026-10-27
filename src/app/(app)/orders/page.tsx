@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requirePermission } from "@/lib/auth";
 import { CommandBar, CommandLink, PageTitle, StatusBadge } from "@/components/ui";
 import { ORDER_STATUS } from "@/lib/domain";
 import { listOrders } from "@/lib/services/orders";
@@ -7,10 +8,12 @@ export default async function OrdersPage(props: {
   searchParams: Promise<{ q?: string; status?: string }>;
 }) {
   const searchParams = await props.searchParams;
+  const user = await requirePermission('order.read');
   const q = searchParams.q?.trim() || "";
   const status = searchParams.status?.trim() || "";
 
   const orders = listOrders({
+    user,
     search: q,
     status: status || undefined,
   });

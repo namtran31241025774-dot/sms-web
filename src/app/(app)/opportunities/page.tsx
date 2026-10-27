@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { formatDate, formatVnd, LEVEL, OPP_STAGE } from "@/lib/domain";
 import { listOpportunities } from "@/lib/services/opportunities";
 import { Icon } from "@/components/icons";
@@ -11,10 +11,10 @@ export const metadata: Metadata = { title: "Cơ hội bán hàng (Opportunities)
 const COLUMNS = ["DEVELOP", "PROPOSE", "CLOSE", "WON", "LOST"] as const;
 
 export default async function OpportunitiesPage({ searchParams }: PageProps<"/opportunities">) {
-  await requireUser();
+  const user = await requirePermission('opp.read');
   const sp = (await searchParams) as { view?: string; stage?: string; ok?: string; error?: string };
   const view = sp.stage ? "list" : (sp.view ?? "board");
-  const rows = listOpportunities({ stage: sp.stage });
+  const rows = listOpportunities({ stage: sp.stage, user });
 
   return (
     <>

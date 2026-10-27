@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { LEAD_SOURCE, LEAD_STATUS } from "@/lib/domain";
 import { settingNumber, users } from "@/lib/services/core";
 import { listLeads, listTags } from "@/lib/services/leads";
@@ -26,7 +26,7 @@ const VIEWS = [
 ];
 
 export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
-  await requireUser();
+  const user = await requirePermission('lead.read');
   const sp = (await searchParams) as {
     view?: string;
     q?: string;
@@ -39,6 +39,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
 
   const isRatingView = view === "HOT" || view === "WARM" || view === "COLD";
   const rows = listLeads({
+    user,
     view: view === "trash" ? "trash" : undefined,
     status: !isRatingView && view && view !== "all" && view !== "trash" ? view : undefined,
     rating: isRatingView ? view : undefined,

@@ -10,17 +10,18 @@ export async function GET(
   request: Request,
   props: { params: Promise<{ id: string }> },
 ) {
-  await requirePermission("quote.read");
+  const user = await requirePermission("quote.read");
 
   const params = await props.params;
   const quoteId = Number(params.id);
-  const q = getQuote(quoteId);
+  const q = getQuote(quoteId, user);
   assert(q, "Không tìm thấy báo giá");
 
   const { searchParams } = new URL(request.url);
   const versionIdParam = searchParams.get("v");
   const version = versionIdParam ? getQuoteVersion(Number(versionIdParam)) : getLatestQuoteVersion(quoteId);
   assert(version, "Không tìm thấy phiên bản báo giá");
+  assert(version.quote_id === quoteId, "Phiên bản không thuộc báo giá");
 
   const o = getOpportunity(q.opportunity_id)!;
   const contact = o.primary_contact_id

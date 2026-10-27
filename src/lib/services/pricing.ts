@@ -269,7 +269,7 @@ export function getApplicablePriceList(params: {
   // Xác định phân khúc theo số lượng nhân sự nếu chưa chỉ định rõ (BR-03)
   let segment: CustomerSegment = params.customerSegment || "ALL";
   if (!params.customerSegment && params.employeeCount !== undefined) {
-    const enterpriseThreshold = settingNumber("segment_enterprise_min_employees") || 200;
+    const enterpriseThreshold = settingNumber("segment_enterprise_min_employees");
     segment = params.employeeCount >= enterpriseThreshold ? "ENTERPRISE" : "SMB";
   }
 
@@ -338,8 +338,8 @@ export function priceFor(
  * - Chiết khấu > 30%: không cho phép áp dụng.
  */
 export function checkDiscount(discountPct: number, role: Role = "SALES"): DiscountCheckResult {
-  const threshold = settingNumber("discount_threshold_pct") || 10;
-  const maxAllowed = settingNumber("discount_max_pct") || 30;
+  const threshold = settingNumber("discount_threshold_pct");
+  const maxAllowed = settingNumber("discount_max_pct");
 
   if (discountPct < 0) {
     return {
@@ -362,7 +362,7 @@ export function checkDiscount(discountPct: number, role: Role = "SALES"): Discou
   }
 
   if (discountPct > threshold) {
-    const isManager = role === "SALES_MANAGER" || role === "ADMIN";
+    const isManager = role === "SALES_MANAGER";
     return {
       allowed: true,
       requiresApproval: !isManager,

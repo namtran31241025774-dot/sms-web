@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { get } from "@/lib/db";
 import { formatDate, formatVnd, LEVEL, LOST_REASONS_BR27, OPP_STAGE, QUOTE_STATUS, RISK_STATUS, STAKEHOLDER_ROLE } from "@/lib/domain";
 import { can } from "@/lib/rbac";
@@ -51,14 +51,14 @@ import {
 } from "../actions";
 
 export async function generateMetadata({ params }: PageProps<"/opportunities/[id]">): Promise<Metadata> {
-  return { title: getOpportunity(Number((await params).id))?.name ?? "Opportunity" };
+  return { title: getOpportunity(Number((await params).id), await requirePermission('opp.read'))?.name ?? "Opportunity" };
 }
 
 export default async function OpportunityPage({ params, searchParams }: PageProps<"/opportunities/[id]">) {
-  const user = await requireUser();
+  const user = await requirePermission('opp.read');
   const oppId = Number((await params).id);
   const sp = (await searchParams) as { tab?: string; ok?: string; error?: string };
-  const o = getOpportunity(oppId);
+  const o = getOpportunity(oppId, user);
   if (!o) notFound();
 
   const tab = sp.tab ?? "summary";

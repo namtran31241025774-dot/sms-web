@@ -1,12 +1,15 @@
+import { DomainError } from "../domain";
+import { assertActorAccess } from "./access";
 // Module 5.0: Quản lý Đơn hàng (Orders - FR-56 → FR-63, HG8)
 // Tuân thủ kiến trúc 3 lớp, BR-05, BR-09, BR-10, BR-11, BR-22, DEC-10, DEC-18, DEC-23.
 import { all, get, nextCode, run, tx } from "../db";
 import { assert } from "../domain";
-import { erp, provisioning } from "../integrations";
 import { checkDiscount } from "./pricing";
 import { actorUserId, audit, notify, notifyRole, settingBool, type Actor } from "./core";
 import { getOpportunity, moveStage } from "./opportunities";
 import { getAcceptedQuoteVersion } from "./quotes";
+import type { UserScope } from "../scope";
+import { recordVisible } from "./access";
 
 export type OrderStatus = "ACTIVE" | "IN_FULFILLMENT" | "FULFILLED" | "CANCELLED";
 export type PaymentStatus = "UNPAID" | "PARTIALLY_PAID" | "PAID";
@@ -127,7 +130,7 @@ const SELECT = `
   LEFT JOIN users ps ON ps.id = o.post_sales_assignee_id
 `;
 
-export function listOrders(filter: { status?: string; search?: string; accountId?: number } = {}) {
+export function listOrders(filter: { status?: string; search?: string; accountId?: number; user?:UserScope } = {}) {
   const clauses: string[] = [];
   const params: (string | number)[] = [];
 
@@ -146,10 +149,11 @@ export function listOrders(filter: { status?: string; search?: string; accountId
   }
 
   const where = clauses.length > 0 ? ` WHERE ${clauses.join(" AND ")}` : "";
-  return all<Order>(`${SELECT}${where} ORDER BY o.id DESC`, ...params);
+  return all<Order>(`${SELECT}${where} ORDER BY o.id DESC`, ...params).filter(r=>!filter.user || recordVisible(filter.user,'order',r.id));
 }
 
-export function getOrder(id: number): Order | undefined {
+export function getOrder(id: number, user?:UserScope): Order | undefined {
+  if(user && !recordVisible(user,'order',id)) return undefined;
   return get<Order>(`${SELECT} WHERE o.id = ?`, id);
 }
 
@@ -226,6 +230,9 @@ export function createOrderFromQuote(actor: Actor, quoteVersionOrQuoteId: number
   }
 
   // Sử dụng hợp đồng getAcceptedQuoteVersion từ WP-04
+  const alreadyCreated = get<{code:string}>("SELECT code FROM orders WHERE source_quote_version_id=?",versionId);
+  assertActorAccess(actor,'quote_version',versionId);
+  assert(!alreadyCreated, `Báo giá đã được tạo đơn hàng ${alreadyCreated?.code}`);
   const data = getAcceptedQuoteVersion(versionId);
   const { quoteVersion: v, quote: q, opportunity: o, account, lines } = data;
 
@@ -339,31 +346,6 @@ export function createOrderFromQuote(actor: Actor, quoteVersionOrQuoteId: number
       );
     }
 
-    // Tự động khởi tạo lịch thanh toán mặc định theo 2 đợt (50% - 50%) khớp chính xác tổng tiền (FR-59, BR-11)
-    const half1 = Math.round(grandTotal / 2);
-    const half2 = grandTotal - half1;
-    run(
-      "INSERT INTO billing_milestones (order_id, name, percentage, amount, conditions, status) VALUES (?, ?, ?, ?, ?, 'PENDING')",
-      orderId,
-      "Tạm ứng đợt 1 (Ký hợp đồng / Xác nhận đơn)",
-      50,
-      half1,
-      "Sau khi hai bên xác nhận đơn hàng",
-    );
-    run(
-      "INSERT INTO billing_milestones (order_id, name, percentage, amount, conditions, status) VALUES (?, ?, ?, ?, ?, 'PENDING')",
-      orderId,
-      "Thanh toán đợt 2 (Nghiệm thu bàn giao)",
-      50,
-      half2,
-      "Sau khi hoàn tất nghiệm thu bàn giao kỹ thuật",
-    );
-
-    // Kích hoạt adapter triển khai ngoài
-    const { ticket } = provisioning.requestFulfillment({
-      code,
-      lines: lines.map((l) => ({ product: l.product_code, quantity: l.quantity })),
-    });
 
     // Cập nhật cơ hội sang giai đoạn WON và lưu doanh thu chốt
     if (o.stage === "PROPOSE" || o.stage === "CLOSE") {
@@ -375,7 +357,7 @@ export function createOrderFromQuote(actor: Actor, quoteVersionOrQuoteId: number
     audit(actor, "order", orderId, "CREATE", {
       from: "QUOTE",
       to: "ACTIVE",
-      details: { quoteCode: q.code, quoteVersionId: v.id, grandTotal, provisioningTicket: ticket, priceLocked: true },
+      details: { quoteCode: q.code, quoteVersionId: v.id, grandTotal, priceLocked: true },
     });
 
     notifyRole("FINANCE", `Đơn hàng mới ${code} – ${grandTotal.toLocaleString("vi-VN")} VND (${account.name})`, `/orders/${orderId}`);
@@ -543,12 +525,6 @@ export function createDirectOrder(actor: Actor, input: DirectOrderInput): number
       );
     }
 
-    // Tạo đợt thanh toán mặc định 100%
-    run(
-      "INSERT INTO billing_milestones (order_id, name, percentage, amount, conditions, status) VALUES (?, 'Toàn bộ giá trị đơn hàng', 100, ?, 'Thanh toán theo hợp đồng', 'PENDING')",
-      orderId,
-      grandTotal,
-    );
 
     audit(actor, "order", orderId, "CREATE_DIRECT", {
       to: "ACTIVE",
@@ -581,6 +557,7 @@ export type MilestoneInput = {
  * - Báo chênh lệch và không cho phép lưu nếu có sai lệch.
  */
 export function setBillingMilestones(actor: Actor, orderId: number, milestones: MilestoneInput[]): void {
+  assertActorAccess(actor, "order", orderId);
   const order = getOrder(orderId);
   assert(order, "Không tìm thấy đơn hàng");
   assert(order.status !== "CANCELLED", "Đơn hàng đã hủy, không thể thay đổi lịch thanh toán");
@@ -599,7 +576,7 @@ export function setBillingMilestones(actor: Actor, orderId: number, milestones: 
   if (totalMilestones !== orderTargetAmount) {
     const diff = totalMilestones - orderTargetAmount;
     const diffText = diff > 0 ? `thừa ${diff.toLocaleString("vi-VN")} ₫` : `thiếu ${Math.abs(diff).toLocaleString("vi-VN")} ₫`;
-    throw new Error(
+    throw new DomainError(
       `Tổng giá trị các đợt thanh toán (${totalMilestones.toLocaleString("vi-VN")} ₫) không khớp với giá trị đơn hàng (${orderTargetAmount.toLocaleString("vi-VN")} ₫). Chênh lệch: ${diffText}`,
     );
   }
@@ -641,9 +618,14 @@ export function setBillingMilestones(actor: Actor, orderId: number, milestones: 
  * Kiểm tra, xác nhận và khóa giá, loại tiền, chiết khấu và điều kiện thương mại trên đơn hàng.
  */
 export function lockOrderPrice(actor: Actor, orderId: number): void {
+  assertActorAccess(actor, "order", orderId);
   const order = getOrder(orderId);
   assert(order, "Không tìm thấy đơn hàng");
   assert(order.status !== "CANCELLED", "Đơn hàng đã hủy");
+  if(order.price_locked_at) {
+    audit(actor,'order',orderId,'PRICE_LOCK',{details:{priceLockedAt:order.price_locked_at,alreadyLocked:true}});
+    return;
+  }
 
   tx(() => {
     run("UPDATE orders SET price_locked_at = datetime('now') WHERE id = ?", orderId);
@@ -670,6 +652,7 @@ export function updateFulfillmentProgress(
     notes?: string | null;
   },
 ): void {
+  assertActorAccess(actor, "order", orderId);
   const order = getOrder(orderId);
   assert(order, "Không tìm thấy đơn hàng");
   assert(order.status !== "CANCELLED" && order.status !== "FULFILLED", "Đơn hàng đã hoàn tất hoặc đã hủy");
@@ -724,6 +707,7 @@ export function createHandover(
     }>;
   },
 ): number {
+  assertActorAccess(actor, "order", orderId);
   const order = getOrder(orderId);
   assert(order, "Không tìm thấy đơn hàng");
   assert(input.title?.trim(), "Tiêu đề biên bản bàn giao không được để trống");
@@ -771,6 +755,7 @@ export function updateHandoverItem(
     acceptanceNotes?: string | null;
   },
 ): void {
+  assertActorAccess(actor, "handover", handoverId);
   const item = get<{ id: number; status: string; handover_id: number }>(
     "SELECT * FROM handover_items WHERE id = ? AND handover_id = ?",
     itemId,
@@ -831,9 +816,13 @@ export function completeOrderAndTransitionPostSales(
     notes?: string | null;
   },
 ): void {
+  assertActorAccess(actor, "order", orderId);
   const order = getOrder(orderId);
   assert(order, "Không tìm thấy đơn hàng");
   assert(order.status !== "CANCELLED", "Đơn hàng đã hủy");
+  const handovers=orderHandovers(orderId);
+  assert(handovers.length>0 && handovers.every(h=>h.status==='COMPLETED'), 'Cần hoàn thành kết quả bàn giao trước khi hoàn thành đơn');
+  assert(handovers.every(h=>handoverItems(h.id).length>0 && handoverItems(h.id).every(i=>i.status==='ACCEPTED')), 'Các hạng mục bàn giao chưa được chấp nhận đầy đủ');
 
   tx(() => {
     run(
@@ -899,6 +888,7 @@ export function getOrderForInvoice(orderId: number) {
 
 // Giữ lại hàm tương thích ngược updateFulfillmentTask
 export function updateFulfillmentTask(actor: Actor, orderId: number, taskId: number, status: "PENDING" | "IN_PROGRESS" | "DONE", note: string | null) {
+  assertActorAccess(actor, "order", orderId);
   const order = getOrder(orderId);
   assert(order, "Không tìm thấy Order");
   assert(order.status !== "CANCELLED" && order.status !== "FULFILLED", "Order đã kết thúc");
@@ -917,108 +907,5 @@ export function updateFulfillmentTask(actor: Actor, orderId: number, taskId: num
       const opp = order.opportunity_id ? getOpportunity(order.opportunity_id) : undefined;
       if (next === "FULFILLED") notify(opp?.owner_id, `Order ${order.code} đã hoàn tất bàn giao`, `/orders/${orderId}`);
     }
-  });
-}
-
-// ===== Tương thích ngược Invoice & Payment cũ cho đến khi WP-06 hoàn thành =====
-export type Invoice = {
-  id: number;
-  code: string;
-  order_id: number;
-  order_code: string;
-  account_name: string;
-  milestone: string;
-  amount: number;
-  due_date: string | null;
-  status: "DRAFT" | "ISSUED" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
-  paid_amount: number;
-  erp_ref: string | null;
-  issued_at: string | null;
-  created_at: string;
-};
-
-const INV_SELECT = `SELECT i.*, o.code AS order_code, a.name AS account_name FROM invoices i
-  JOIN orders o ON o.id = i.order_id JOIN accounts a ON a.id = o.account_id`;
-
-export function listInvoices(filter: { status?: string; orderId?: number } = {}) {
-  if (filter.orderId) return all<Invoice>(`${INV_SELECT} WHERE i.order_id = ? ORDER BY i.id`, filter.orderId);
-  if (filter.status) return all<Invoice>(`${INV_SELECT} WHERE i.status = ? ORDER BY i.id DESC`, filter.status);
-  return all<Invoice>(`${INV_SELECT} ORDER BY i.id DESC`);
-}
-
-export function getInvoice(id: number) {
-  return get<Invoice>(`${INV_SELECT} WHERE i.id = ?`, id);
-}
-
-export function paymentsOf(invoiceId: number) {
-  return all<{ id: number; amount: number; paid_at: string; method: string | null; reference: string | null; source: string }>(
-    "SELECT * FROM payments WHERE invoice_id = ? ORDER BY paid_at",
-    invoiceId,
-  );
-}
-
-export function createInvoice(actor: Actor, orderId: number, input: { milestone: string; amount: number; dueDate: string | null }) {
-  const order = getOrder(orderId);
-  assert(order, "Không tìm thấy Order");
-  assert(order.status !== "CANCELLED", "Order đã hủy");
-  assert(input.milestone?.trim(), "Thiếu tên mốc thanh toán");
-  assert(Number.isInteger(input.amount) && input.amount > 0, "Số tiền không hợp lệ");
-  assert(order.invoiced + input.amount <= (order.grand_total || order.total), `Vượt giá trị Order (còn có thể lập ${((order.grand_total || order.total) - order.invoiced).toLocaleString("vi-VN")})`);
-  return tx(() => {
-    const id = run(
-      "INSERT INTO invoices (code, order_id, milestone, amount, due_date, created_by) VALUES (?,?,?,?,?,?)",
-      nextCode("invoices", "INV"), orderId, input.milestone.trim(), input.amount, input.dueDate, actorUserId(actor),
-    ).id;
-    audit(actor, "invoice", id, "CREATE", { to: "DRAFT", details: input });
-    notifyRole("FINANCE", `Hóa đơn nháp mới cho ${order.code} cần phát hành`, "/invoices");
-    return id;
-  });
-}
-
-export function issueInvoice(actor: Actor, id: number) {
-  const inv = getInvoice(id);
-  assert(inv, "Không tìm thấy hóa đơn");
-  assert(inv.status === "DRAFT", "Chỉ phát hành hóa đơn nháp");
-  tx(() => {
-    const { erpRef } = erp.pushInvoice({ code: inv.code, amount: inv.amount, orderCode: inv.order_code });
-    run("UPDATE invoices SET status='ISSUED', erp_ref=?, issued_by=?, issued_at=datetime('now') WHERE id=?", erpRef, actorUserId(actor), id);
-    audit(actor, "invoice", id, "ISSUE", { from: "DRAFT", to: "ISSUED", details: { erpRef } });
-  });
-}
-
-export function cancelInvoice(actor: Actor, id: number, reason: string) {
-  const inv = getInvoice(id);
-  assert(inv, "Không tìm thấy hóa đơn");
-  assert(inv.paid_amount === 0, "Hóa đơn đã có thanh toán, không hủy được");
-  assert(reason?.trim(), "Cần lý do hủy");
-  run("UPDATE invoices SET status='CANCELLED' WHERE id=?", id);
-  audit(actor, "invoice", id, "CANCEL", { from: inv.status, to: "CANCELLED", reason });
-}
-
-export function recordPayment(
-  actor: Actor,
-  invoiceId: number,
-  input: { amount: number; paidAt: string; method?: string | null; reference?: string | null; source?: "USER" | "ERP" },
-) {
-  const inv = getInvoice(invoiceId);
-  assert(inv, "Không tìm thấy hóa đơn");
-  assert(inv.status === "ISSUED" || inv.status === "PARTIALLY_PAID", "Hóa đơn chưa phát hành hoặc đã thanh toán đủ");
-  assert(Number.isInteger(input.amount) && input.amount > 0, "Số tiền không hợp lệ");
-  assert(inv.paid_amount + input.amount <= inv.amount, "Số tiền vượt giá trị hóa đơn");
-  if (input.reference) {
-    assert(!get("SELECT id FROM payments WHERE invoice_id = ? AND reference = ?", invoiceId, input.reference), "Mã tham chiếu thanh toán đã được ghi nhận");
-  }
-  tx(() => {
-    run(
-      "INSERT INTO payments (invoice_id, amount, paid_at, method, reference, source, recorded_by) VALUES (?,?,?,?,?,?,?)",
-      invoiceId, input.amount, input.paidAt, input.method ?? null, input.reference ?? null, input.source ?? "USER", actorUserId(actor),
-    );
-    const paid = inv.paid_amount + input.amount;
-    const to = paid >= inv.amount ? "PAID" : "PARTIALLY_PAID";
-    run("UPDATE invoices SET paid_amount=?, status=? WHERE id=?", paid, to, invoiceId);
-    audit(actor, "invoice", invoiceId, "PAYMENT", { from: inv.status, to, details: input });
-    const order = getOrder(inv.order_id);
-    const opp = order?.opportunity_id ? getOpportunity(order.opportunity_id) : undefined;
-    notify(opp?.owner_id, `${inv.code}: đã nhận ${input.amount.toLocaleString("vi-VN")} ₫ (${to === "PAID" ? "đủ" : "một phần"})`, "/invoices");
   });
 }
