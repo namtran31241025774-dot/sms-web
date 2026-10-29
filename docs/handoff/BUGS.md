@@ -1,5 +1,7 @@
 # Lỗi phát hiện khi test
 
+- [x] BUG-045 [WP-08][mức: cao] Tab nghiên cứu cơ hội lỗi render ngay sau khi Opportunity Agent chạy thành công: next_actions_json chứa object {action,owner_role,why} nhưng page ép thành string[] và render object trực tiếp. Sửa bằng component hiển thị nội dung/vai trò/lý do, hỗ trợ chuỗi cũ và JSON lỗi. 29/10: npm run check xanh, 197 test (3 hồi quy render); tick chỉ xác nhận local trên nhánh review, chưa merge/deploy. Không chạy lại Agent hoặc sửa kết quả người dùng để chữa lỗi. (FR-36, FR-44)
+
 Mẫu: `- [ ] BUG-NNN [WP-xx][mức: cao/trung bình/thấp] Mô tả. Tái hiện: … Mong đợi: … (FR/HG liên quan)`
 
 WP sở hữu sửa trên nhánh `fix/BUG-NNN-…`, kèm test tái hiện, rồi tick khi đã gộp.

@@ -30,6 +30,10 @@ Trạng thái:
 - BUG-014–038, 040–041 đã sửa: 194 test, typecheck/lint xanh; build thành công. BUG-039 còn xác minh volume trên Render.
 - Bàn giao: `docs/handoff/REVIEW-27-10.md`; BUG-012/013 vẫn thuộc WP-11.
 
+## Test trực tiếp 29/10 — BUG-045
+
+- Đã sửa lỗi render kết quả Opportunity Agent; 197 test xanh. Chờ review, chưa merge/deploy. Không đổi mô hình ERD hay tự xác minh nghiên cứu của người dùng.
+
 ## Quyết định cần nhóm chốt (ảnh hưởng code)
 
 Xem `docs/requirements/DECISIONS.md`, mục *Việc nhóm cần sửa trong bài*. Các mục **Mặc định** quan trọng nhất:

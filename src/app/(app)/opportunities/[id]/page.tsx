@@ -27,6 +27,7 @@ import { quotesOf } from "@/lib/services/quotes";
 import { SubmitButton } from "@/components/client";
 import { Icon } from "@/components/icons";
 import { AgentRuns, AuditTrail, SALES_STAGES, Timeline } from "@/components/record";
+import { OpportunityNextActions } from "@/components/opportunity-next-actions";
 import {
   Badge, Card, CommandAction, CommandBar, CommandLink, CommandSep, Empty, Flash, FormField, Grid, HeaderField, MessageBar, PageTitle, Persona, ProcessFlow, StatusBadge, Tabs,
 } from "@/components/ui";
@@ -760,7 +761,6 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
             {research.length ? (
               research.map((r) => {
                 const rRisks = JSON.parse(r.risks_json) as { description: string; severity: string }[];
-                const actions = JSON.parse(r.next_actions_json) as string[];
                 const sources = JSON.parse(r.sources_json) as { ref: string; detail: string }[];
                 return (
                   <Card
@@ -795,9 +795,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                         </div>
                         <div>
                           <div className="label">Tối đa 3 hành động ưu tiên</div>
-                          <ol className="list-decimal space-y-1 pl-5">
-                            {actions.map((a, i) => <li key={i}>{a}</li>)}
-                          </ol>
+                          <OpportunityNextActions serialized={r.next_actions_json} />
                         </div>
                         <div>
                           <div className="label">Nguồn dẫn</div>
