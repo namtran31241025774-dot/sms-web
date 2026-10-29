@@ -16,6 +16,7 @@ import {
   OpportunityResearchSchema,
 } from "./schemas";
 import { validateEvidence, recordAiEvidence, InvalidEvidenceError } from "./evidence";
+import { evaluateOpportunityRules, type RiskCategory } from "./rules";
 
 export type AgentName = "QUALIFICATION" | "OPPORTUNITY";
 
@@ -487,6 +488,17 @@ export const TOOLS = {
       };
     },
   }),
+  evaluate_opportunity_rules: tool({
+    description:
+      "Chạy bộ quy tắc OPP-R01..R10 do backend sở hữu (BR-28). Trả về mức quan trọng, rủi ro có mã rule, hành động đã xếp ưu tiên, cổng phê duyệt và độ bao phủ dữ liệu. Không được sửa kết quả này; chỉ diễn giải.",
+    access: "READ",
+    agents: ["OPPORTUNITY"],
+    input: empty,
+    run: (ctx) => {
+      oppOf(ctx);
+      return evaluateOpportunityRules(ctx.entityId);
+    },
+  }),
   save_opportunity_research: tool({
     description:
       "Ghi kết quả nghiên cứu (Opportunity Research) theo schema chuẩn (6 mục insight, importance reason, risks, max 3 next_actions, sources). Đây là quyền ghi DUY NHẤT của Agent.",
@@ -509,32 +521,65 @@ export const TOOLS = {
         ? ctx.runId
         : null;
 
-      const importanceReason = input.importance_reason || `Doanh thu ${o.amount.toLocaleString("vi-VN")} ₫`;
-      const nextActions = input.next_actions.slice(0, 3);
+      // BR-28: backend chạy lại bộ quy tắc và khóa mức quan trọng, rủi ro có mã rule, thứ tự hành động.
+      // Phần của LLM được giữ nhưng tách riêng: rủi ro không có rule = "chưa phân loại", hành động thêm = additional.
+      const rules = evaluateOpportunityRules(o.id);
+      const ruleCategories = new Set(rules.risks.map((r) => r.category));
+      const llmRisks = input.risks
+        .filter((r) => !r.category || !ruleCategories.has(r.category as RiskCategory))
+        .map((r) => ({ ...r, rule_id: null, unclassified: true }));
+      const actionText = (a: string | { action: string }) => (typeof a === "string" ? a : a.action);
+      const ruleActions = new Set(rules.next_actions.concat(rules.additional_actions).map((a) => a.action));
+      const llmActions = [...input.next_actions, ...(input.additional_actions ?? [])]
+        .filter((a) => !ruleActions.has(actionText(a)));
 
       const { id } = run(
         `INSERT INTO opportunity_research (
           opportunity_id, run_id, importance, importance_reason, summary,
           changes_since_last, insights_json, risks_json, next_actions_json,
-          additional_actions_json, sources_json, email_insight_status, status
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'PENDING_REVIEW')`,
+          additional_actions_json, sources_json, email_insight_status, status,
+          ruleset_version, ruleset_hash, confidence, confidence_band, llm_importance, gates_json
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'PENDING_REVIEW', ?,?,?,?,?,?)`,
         o.id,
         validRunId,
-        input.importance,
-        importanceReason,
+        rules.importance,
+        rules.importance_reason,
         input.summary,
         input.changes_since_last ?? null,
         JSON.stringify(input.insights ?? {}),
-        JSON.stringify(input.risks),
-        JSON.stringify(nextActions),
-        JSON.stringify(input.additional_actions ?? []),
+        JSON.stringify([...rules.risks, ...llmRisks]),
+        JSON.stringify(rules.next_actions),
+        JSON.stringify([...rules.additional_actions, ...llmActions]),
         JSON.stringify(verifiedSources),
         input.email_insight_status ?? "OK",
+        rules.ruleset_version,
+        rules.ruleset_hash,
+        rules.confidence,
+        rules.confidence_band,
+        input.importance,
+        JSON.stringify(rules.gates),
       );
 
+      for (const e of rules.evaluations) {
+        run(
+          `INSERT INTO ai_rule_evaluations (run_id, research_id, opportunity_id, rule_id, br_ref, ruleset_version, ruleset_hash,
+             status, severity, raw_value, threshold, rationale, limitation, evidence_refs_json, required_action, human_gate)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          validRunId, id, o.id, e.rule_id, e.br, rules.ruleset_version, rules.ruleset_hash,
+          e.status, e.severity, e.raw_value === null ? null : String(e.raw_value), e.threshold === null ? null : String(e.threshold),
+          e.rationale, e.limitation, JSON.stringify(e.evidence_refs), e.required_action?.action ?? null, e.human_gate,
+        );
+      }
+
       recordAiEvidence({ runId: ctx.runId, researchId: id, refs: verifiedSources });
-      audit({ type: "AI", agent: ctx.agent, runId: ctx.runId }, "opportunity_research", id, "CREATE", { to: "PENDING_REVIEW" });
-      return { research_id: id, status: "PENDING_REVIEW" };
+      audit({ type: "AI", agent: ctx.agent, runId: ctx.runId }, "opportunity_research", id, "CREATE", {
+        to: "PENDING_REVIEW",
+        details: {
+          ruleset: `${rules.ruleset_version}#${rules.ruleset_hash}`,
+          ...(input.importance !== rules.importance ? { llm_importance_overridden: `${input.importance}→${rules.importance}` } : {}),
+        },
+      });
+      return { research_id: id, status: "PENDING_REVIEW", importance: rules.importance, confidence: rules.confidence, gates: rules.gates };
     },
   }),
   notify_owner: tool({

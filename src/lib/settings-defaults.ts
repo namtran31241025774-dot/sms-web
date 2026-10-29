@@ -115,6 +115,15 @@ export const SETTING_DEFAULTS: Record<string, SettingDefinition> = {
     value: "6",
     description: "Chu kỳ Opportunity Agent làm mới nghiên cứu cơ hội (giờ) (BR-15, FR-36)",
   },
+  // BR-28: Bộ quy tắc của Opportunity Agent
+  opp_close_warning_days: {
+    value: "21",
+    description: "Số ngày còn lại tới ngày chốt mà cơ hội vẫn ở Develop thì gắn rủi ro tiến độ (OPP-R06, BR-28)",
+  },
+  ai_min_confidence: {
+    value: "0.6",
+    description: "Độ bao phủ dữ liệu tối thiểu của bộ quy tắc; thấp hơn thì kết quả gắn cờ cần bổ sung dữ liệu (BR-28)",
+  },
   email_window_days: {
     value: "30",
     description: "Cửa sổ email gần nhất Opportunity Agent được đọc (ngày) (BR-15, FR-89)",

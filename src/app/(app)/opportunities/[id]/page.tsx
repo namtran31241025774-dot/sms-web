@@ -20,11 +20,13 @@ import {
   listSolutions,
   researchOf,
   risksOf,
+  ruleEvaluationsOf,
   stageHistoryOf,
   stakeholdersOf,
 } from "@/lib/services/opportunities";
 import { quotesOf } from "@/lib/services/quotes";
 import { SubmitButton } from "@/components/client";
+import { RuleEvaluationTable } from "@/components/rule-evaluation-table";
 import { Icon } from "@/components/icons";
 import { AgentRuns, AuditTrail, SALES_STAGES, Timeline } from "@/components/record";
 import { OpportunityNextActions } from "@/components/opportunity-next-actions";
@@ -760,7 +762,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
           <div className="space-y-4">
             {research.length ? (
               research.map((r) => {
-                const rRisks = JSON.parse(r.risks_json) as { description: string; severity: string }[];
+                const rRisks = JSON.parse(r.risks_json) as { description: string; severity: string; rule_id?: string | null; unclassified?: boolean }[];
                 const sources = JSON.parse(r.sources_json) as { ref: string; detail: string }[];
                 return (
                   <Card
@@ -776,8 +778,11 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                     <form action={verifyResearchAction} className="space-y-3 text-sm">
                       <input type="hidden" name="id" value={o.id} />
                       <input type="hidden" name="research_id" value={r.id} />
-                      <div className="flex items-center gap-2">
-                        Mức quan trọng đề xuất: <StatusBadge status={r.importance} labels={LEVEL} />
+                      <div className="flex flex-wrap items-center gap-2">
+                        Mức quan trọng (theo quy tắc): <StatusBadge status={r.importance} labels={LEVEL} />
+                        {r.llm_importance && r.llm_importance !== r.importance && <span className="text-xs text-ink-3">LLM đề xuất {LEVEL[r.llm_importance as keyof typeof LEVEL] ?? r.llm_importance}, đã thay bằng kết quả quy tắc</span>}
+                        {r.confidence !== null && <span className="text-xs text-ink-3">· Độ bao phủ dữ liệu {Math.round(r.confidence * 100)}% ({r.confidence_band === "LOW" ? "thấp – cần bổ sung dữ liệu" : r.confidence_band === "MEDIUM" ? "trung bình" : "cao"})</span>}
+                        {r.ruleset_hash && <code className="text-[11px] text-ink-3">{r.ruleset_version}#{r.ruleset_hash}</code>}
                       </div>
                       <p className="text-ink-2">{r.summary}</p>
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -787,7 +792,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                             {rRisks.map((x, i) => (
                               <li key={i} className="flex items-start gap-2">
                                 {r.status === "PENDING_REVIEW" && <input type="checkbox" name="risk" value={i} defaultChecked className="mt-0.5" />}
-                                <span><StatusBadge status={x.severity} labels={LEVEL} /> {x.description}</span>
+                                <span><StatusBadge status={x.severity} labels={LEVEL} /> {x.rule_id ? <code className="text-[11px]">{x.rule_id}</code> : x.unclassified ? <span className="text-[11px] text-ink-3">Chưa phân loại (LLM)</span> : null} {x.description}</span>
                               </li>
                             ))}
                             {!rRisks.length && <li className="text-ink-3">Không có</li>}
@@ -805,6 +810,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                           </ul>
                         </div>
                       </div>
+                      <RuleEvaluationTable rows={ruleEvaluationsOf(r.id)} />
                       {r.status === "PENDING_REVIEW" && can(user.role, "ai.review") && (
                         <div className="flex flex-wrap items-center gap-3 border-t border-[#f0f0f0] pt-3">
                           <label className="flex items-center gap-2"><input type="checkbox" name="apply_importance" defaultChecked /> Áp dụng mức quan trọng vào hồ sơ</label>

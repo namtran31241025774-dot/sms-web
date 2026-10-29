@@ -369,7 +369,8 @@ describe("WP-08: AI Agent (FR-06, FR-19, FR-20, FR-32, FR-36, FR-44, FR-88, FR-8
         "SELECT importance_reason, email_insight_status, insights_json FROM opportunity_research WHERE id = ?",
         out.research_id,
       );
-      expect(row?.importance_reason).toBe("Doanh thu 300 triệu");
+      // BR-28: lý do mức quan trọng do rule OPP-R01 (BR-08) khóa, không lấy chữ của LLM
+      expect(row?.importance_reason).toContain("(BR-08)");
       expect(row?.email_insight_status).toBe("NO_INSIGHT");
       expect(row?.insights_json).toContain("NO_INSIGHT");
     });

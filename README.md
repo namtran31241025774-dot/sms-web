@@ -7,6 +7,29 @@ Hệ thống quản lý hoạt động Sales cho doanh nghiệp B2B SaaS có d�
 
 Đồ án môn Kiến trúc Hệ thống, UEH.
 
+## Câu chuyện của hệ thống
+
+Một thương vụ đi qua 5 giai đoạn **Qualify → Develop → Propose → Close → Fulfill**. Hai Agent làm phần việc tốn thời gian của nhân viên — đọc dữ liệu, đối chiếu tiêu chí, tìm rủi ro, đề xuất bước tiếp theo — nhưng **không quyết định thay người**:
+
+1. Lead mới vào → **Qualification Agent** chấm BANT có căn cứ, đề xuất làm giàu / loại / chuyển đổi, soạn email hỏi thêm. SDR duyệt (HG1–HG3).
+2. Cơ hội ở Develop → **Opportunity Agent** đọc hồ sơ, email, ghi chú họp, rồi gọi **bộ quy tắc OPP-R01..R10** do backend sở hữu.
+3. Mỗi nhận định đi kèm chuỗi **quy tắc → dữ liệu quan sát → ngưỡng → giới hạn kết luận → việc cần làm → cổng duyệt**. Thiếu dữ liệu thì ghi *Chưa đánh giá được*, không suy đoán.
+4. AE xác minh bản nghiên cứu (HG4) mới chép vào hồ sơ; cơ hội mức Cao hoặc còn rủi ro phải qua QLKD (HG6).
+5. Mọi lần chạy để lại dấu vết: lần chạy, công cụ đã gọi, căn cứ đã xác thực, kết quả từng quy tắc và **hash bộ quy tắc** đang dùng.
+
+Ranh giới cốt lõi: **LLM (OpenAI) chọn bước và diễn giải; backend sở hữu ngưỡng, trạng thái, quyền và cổng duyệt; con người quyết định.**
+
+## Whitepapers
+
+| Tài liệu | Nội dung |
+| :---- | :---- |
+| [01 · Hai Agent và Harness](docs/whitepapers/01-agent-harness.md) | Các lớp của một Agent, vòng gọi công cụ có giới hạn, mock và OpenAI, Agent không được làm gì |
+| [02 · Bộ quy tắc và mô hình quyết định](docs/whitepapers/02-rules-and-decision-model.md) | OPP-R01..R10, trạng thái, độ bao phủ dữ liệu, ai sở hữu phần nào (BR-28) |
+| [03 · Dữ liệu của lớp AI](docs/whitepapers/03-ai-data-model.md) | Bảng AI, `ai_rule_evaluations`, hai đường truy vết |
+| [04 · Kiểm soát, con người duyệt, bảo mật](docs/whitepapers/04-control-hitl-security.md) | HG1–HG8, kill switch, ngân sách, căn cứ, OWASP |
+| [05 · Kịch bản test trên app](docs/whitepapers/05-demo-test-scenarios.md) | 7 ca thao tác để thấy dữ liệu chạy qua Agent |
+| [06 · Hỏi đáp kỹ thuật và bản đồ code](docs/whitepapers/06-technical-qa-and-implementation-map.md) | Câu hỏi thường gặp, màn hình → code → test, việc còn mở |
+
 ## Bắt đầu
 
 ```sh

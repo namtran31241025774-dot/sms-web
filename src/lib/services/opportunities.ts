@@ -931,11 +931,26 @@ export function researchOf(id: number) {
     reviewed_by_name: string | null;
     reviewed_at: string | null;
     created_at: string;
+    ruleset_version: string | null;
+    ruleset_hash: string | null;
+    confidence: number | null;
+    confidence_band: string | null;
+    llm_importance: string | null;
+    gates_json: string | null;
   }>(
     `SELECT r.*, u.name AS reviewed_by_name FROM opportunity_research r LEFT JOIN users u ON u.id = r.reviewed_by
      WHERE r.opportunity_id = ? ORDER BY r.id DESC`,
     id,
   );
+}
+
+/** Kết quả từng quy tắc OPP-R01..R10 đã khóa cho một bản nghiên cứu (BR-28). */
+export function ruleEvaluationsOf(researchId: number) {
+  return all<{
+    rule_id: string; br_ref: string; status: string; severity: string | null; raw_value: string | null;
+    threshold: string | null; rationale: string; limitation: string | null; evidence_refs_json: string;
+    required_action: string | null; human_gate: string | null;
+  }>("SELECT * FROM ai_rule_evaluations WHERE research_id = ? ORDER BY rule_id", researchId);
 }
 
 export function setProposedSolution(actor: Actor, id: number, solution: string) {

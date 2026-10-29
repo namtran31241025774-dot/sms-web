@@ -3,6 +3,7 @@
 import { stripAccents } from "../domain";
 import { get } from "../db";
 import { invokeTool, type ToolCallLog, type ToolContext } from "./tools";
+import type { RuleOutcome } from "./rules";
 
 type Research = { untrusted_data: true; data: { title: string; snippet: string; source: string }[] };
 type Wrapped<T> = { data: T };
@@ -191,30 +192,11 @@ export function mockOpportunityAgent(ctx: ToolContext, log: ToolCallLog[]): stri
   const web = (call("web_research", { query: o.account }) as Research).data;
   call("get_win_history");
 
-  const risks: { category: "MISSING_DECISION_MAKER" | "COMPETITOR" | "TIMELINE" | "TECH_CONSTRAINT" | "OTHER"; description: string; severity: "LOW" | "MEDIUM" | "HIGH"; sources?: { ref: string; detail: string; quote: string }[] }[] = [];
-  const actions: { action: string; owner_role: string; why: string }[] = [];
+  // Mức quan trọng, rủi ro và thứ tự hành động lấy từ rule engine (BR-28) — mock không tự đặt ngưỡng.
+  const rules = call("evaluate_opportunity_rules") as RuleOutcome;
+  const risks = rules.risks.map(({ category, severity, description }) => ({ category, severity, description }));
+  const actions = [...rules.next_actions, ...rules.additional_actions].map(({ action, owner_role, why }) => ({ action, owner_role, why }));
   const sources: { ref: string; detail: string; quote: string }[] = [];
-
-  if (!o.stakeholders.some((s) => s.role === "DECISION_MAKER")) {
-    risks.push({ category: "MISSING_DECISION_MAKER", description: "Chưa xác định/tiếp cận người ra quyết định", severity: "HIGH" });
-    actions.push({ action: "Đề nghị champion giới thiệu người quyết định và đặt lịch họp với họ", owner_role: "AE", why: "Bắt buộc theo HG6" });
-  }
-  if (!o.customer_need.data) {
-    risks.push({ category: "OTHER", description: "Chưa ghi nhận Customer Need", severity: "HIGH" });
-    actions.push({ action: "Tổ chức buổi khảo sát nhu cầu và ghi vào hồ sơ", owner_role: "AE", why: "Mục kiểm soát Nhu cầu" });
-  }
-  for (const c of o.competitors) {
-    risks.push({ category: "COMPETITOR", description: `Đang cạnh tranh với ${c.name}${c.strengths ? ` (mạnh: ${c.strengths})` : ""}`, severity: "MEDIUM" });
-  }
-  if (o.competitors.length) actions.push({ action: `Chuẩn bị bảng so sánh với ${o.competitors[0].name} nhấn vào điểm khác biệt AI Agent`, owner_role: "AE", why: "Cạnh tranh giải pháp" });
-  if (emailsData.emails.length === 0) {
-    risks.push({ category: "TIMELINE", description: `Không có email trao đổi trong ${emailsData.window_days} ngày`, severity: "MEDIUM" });
-    actions.push({ action: "Gửi follow-up tóm tắt cuộc họp gần nhất và đề xuất bước tiếp theo", owner_role: "AE", why: "Tương tác khách hàng" });
-  }
-  if (o.close_date && new Date(o.close_date).getTime() - Date.now() < 21 * 86400000 && o.stage === "DEVELOP") {
-    risks.push({ category: "TIMELINE", description: "Close date còn dưới 3 tuần nhưng vẫn ở Develop", severity: "HIGH" });
-  }
-  if (!o.checklist.solution_confirmed) actions.push({ action: "Phối hợp Presales hoàn thiện và xác nhận Proposed Solution", owner_role: "PRESALES", why: "Mục kiểm soát Giải pháp" });
 
   emailsData.emails.slice(0, 3).forEach((e) => sources.push({ ref: e.ref, detail: e.subject, quote: e.subject }));
   meetings.slice(0, 3).forEach((m) => sources.push({ ref: m.ref, detail: m.subject, quote: m.subject }));
@@ -224,12 +206,8 @@ export function mockOpportunityAgent(ctx: ToolContext, log: ToolCallLog[]): stri
     sources.push({ ref: "web_research", detail: "Nghiên cứu thị trường", quote: o.account });
   }
 
-  let importance: "LOW" | "MEDIUM" | "HIGH" = o.amount_vnd >= 500_000_000 ? "HIGH" : o.amount_vnd >= 150_000_000 ? "MEDIUM" : "LOW";
-  if (importance === "MEDIUM" && web.some((w) => /mở rộng|gọi vốn|số hóa/i.test(w.snippet))) importance = "HIGH";
-
-  const importanceReason = o.amount_vnd >= 500_000_000
-    ? `Doanh thu ước tính ${o.amount_vnd.toLocaleString("vi-VN")} ₫ vượt ngưỡng 500 triệu`
-    : `Doanh thu ước tính ${o.amount_vnd.toLocaleString("vi-VN")} ₫`;
+  const importance = rules.importance;
+  const importanceReason = rules.importance_reason;
 
   const summary =
     `${o.account} – giá trị dự kiến ${o.amount_vnd.toLocaleString("vi-VN")} ₫, mức quan trọng ${importance}. ` +

@@ -13,6 +13,7 @@ import { wp06_001_invoices_payments } from "./wp06_001_invoices_payments";
 import { wp06_002_payment_invoice_safety } from "./wp06_002_payment_invoice_safety";
 import { wp08_002_edit_and_refresh } from "./wp08_002_edit_and_refresh";
 import {wp10_001_integration_requests} from './wp10_001_integration_requests';
+import { wp08_003_rule_evaluations } from "./wp08_003_rule_evaluations";
 
 export const MIGRATIONS: readonly Migration[] = [
   wp00_001_shared_schema,
@@ -28,6 +29,7 @@ export const MIGRATIONS: readonly Migration[] = [
   wp06_002_payment_invoice_safety,
   wp08_002_edit_and_refresh,
   wp10_001_integration_requests,
+  wp08_003_rule_evaluations,
 ] as const;
 
 /**
