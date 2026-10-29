@@ -39,31 +39,41 @@ AE ghi nhu cầu, ngân sách, ngày chốt, liên hệ, bảng giá và checkli
 
 ![Input Data](assets/input-data.jpg)
 
-### 2. Làm cho từng bước của Agent nhìn thấy được
+### 2. Mỗi Agent có hồ sơ rõ ràng
 
-Mỗi lần chạy ghi rõ công cụ đã gọi theo đúng thứ tự, trong đó có `evaluate_opportunity_rules` và công cụ ghi duy nhất `save_opportunity_research`. Công cụ sai quyền bị chặn và ghi DENIED.
+Trang **Trung tâm AI Agent** (`/agents`) trình bày từng Agent theo 6 thành phần: nhiệm vụ & kích hoạt, công cụ (đọc / ghi), quy tắc, việc không được làm, cổng con người, đầu ra & dấu vết; kèm workflow 8 bước có nhãn **ai làm bước đó** (Hệ thống / LLM / Quy tắc / Con người), giới hạn vận hành và thống kê lần chạy. Nội dung đọc từ registry công cụ, bộ quy tắc và cấu hình thật, không phải mô tả tĩnh.
+
+![Agent center](assets/agent-center.jpg)
+
+### 3. Làm cho từng bước của một lần chạy nhìn thấy được
+
+Mỗi bản nghiên cứu có thanh **Workflow của lần chạy này**: bước nào đã xong, do ai làm, kết quả tóm tắt (số công cụ đã gọi, số vi phạm / cảnh báo / thiếu dữ liệu, số nguồn đã xác thực) và bước nào đang chờ con người.
+
+![Run workflow](assets/run-workflow.png)
+
+Lịch sử chạy ghi đúng thứ tự công cụ đã gọi, trong đó có `evaluate_opportunity_rules` và công cụ ghi duy nhất `save_opportunity_research`. Công cụ sai quyền bị chặn và ghi DENIED.
 
 ![Agent workflow](assets/agent-workflow.png)
 
-### 3. Giải thích kết luận bằng quy tắc
+### 4. Giải thích kết luận bằng quy tắc
 
 Bảng **Căn cứ quy tắc** cho thấy quy tắc nào, giá trị quan sát, ngưỡng, kết quả, giới hạn kết luận, việc cần làm và cổng duyệt. Thiếu dữ liệu thì ghi *Chưa đánh giá được* thay vì đoán.
 
 ![Rule evaluations](assets/rule-evaluations.jpg)
 
-### 4. Con người xác minh trước khi hồ sơ thay đổi
+### 5. Con người xác minh trước khi hồ sơ thay đổi
 
 AE chọn rủi ro nào được thêm vào hồ sơ. Rủi ro OPP-R02 vào tab Quản lý rủi ro (gắn nhãn AI) và **cổng QLKD rà soát (BR-06)** bật lên trước khi được chuyển sang Propose.
 
 ![Human gate](assets/human-gate.png)
 
-### 5. Dữ kiện thay đổi được đánh giá lại
+### 6. Dữ kiện thay đổi được đánh giá lại
 
 Khách báo ngân sách 300 triệu. Agent chạy lại: độ bao phủ dữ liệu lên 100 %, **OPP-R07 chuyển thành vi phạm** (420 triệu > 300 triệu) và hành động "rà lại phạm vi hoặc chia giai đoạn" lên vị trí thứ hai. Bản #1 vẫn được giữ.
 
 ![Research V2](assets/research-v2.png)
 
-### 6. Giữ dấu vết để kiểm tra lại
+### 7. Giữ dấu vết để kiểm tra lại
 
 Mỗi bản nghiên cứu gắn với lần chạy, phiên bản cấu hình Agent, `ruleset_version` + `ruleset_hash`, người xác minh và nhật ký audit (kể cả khi LLM đề xuất mức quan trọng khác quy tắc). Xem [03 · Bộ nhớ hồ sơ và truy xuất](docs/whitepapers/03-record-memory-and-retrieval.md).
 

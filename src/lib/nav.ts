@@ -28,6 +28,11 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         icon: "home",
       },
       {
+        href: "/agents",
+        label: "AI Agent",
+        icon: "bot",
+      },
+      {
         href: "/ai-review",
         label: "Kiểm duyệt AI",
         icon: "sparkle",

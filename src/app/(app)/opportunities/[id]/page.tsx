@@ -27,6 +27,7 @@ import {
 import { quotesOf } from "@/lib/services/quotes";
 import { SubmitButton } from "@/components/client";
 import { RuleEvaluationTable } from "@/components/rule-evaluation-table";
+import { ResearchFlow } from "@/components/research-flow";
 import { Icon } from "@/components/icons";
 import { AgentRuns, AuditTrail, SALES_STAGES, Timeline } from "@/components/record";
 import { OpportunityNextActions } from "@/components/opportunity-next-actions";
@@ -764,6 +765,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
               research.map((r) => {
                 const rRisks = JSON.parse(r.risks_json) as { description: string; severity: string; rule_id?: string | null; unclassified?: boolean }[];
                 const sources = JSON.parse(r.sources_json) as { ref: string; detail: string }[];
+                const evals = ruleEvaluationsOf(r.id);
                 return (
                   <Card
                     key={r.id}
@@ -784,6 +786,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                         {r.confidence !== null && <span className="text-xs text-ink-3">· Độ bao phủ dữ liệu {Math.round(r.confidence * 100)}% ({r.confidence_band === "LOW" ? "thấp – cần bổ sung dữ liệu" : r.confidence_band === "MEDIUM" ? "trung bình" : "cao"})</span>}
                         {r.ruleset_hash && <code className="text-[11px] text-ink-3">{r.ruleset_version}#{r.ruleset_hash}</code>}
                       </div>
+                      <ResearchFlow research={r} evals={evals} />
                       <p className="text-ink-2">{r.summary}</p>
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div>
@@ -810,7 +813,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                           </ul>
                         </div>
                       </div>
-                      <RuleEvaluationTable rows={ruleEvaluationsOf(r.id)} />
+                      <RuleEvaluationTable rows={evals} />
                       {r.status === "PENDING_REVIEW" && can(user.role, "ai.review") && (
                         <div className="flex flex-wrap items-center gap-3 border-t border-[#f0f0f0] pt-3">
                           <label className="flex items-center gap-2"><input type="checkbox" name="apply_importance" defaultChecked /> Áp dụng mức quan trọng vào hồ sơ</label>

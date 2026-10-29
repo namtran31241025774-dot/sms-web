@@ -53,3 +53,7 @@
 ## Test tự động tương ứng
 
 `npm test` → `tests/wp08-opportunity-rules.test.ts` kiểm các ca B, C, A (thiếu dữ liệu), hash đổi khi đổi tham số, LLM bị thay mức quan trọng, mock chạy end-to-end.
+
+## Ca H — Xem toàn cảnh Agent
+
+Vào menu **AI Agent** (`/agents`): chọn Qualification hoặc Opportunity ở thanh lệnh để xem 6 thành phần của Agent, workflow 8 bước có nhãn người/hệ thống/LLM/quy tắc, giới hạn vận hành và các lần chạy gần đây. Trên tab Nghiên cứu AI của từng cơ hội, thanh **Workflow của lần chạy này** cho thấy bước nào đã xong và bước nào đang chờ người.
