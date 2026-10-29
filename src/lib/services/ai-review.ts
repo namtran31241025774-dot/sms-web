@@ -294,3 +294,11 @@ export function editSuggestion(actor: Actor, id: number, payloadUpdates: Record<
   audit(actor, "ai_suggestion", id, "EDIT", { details: { fields: Object.keys(payloadUpdates) } });
   return "Đã lưu chỉnh sửa đề xuất";
 }
+
+/** Thông tin một lần chạy để dựng workflow trên thẻ nghiên cứu (component không gọi thẳng db). */
+export function runForWorkflow(runId: number) {
+  return get<{ trigger: string; model: string; status: string; tool_calls_json: string | null; input_tokens: number | null; output_tokens: number | null; name: string | null }>(
+    "SELECT r.trigger, r.model, r.status, r.tool_calls_json, r.input_tokens, r.output_tokens, u.name FROM ai_runs r LEFT JOIN users u ON u.id = r.triggered_by WHERE r.id = ?",
+    runId,
+  );
+}

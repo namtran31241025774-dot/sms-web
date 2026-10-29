@@ -1,6 +1,8 @@
 // Hồ sơ mô tả 2 Agent cho trang Trung tâm AI Agent.
 // Công cụ, quy tắc và giới hạn đọc từ registry/cấu hình thật (TOOLS, OPPORTUNITY_RULES, settings) nên trang không mô tả sai code.
-import { all, get } from "../db";
+import { all } from "../db";
+import type { UserScope } from "../scope";
+import { recordVisible } from "../services/access";
 import { settingNumber } from "../services/core";
 import { agentMode } from "./runtime";
 import { PROMPT_VERSION } from "./prompts";
@@ -105,21 +107,31 @@ export function agentRuntimeInfo() {
   return { mode: agentMode(), prompts: PROMPT_VERSION, ruleset: RULESET_VERSION, refreshHours: settingNumber("opp_refresh_hours") };
 }
 
-export function agentStats(agent: AgentName) {
-  const runs = get<{ total: number; ok: number; last: string | null }>(
-    "SELECT COUNT(*) total, COALESCE(SUM(status='SUCCEEDED'),0) ok, MAX(started_at) last FROM ai_runs WHERE agent=? AND started_at>=datetime('now','-7 days')",
+type Visible = { entity_type: "lead" | "opportunity"; entity_id: number };
+const visibleTo = (user: UserScope) => <T extends Visible>(r: T) => recordVisible(user, r.entity_type, r.entity_id);
+
+/** Thống kê 7 ngày, chỉ tính hồ sơ người xem được phép thấy (FR-98). */
+export function agentStats(agent: AgentName, user: UserScope) {
+  const runs = all<Visible & { status: string; denied: number }>(
+    `SELECT r.entity_type, r.entity_id, r.status,
+       (SELECT COUNT(*) FROM tool_calls t WHERE t.run_id = r.id AND t.outcome = 'DENIED') AS denied
+     FROM ai_runs r WHERE r.agent = ? AND r.started_at >= datetime('now','-7 days')`,
     agent,
-  )!;
-  const pending = agent === "QUALIFICATION"
-    ? get<{ n: number }>("SELECT COUNT(*) n FROM ai_suggestions WHERE status='PENDING_REVIEW' AND agent='QUALIFICATION'")?.n ?? 0
-    : get<{ n: number }>("SELECT COUNT(*) n FROM opportunity_research WHERE status='PENDING_REVIEW'")?.n ?? 0;
-  const denied = get<{ n: number }>("SELECT COUNT(*) n FROM tool_calls t JOIN ai_runs r ON r.id=t.run_id WHERE r.agent=? AND t.outcome='DENIED'", agent)?.n ?? 0;
-  return { ...runs, pending, denied };
+  ).filter(visibleTo(user));
+  const pending = (agent === "QUALIFICATION"
+    ? all<Visible>("SELECT entity_type, entity_id FROM ai_suggestions WHERE status='PENDING_REVIEW' AND agent='QUALIFICATION'")
+    : all<Visible>("SELECT 'opportunity' AS entity_type, opportunity_id AS entity_id FROM opportunity_research WHERE status='PENDING_REVIEW'")
+  ).filter(visibleTo(user)).length;
+  return {
+    total: runs.length,
+    ok: runs.filter((r) => r.status === "SUCCEEDED").length,
+    pending,
+    denied: runs.reduce((n, r) => n + r.denied, 0),
+  };
 }
 
-export function recentRuns(limit = 8) {
-  return all<{ id: number; agent: string; trigger: string; status: string; entity_type: string; entity_id: number; model: string; started_at: string; summary: string | null; error: string | null }>(
-    "SELECT id, agent, trigger, status, entity_type, entity_id, model, started_at, summary, error FROM ai_runs ORDER BY id DESC LIMIT ?",
-    limit,
-  );
+export function recentRuns(user: UserScope, limit = 8) {
+  return all<Visible & { id: number; agent: string; trigger: string; status: string; model: string; started_at: string; summary: string | null; error: string | null }>(
+    "SELECT id, agent, trigger, status, entity_type, entity_id, model, started_at, summary, error FROM ai_runs ORDER BY id DESC LIMIT 200",
+  ).filter(visibleTo(user)).slice(0, limit);
 }

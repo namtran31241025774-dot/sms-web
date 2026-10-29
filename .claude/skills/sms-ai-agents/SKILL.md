@@ -1,6 +1,6 @@
 ---
 name: sms-ai-agents
-description: Đặc tả và guardrails cho 2 AI Agent trong SMS — Sales Qualification Agent (Qualify) và Sales Opportunity Agent (Develop): trigger, input, tools, output, quyền ghi và human gates. Dùng khi code agent, prompt, tool definitions, scheduler, workspace kiểm duyệt AI, hoặc phân quyền ghi dữ liệu của AI. Dùng kèm skill claude-api cho phần gọi model.
+description: Đặc tả và guardrails cho 2 AI Agent trong SMS — Sales Qualification Agent (Qualify) và Sales Opportunity Agent (Develop): trigger, input, tools, output, quyền ghi và human gates. Dùng khi code agent, prompt, tool definitions, scheduler, workspace kiểm duyệt AI, hoặc phân quyền ghi dữ liệu của AI. Phần quy tắc/kiểm soát (BR-28) xem skill sms-agent-rules; kiểm tra giao diện xem skill sms-verify-ui.
 ---
 
 # SMS — AI Agents
@@ -28,6 +28,7 @@ description: Đặc tả và guardrails cho 2 AI Agent trong SMS — Sales Quali
 - **Trigger:** Opportunity đủ tiêu chí; trường trọng yếu thay đổi; sau cuộc họp được đồng bộ; lịch làm mới (tham số thiết kế: email mỗi 6 giờ, cửa sổ 30 ngày — để trong config, không hard-code như SLA).
 - **Input:** CRM, email của contact bên ngoài đã liên kết, meeting intelligence, web, tiêu chí do QLKD cấu hình, lịch sử thắng, competitor.
 - **Tools:** chỉ **đọc** CRM/email/meeting/web; **ghi** duy nhất vào OpportunityResearch, scheduler, notification.
+- **Quy tắc:** mức quan trọng, rủi ro có mã, thứ tự 3 hành động, cổng duyệt do rule engine `src/lib/agents/rules.ts` (OPP-R01..R10) khóa ở server; LLM chỉ diễn giải. Xem skill `sms-agent-rules`.
 - **Output:** Opportunity Research, mức quan trọng (Thấp/Trung bình/Cao), nguồn dẫn, rủi ro, **tối đa 3** hành động ưu tiên, log làm mới.
 - **Cấm:** sửa revenue, close date, stage, price list; tự tick checklist; tự chuyển stage; tự liên hệ khách hàng; tính/đổi giá (Product Insights ≠ CPQ).
 - **Human gates:** AE xác minh trước khi cập nhật hồ sơ; Presales quyết định giải pháp; mức quan trọng Cao hoặc còn rủi ro mở → Sales Manager rà soát trước khi chuyển giai đoạn (DEC-07, BR-06).

@@ -16,7 +16,7 @@ import {
   OpportunityResearchSchema,
 } from "./schemas";
 import { validateEvidence, recordAiEvidence, InvalidEvidenceError } from "./evidence";
-import { evaluateOpportunityRules, type RiskCategory } from "./rules";
+import { evaluateOpportunityRules, linkedInboundEmails, type RiskCategory, type RuleOutcome } from "./rules";
 
 export type AgentName = "QUALIFICATION" | "OPPORTUNITY";
 
@@ -26,6 +26,8 @@ export type ToolContext = {
   entityType: "lead" | "opportunity";
   entityId: number;
   webSources?: { source: string; title: string; snippet: string }[];
+  /** Kết quả bộ quy tắc trong lần chạy; Agent không ghi được hồ sơ nên tái dùng khi lưu nghiên cứu. */
+  ruleOutcome?: RuleOutcome;
 };
 
 export class AgentPermissionError extends Error {}
@@ -380,17 +382,11 @@ export const TOOLS = {
       const o = oppOf(ctx);
       const days = settingNumber("email_window_days");
 
-      // BUG-004: Chỉ trả email IN có người gửi khớp contact đã liên kết; không có thì trả email_insight_status = NO_INSIGHT
-      const linkedContacts = all<{ id: number; email: string }>(
-        `SELECT DISTINCT c.id, LOWER(c.email) as email FROM contacts c
-         WHERE c.id = ? 
-            OR c.id IN (SELECT contact_id FROM stakeholders WHERE opportunity_id = ?)
-            OR c.account_id = ?`,
-        o.primary_contact_id ?? 0, o.id, o.account_id ?? 0,
-      );
-      const linkedEmails = linkedContacts.map((c) => c.email).filter(Boolean);
+      // BUG-004: Chỉ trả email IN có người gửi khớp contact đã liên kết; không có thì trả email_insight_status = NO_INSIGHT.
+      // Dùng chung bộ lọc với quy tắc OPP-R05 để Agent và rule không nói ngược nhau.
+      const { linked, rows: matchedRows } = linkedInboundEmails(o, days);
 
-      if (linkedEmails.length === 0) {
+      if (linked === 0) {
         return {
           email_insight_status: "NO_INSIGHT",
           reason: "Cơ hội chưa liên kết với người liên hệ bên ngoài nào",
@@ -398,21 +394,6 @@ export const TOOLS = {
           emails: [],
         };
       }
-
-      // Lấy chỉ các hoạt động EMAIL có direction = 'IN'
-      const rows = all<{ id: number; direction: string | null; subject: string; body: string | null; occurred_at: string }>(
-        `SELECT id, direction, subject, body, occurred_at FROM activities
-         WHERE type='EMAIL' AND direction='IN'
-           AND ((entity_type='opportunity' AND entity_id=?) OR (entity_type='lead' AND entity_id=?))
-           AND occurred_at >= datetime('now', ?) ORDER BY occurred_at DESC LIMIT 20`,
-        o.id, o.lead_id ?? 0, `-${days} days`,
-      );
-
-      // Lọc các email nhận từ đúng người liên hệ đã liên kết
-      const matchedRows = rows.filter((r) => {
-        const text = `${r.subject} ${r.body ?? ""}`.toLowerCase();
-        return linkedEmails.some((email) => text.includes(email));
-      });
 
       if (matchedRows.length === 0) {
         return {
@@ -496,7 +477,8 @@ export const TOOLS = {
     input: empty,
     run: (ctx) => {
       oppOf(ctx);
-      return evaluateOpportunityRules(ctx.entityId);
+      ctx.ruleOutcome = evaluateOpportunityRules(ctx.entityId);
+      return ctx.ruleOutcome;
     },
   }),
   save_opportunity_research: tool({
@@ -523,8 +505,9 @@ export const TOOLS = {
 
       // BR-28: backend chạy lại bộ quy tắc và khóa mức quan trọng, rủi ro có mã rule, thứ tự hành động.
       // Phần của LLM được giữ nhưng tách riêng: rủi ro không có rule = "chưa phân loại", hành động thêm = additional.
-      const rules = evaluateOpportunityRules(o.id);
-      const ruleCategories = new Set(rules.risks.map((r) => r.category));
+      const rules = ctx.ruleOutcome ?? evaluateOpportunityRules(o.id);
+      // OTHER là nhóm chung, không coi là trùng với rủi ro của quy tắc.
+      const ruleCategories = new Set<RiskCategory>(rules.risks.map((r) => r.category).filter((c) => c !== "OTHER"));
       const llmRisks = input.risks
         .filter((r) => !r.category || !ruleCategories.has(r.category as RiskCategory))
         .map((r) => ({ ...r, rule_id: null, unclassified: true }));

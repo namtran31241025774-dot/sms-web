@@ -4,6 +4,7 @@
 import { createHash } from "node:crypto";
 import { all, get } from "../db";
 import { setting, settingBool, settingNumber } from "../services/core";
+import { SETTING_DEFAULTS } from "../settings-defaults";
 import { competitorsOf, getOpportunity, risksOf, stakeholdersOf } from "../services/opportunities";
 
 export const RULESET_VERSION = "opp-rules-v1";
@@ -64,6 +65,30 @@ const vnd = (n: number) => `${n.toLocaleString("vi-VN")} ₫`;
 export function rulesetHash(): string {
   const snapshot = OPPORTUNITY_RULES.map((r) => ({ ...r, values: r.settings.map((k) => [k, setting(k)]) }));
   return createHash("sha256").update(JSON.stringify({ v: RULESET_VERSION, snapshot })).digest("hex").slice(0, 16);
+}
+
+/** Email nhận (IN) từ người liên hệ đã liên kết với cơ hội — bộ lọc dùng chung cho công cụ get_recent_emails và OPP-R05. */
+export function linkedInboundEmails(
+  o: { id: number; lead_id: number | null; primary_contact_id: number | null; account_id: number | null },
+  days: number | null,
+) {
+  const linkedEmails = all<{ email: string }>(
+    `SELECT DISTINCT LOWER(c.email) AS email FROM contacts c
+     WHERE c.id = ? OR c.id IN (SELECT contact_id FROM stakeholders WHERE opportunity_id = ?) OR c.account_id = ?`,
+    o.primary_contact_id ?? 0, o.id, o.account_id ?? 0,
+  ).map((c) => c.email).filter(Boolean);
+  if (!linkedEmails.length) return { linked: 0, rows: [] };
+  const rows = all<{ id: number; direction: string | null; subject: string; body: string | null; occurred_at: string }>(
+    `SELECT id, direction, subject, body, occurred_at FROM activities
+     WHERE type='EMAIL' AND direction='IN'
+       AND ((entity_type='opportunity' AND entity_id=?) OR (entity_type='lead' AND entity_id=?))
+       ${days === null ? "" : "AND occurred_at >= datetime('now', ?)"} ORDER BY occurred_at DESC LIMIT 20`,
+    ...[o.id, o.lead_id ?? 0, ...(days === null ? [] : [`-${days} days`])],
+  ).filter((r) => {
+    const text = `${r.subject} ${r.body ?? ""}`.toLowerCase();
+    return linkedEmails.some((email) => text.includes(email));
+  });
+  return { linked: linkedEmails.length, rows };
 }
 
 function firstNumber(text: string | null | undefined): number | null {
@@ -135,10 +160,12 @@ export function evaluateOpportunityRules(opportunityId: number): RuleOutcome {
 
   // OPP-R05 — tương tác email (BR-15)
   const days = settingNumber("email_window_days");
-  const anyEmail = get<{ n: number }>("SELECT COUNT(*) n FROM activities WHERE type='EMAIL' AND ((entity_type='opportunity' AND entity_id=?) OR (entity_type='lead' AND entity_id=?))", o.id, o.lead_id ?? 0)!.n;
-  const recentIn = get<{ n: number }>("SELECT COUNT(*) n FROM activities WHERE type='EMAIL' AND direction='IN' AND ((entity_type='opportunity' AND entity_id=?) OR (entity_type='lead' AND entity_id=?)) AND occurred_at>=datetime('now',?)", o.id, o.lead_id ?? 0, `-${days} days`)!.n;
-  if (!anyEmail) ev.push({ ...base("OPP-R05"), ...empty, status: "NOT_EVALUABLE", raw_value: null, threshold: `≥ 1 email nhận trong ${days} ngày`,
-    rationale: "Hồ sơ chưa có email nào được đồng bộ", limitation: "Không có email không chứng minh khách im lặng; có thể chưa đồng bộ", evidence_refs: ["activities.email"] });
+  // Cùng bộ lọc với công cụ get_recent_emails: chỉ email nhận từ người liên hệ đã liên kết.
+  const everIn = linkedInboundEmails(o, null);
+  const recentIn = linkedInboundEmails(o, days).rows.length;
+  if (!everIn.rows.length) ev.push({ ...base("OPP-R05"), ...empty, status: "NOT_EVALUABLE", raw_value: null, threshold: `≥ 1 email nhận trong ${days} ngày`,
+    rationale: everIn.linked ? "Chưa có email nhận nào từ người liên hệ đã liên kết được đồng bộ" : "Cơ hội chưa liên kết người liên hệ bên ngoài nào",
+    limitation: "Không có email không chứng minh khách im lặng; có thể chưa đồng bộ", evidence_refs: ["activities.email"] });
   else if (!recentIn) ev.push({ ...base("OPP-R05"), ...empty, status: "HIT", severity: "MEDIUM", raw_value: 0, threshold: `≥ 1 email nhận trong ${days} ngày`,
     rationale: `Có lịch sử email nhưng không có email nhận trong ${days} ngày gần nhất`, limitation: "Chỉ tính email đã đồng bộ vào hệ thống",
     evidence_refs: ["activities.email"], risk_category: "DISENGAGED_STAKEHOLDER",
@@ -151,10 +178,11 @@ export function evaluateOpportunityRules(opportunityId: number): RuleOutcome {
     required_action: { action: "Thống nhất ngày chốt dự kiến với khách", owner_role: "AE" } });
   else {
     const left = Math.ceil((new Date(o.close_date).getTime() - Date.now()) / 86400000);
-    const hit = left < warnDays && o.stage === "DEVELOP";
+    const overdue = left < 0;
+    const hit = overdue || (left < warnDays && o.stage === "DEVELOP");
     ev.push(hit
-      ? { ...base("OPP-R06"), ...empty, status: "HIT", severity: "HIGH", raw_value: left, threshold: `< ${warnDays} ngày khi còn ở Develop`,
-          rationale: `Còn ${left} ngày tới ngày chốt nhưng vẫn ở giai đoạn Phát triển`, evidence_refs: ["opportunity.close_date", "opportunity.stage"], risk_category: "TIMELINE",
+      ? { ...base("OPP-R06"), ...empty, status: "HIT", severity: "HIGH", raw_value: left, threshold: `< ${warnDays} ngày khi còn ở Develop, hoặc đã quá ngày chốt`,
+          rationale: overdue ? `Đã quá ngày chốt ${-left} ngày mà cơ hội vẫn mở` : `Còn ${left} ngày tới ngày chốt nhưng vẫn ở giai đoạn Phát triển`, evidence_refs: ["opportunity.close_date", "opportunity.stage"], risk_category: "TIMELINE",
           required_action: { action: "Rà lại kế hoạch chốt hoặc cập nhật ngày chốt thực tế", owner_role: "AE" } }
       : { ...base("OPP-R06"), ...empty, status: "PASSED", raw_value: left, threshold: `< ${warnDays} ngày khi còn ở Develop`, rationale: `Còn ${left} ngày tới ngày chốt`, evidence_refs: ["opportunity.close_date"] });
   }
@@ -195,6 +223,12 @@ export function evaluateOpportunityRules(opportunityId: number): RuleOutcome {
   return derive(ev, importance, importanceReason);
 }
 
+// Tham số trống hoặc không hợp lệ thì dùng mặc định, để cờ "cần bổ sung dữ liệu" không bị tắt ngầm.
+function minConfidence(): number {
+  const v = settingNumber("ai_min_confidence");
+  return Number.isFinite(v) && v > 0 && v <= 1 ? v : Number(SETTING_DEFAULTS.ai_min_confidence.value);
+}
+
 function derive(ev: RuleEvaluation[], importance: Severity, importanceReason: string): RuleOutcome {
   const risks = ev.filter((e) => e.status === "HIT" && e.risk_category && e.severity).map((e) => ({
     rule_id: e.rule_id, category: e.risk_category!, severity: e.severity!, description: e.limitation ? `${e.rationale}. ${e.limitation}` : e.rationale,
@@ -219,6 +253,6 @@ function derive(ev: RuleEvaluation[], importance: Severity, importanceReason: st
     additional_actions: actions.slice(3),
     gates: [...new Set(ev.map((e) => e.human_gate).filter((g): g is HumanGate => !!g))],
     confidence,
-    confidence_band: confidence >= 0.8 ? "HIGH" : confidence >= settingNumber("ai_min_confidence") ? "MEDIUM" : "LOW",
+    confidence_band: confidence >= 0.8 ? "HIGH" : confidence >= minConfidence() ? "MEDIUM" : "LOW",
   };
 }

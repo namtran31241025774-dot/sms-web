@@ -15,6 +15,15 @@ function makeOpp(opts: { amount: number; budget?: number; need?: string | null; 
   );
   return id;
 }
+// Đổi tạm một tham số rồi trả lại đúng giá trị cũ (không xoá dòng seed).
+function withSetting(key: string, value: string, fn: () => void) {
+  const prev = get<{ value: string }>("SELECT value FROM settings WHERE key = ?", key);
+  run("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", key, value);
+  try { fn(); } finally {
+    if (prev) run("UPDATE settings SET value = ? WHERE key = ?", prev.value, key);
+    else run("DELETE FROM settings WHERE key = ?", key);
+  }
+}
 const byId = (o: ReturnType<typeof evaluateOpportunityRules>, id: string) => o.evaluations.find((e) => e.rule_id === id)!;
 
 describe("WP-08 BR-28: Bộ quy tắc Opportunity Agent (OPP-R01..R10)", () => {
@@ -41,9 +50,14 @@ describe("WP-08 BR-28: Bộ quy tắc Opportunity Agent (OPP-R01..R10)", () => {
     // 4/10 quy tắc thiếu dữ liệu → độ bao phủ 0,6 = đúng ngưỡng ai_min_confidence
     expect(o.confidence).toBe(0.6);
     expect(o.confidence_band).toBe("MEDIUM");
-    run("INSERT OR REPLACE INTO settings (key, value) VALUES ('ai_min_confidence', '0.7')");
-    expect(evaluateOpportunityRules(makeOpp({ amount: 50_000_000 })).confidence_band).toBe("LOW");
-    run("DELETE FROM settings WHERE key = 'ai_min_confidence'");
+    withSetting("ai_min_confidence", "0.7", () => {
+      expect(evaluateOpportunityRules(makeOpp({ amount: 50_000_000 })).confidence_band).toBe("LOW");
+    });
+    // Tham số bị xoá trắng thì dùng mặc định 0,6 chứ không tắt cờ LOW
+    withSetting("ai_min_confidence", "", () => {
+      run("UPDATE settings SET value = '' WHERE key = 'ai_min_confidence'");
+      expect(evaluateOpportunityRules(makeOpp({ amount: 50_000_000 })).confidence).toBe(0.6);
+    });
   });
 
   it("OPP-R07 vượt ngân sách và OPP-R06 sắp tới ngày chốt khi còn Develop", () => {
@@ -51,6 +65,20 @@ describe("WP-08 BR-28: Bộ quy tắc Opportunity Agent (OPP-R01..R10)", () => {
     expect(byId(o, "OPP-R07").status).toBe("HIT");
     expect(byId(o, "OPP-R06").status).toBe("HIT");
     expect(o.risks.map((r) => r.category)).toEqual(expect.arrayContaining(["OVER_BUDGET", "TIMELINE"]));
+  });
+
+  it("OPP-R06 gắn rủi ro khi đã quá ngày chốt, kể cả ở Propose", () => {
+    const id = makeOpp({ amount: 50_000_000, closeInDays: -12 });
+    run("UPDATE opportunities SET stage='PROPOSE' WHERE id=?", id);
+    const e = byId(evaluateOpportunityRules(id), "OPP-R06");
+    expect(e.status).toBe("HIT");
+    expect(e.rationale).toContain("quá ngày chốt");
+  });
+
+  it("OPP-R05 dùng cùng bộ lọc với get_recent_emails: email không từ người liên hệ đã liên kết không được tính", () => {
+    const id = makeOpp({ amount: 50_000_000 });
+    run("INSERT INTO activities (entity_type, entity_id, type, direction, subject, body, occurred_at) VALUES ('opportunity', ?, 'EMAIL', 'IN', 'Hỏi giá', 'from: la@khac.vn', datetime('now'))", id);
+    expect(byId(evaluateOpportunityRules(id), "OPP-R05").status).toBe("NOT_EVALUABLE");
   });
 
   it("Hành động ưu tiên xếp theo HIT/mức độ, tối đa 3; cổng QLKD bật khi có rủi ro", () => {
@@ -64,9 +92,7 @@ describe("WP-08 BR-28: Bộ quy tắc Opportunity Agent (OPP-R01..R10)", () => {
 
   it("Hash bộ quy tắc đổi khi đổi tham số BR-08", () => {
     const before = rulesetHash();
-    run("INSERT OR REPLACE INTO settings (key, value) VALUES ('importance_medium_amount', '120000000')");
-    expect(rulesetHash()).not.toBe(before);
-    run("DELETE FROM settings WHERE key = 'importance_medium_amount'");
+    withSetting("importance_medium_amount", "120000000", () => expect(rulesetHash()).not.toBe(before));
     expect(rulesetHash()).toBe(before);
   });
 
@@ -90,6 +116,18 @@ describe("WP-08 BR-28: Bộ quy tắc Opportunity Agent (OPP-R01..R10)", () => {
     expect(risks.find((r) => r.category === "TECH_CONSTRAINT")?.unclassified).toBe(true);
     expect(risks.find((r) => r.category === "MISSING_DECISION_MAKER")?.rule_id).toBe("OPP-R02");
     expect(all("SELECT rule_id FROM ai_rule_evaluations WHERE research_id = ?", out.research_id)).toHaveLength(10);
+  });
+
+  it("Rủi ro OTHER của LLM được giữ dù quy tắc cũng có rủi ro OTHER", () => {
+    const oppId = makeOpp({ amount: 30_000_000 }); // không có nhu cầu → OPP-R03 HIT (OTHER)
+    const ctx: ToolContext = { agent: "OPPORTUNITY", runId: 0, entityType: "opportunity", entityId: oppId };
+    const out = invokeTool(ctx, "save_opportunity_research", {
+      importance: "LOW", summary: "Có rủi ro khác ngoài quy tắc",
+      risks: [{ category: "OTHER", severity: "MEDIUM", description: "Khách sắp sáp nhập công ty mẹ" }],
+      next_actions: [], sources: [{ ref: "opportunity.code", quote: `OPP-RULE-${seq}` }],
+    }, []) as { research_id: number };
+    const risks = JSON.parse(get<{ risks_json: string }>("SELECT risks_json FROM opportunity_research WHERE id = ?", out.research_id)!.risks_json) as { description: string }[];
+    expect(risks.some((r) => r.description.includes("sáp nhập"))).toBe(true);
   });
 
   it("Mock Agent chạy end-to-end và dùng kết quả rule (không còn ngưỡng tự đặt)", async () => {

@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Trung tâm AI Agent" };
 const AGENT_LABEL: Record<string, string> = { QUALIFICATION: "Qualification", OPPORTUNITY: "Opportunity" };
 
 export default async function AgentsPage({ searchParams }: PageProps<"/agents">) {
-  await requireUser();
+  const user = await requireUser();
   const sp = (await searchParams) as { agent?: string };
   const info = agentRuntimeInfo();
   const current = AGENT_PROFILES.find((a) => a.name === sp.agent) ?? AGENT_PROFILES[1];
@@ -39,7 +39,7 @@ export default async function AgentsPage({ searchParams }: PageProps<"/agents">)
         {/* 1. Hai Agent trong quy trình Sales */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {AGENT_PROFILES.map((a) => {
-            const s = agentStats(a.name);
+            const s = agentStats(a.name, user);
             const active = a.name === current.name;
             return (
               <Link key={a.name} href={`/agents?agent=${a.name}`} className={`block rounded-lg border bg-surface p-4 shadow-[var(--shadow-4)] transition-shadow hover:shadow-[var(--shadow-16)] ${active ? "border-[#0f6cbd] ring-2 ring-[#ebf3fc]" : "border-transparent"}`}>
@@ -97,7 +97,7 @@ export default async function AgentsPage({ searchParams }: PageProps<"/agents">)
               <tr><th className="px-4 py-2">Lần chạy</th><th className="px-4 py-2">Agent</th><th className="px-4 py-2">Hồ sơ</th><th className="px-4 py-2">Kích hoạt</th><th className="px-4 py-2">Trạng thái</th><th className="px-4 py-2">Kết quả</th></tr>
             </thead>
             <tbody>
-              {recentRuns().map((r) => (
+              {recentRuns(user).map((r) => (
                 <tr key={r.id} className="border-t border-[#f0f0f0] align-top">
                   <td className="px-4 py-2 whitespace-nowrap">#{r.id}<div className="text-xs text-ink-3">{formatDate(r.started_at, true)}</div></td>
                   <td className="px-4 py-2">{AGENT_LABEL[r.agent] ?? r.agent}<div className="text-xs text-ink-3">{r.model}</div></td>

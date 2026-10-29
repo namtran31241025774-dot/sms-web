@@ -235,7 +235,7 @@ export function mockOpportunityAgent(ctx: ToolContext, log: ToolCallLog[]): stri
         : { status: "NO_INSIGHT", reason: "Chưa ghi nhận nhu cầu chi tiết" },
       product: { text: "Giải pháp SaaS B2B và dịch vụ triển khai phù hợp", sources },
     },
-    risks,
+    risks: [], // rủi ro của quy tắc do server tự thêm khi lưu; mock không có rủi ro ngoài quy tắc
     next_actions: actions.slice(0, 3),
     additional_actions: actions.slice(3),
     email_insight_status: emailsData.email_insight_status,
