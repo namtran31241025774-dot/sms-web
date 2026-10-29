@@ -1,6 +1,6 @@
-# 04 · Kiểm soát, con người duyệt và bảo mật
+# 05 · Cổng con người, chạy lại và quản trị
 
-> **Mục đích.** Agent được phép phân tích và đề xuất; mọi hành động có hậu quả ra ngoài hoặc thay đổi hồ sơ chính thức phải qua người có thẩm quyền.
+> **Mục đích.** Agent đề xuất; người có thẩm quyền quyết định. Khi dữ kiện thay đổi, hệ thống chạy lại Agent trên cùng hồ sơ, giữ bản cũ để so sánh trước/sau.
 
 ## 1. Tám cổng con người (HG)
 
@@ -15,6 +15,7 @@
 | HG7 Duyệt chiết khấu vượt hạn mức | Báo giá (BR-05) | Không gửi khách |
 | HG8 Hoá đơn chính thức | Tài chính | Chỉ hoá đơn có số chính thức mới gửi |
 
+
 ## 2. Kiểm soát vận hành (FR-88..95)
 
 | Kiểm soát | Giá trị mặc định | Hành vi khi vi phạm |
@@ -27,23 +28,22 @@
 | Kích hoạt cấu hình (BR-25) | Phải có kết quả đánh giá | Không kích hoạt phiên bản chưa đánh giá |
 | Cảnh báo (BR-23) | Tỷ lệ lỗi ≥ 20 %, có DENIED, kết quả không căn cứ | Thông báo AI_MANAGER |
 
-## 3. Kiểm soát dữ liệu đầu ra
 
-- **Căn cứ (evidence):** `validateEvidence` chỉ nhận trường có thật và có giá trị của hồ sơ đang chạy, `activity:<id>` thuộc hồ sơ đó, hoặc URL có trong kết quả web của **chính lần chạy**; trích dẫn phải xuất hiện nguyên văn trong nguồn.
-- **Quy tắc (BR-28):** mức quan trọng, rủi ro có mã, thứ tự hành động, cổng duyệt do `rules.ts` tính lại ở server khi lưu, bất kể LLM gửi gì.
-- **Thiếu dữ liệu:** trả `NOT_EVALUABLE` / `NO_INSIGHT`, không suy đoán.
+## 3. Dữ kiện thay đổi → chạy lại có kiểm soát
 
-## 4. Bảo mật
+Đổi trường trọng yếu (nhu cầu, giải pháp, doanh thu, ngày chốt, bên liên quan, đối thủ — BR-15) phát sự kiện `opportunity.key_field_changed` → hẹn làm mới sau 2 phút; hoặc AE bấm chạy lại. Bản nghiên cứu mới **không ghi đè** bản cũ: bản chờ duyệt cũ chuyển DISMISSED, bản đã xác minh giữ nguyên.
 
-| Rủi ro (OWASP LLM / Agentic) | Biện pháp trong SMS |
-|---|---|
-| Prompt injection qua email, ghi chú, web | Bọc `untrusted_data` + prompt cấm làm theo chỉ dẫn trong dữ liệu |
-| Excessive agency | Công cụ chỉ thao tác trên `ctx.entityId`; không có công cụ sửa giá, giai đoạn, đối thủ |
-| Tool misuse / privilege | `invokeTool` kiểm Agent ↔ công cụ, ghi DENIED |
-| Rò rỉ dữ liệu nhạy cảm trong log | `redactSensitive` che email, SĐT, khoá, token trước khi ghi `tool_calls` |
-| Khoá API | Chỉ ở biến môi trường máy chủ, không vào prompt hay log |
-| Kết luận không kiểm chứng | Bản nghiên cứu luôn PENDING_REVIEW; HG4 |
+Ví dụ trên app (ảnh `assets/research-v2.png`): ngân sách khách đổi từ 0 → 300 000 000 ₫.
 
-## 5. Safe failure
+| | Bản #1 | Bản #2 |
+|---|---|---|
+| OPP-R07 Ngân sách | Chưa đánh giá được | **Vi phạm**: 420 tr > 300 tr |
+| Độ bao phủ dữ liệu | 90 % | 100 % |
+| Rủi ro | OPP-R02 | OPP-R02, OPP-R07 |
+| Hành động ưu tiên #2 | So sánh với Excel | Rà lại phạm vi / chia giai đoạn cho khớp ngân sách |
+| Hash bộ quy tắc | giống nhau | giống nhau (tham số không đổi) |
+
+## 4. Safe failure
 
 Lỗi provider, sai schema, vượt giới hạn, căn cứ không hợp lệ → lần chạy FAILED có lý do, không có bản nghiên cứu "trông như thật". Người dùng chạy lại bằng RETRY (có liên kết `retry_of_run_id`).
+

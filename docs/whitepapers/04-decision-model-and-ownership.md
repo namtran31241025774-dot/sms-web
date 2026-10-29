@@ -1,4 +1,4 @@
-# 02 · Bộ quy tắc và mô hình quyết định (BR-28)
+# 04 · Mô hình quyết định và quyền sở hữu quy tắc (BR-28)
 
 > **Mục đích.** Trả lời được câu hỏi "Kết quả này dựa trên quy tắc nào, dữ liệu nào, và ai chịu trách nhiệm xác nhận?". Kết quả của Opportunity Agent không được chấm từ đoạn văn của LLM, mà từ 10 quy tắc **OPP-R01..R10** do backend sở hữu (`src/lib/agents/rules.ts`).
 
@@ -67,4 +67,4 @@ Mỗi bản nghiên cứu lưu `ruleset_version` (`opp-rules-v1`) và `ruleset_h
 
 ## 7. Qualification Agent
 
-Đã có kiểm soát server-side: BANT 0–25 mỗi tiêu chí, tổng do server tính (BR-01), confidence < 0,6 hoặc dữ liệu mâu thuẫn → ép `NEED_INFO`, mọi đề xuất phải có ≥ 1 căn cứ hợp lệ. Chưa có bảng `ai_rule_evaluations` riêng cho Qualification — xem mục "Việc còn mở" ở whitepaper 06.
+Đã có kiểm soát server-side: BANT 0–25 mỗi tiêu chí, tổng do server tính (BR-01), confidence < 0,6 hoặc dữ liệu mâu thuẫn → ép `NEED_INFO`, mọi đề xuất phải có ≥ 1 căn cứ hợp lệ. Chưa có bảng `ai_rule_evaluations` riêng cho Qualification — xem mục "Việc còn mở" ở whitepaper 07.

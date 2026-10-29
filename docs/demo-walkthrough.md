@@ -1,4 +1,4 @@
-# 05 · Kịch bản test trên app để minh họa luồng dữ liệu Agent
+# Kịch bản demo và test tay trên app
 
 > Dùng một thương vụ xuyên suốt: **Minh Tâm – Sales Cloud Pro + AI**, tài khoản **Trần Thị Bình** (AE, `binh.tran@sms.local` / `Password123!`). Chế độ mock (không cần khoá OpenAI). Số tiền là dữ liệu thử.
 

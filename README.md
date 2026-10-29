@@ -1,36 +1,122 @@
-# SMS – Sales Management System
+# SMS – Agentic Sales Management System
 
-Hệ thống quản lý hoạt động Sales cho doanh nghiệp B2B SaaS có dịch vụ triển khai, tích hợp 2 AI Agent:
+> Đồ án môn Kiến trúc Hệ thống (UEH): hệ thống quản lý Sales B2B SaaS có hai AI Agent được kiểm soát bằng quy tắc, căn cứ và cổng duyệt của con người.
 
-- **Sales Qualification Agent:** sàng lọc khách hàng tiềm năng.  
-- **Sales Opportunity Agent:** nghiên cứu và theo dõi cơ hội.
+Repository này vừa là mã nguồn chạy được, vừa là bản trình bày kiến trúc. Nó cho thấy một Agent có thể đi từ dữ liệu bán hàng rời rạc tới một nhận định **có quy tắc, có căn cứ, có giới hạn kết luận**, để nhân viên kinh doanh xác minh, quản lý rà soát và mọi bước đều truy vết được.
 
-Đồ án môn Kiến trúc Hệ thống, UEH.
+![Opportunity Research](assets/opportunity-research.jpg)
 
-## Câu chuyện của hệ thống
+## Câu chuyện của đồ án
 
-Một thương vụ đi qua 5 giai đoạn **Qualify → Develop → Propose → Close → Fulfill**. Hai Agent làm phần việc tốn thời gian của nhân viên — đọc dữ liệu, đối chiếu tiêu chí, tìm rủi ro, đề xuất bước tiếp theo — nhưng **không quyết định thay người**:
+Kịch bản xuyên suốt là cơ hội **Minh Tâm – Sales Cloud Pro + AI** (OPP-2026-0001) của Công ty CP Giải pháp số Minh Tâm, do AE **Trần Thị Bình** phụ trách:
 
-1. Lead mới vào → **Qualification Agent** chấm BANT có căn cứ, đề xuất làm giàu / loại / chuyển đổi, soạn email hỏi thêm. SDR duyệt (HG1–HG3).
-2. Cơ hội ở Develop → **Opportunity Agent** đọc hồ sơ, email, ghi chú họp, rồi gọi **bộ quy tắc OPP-R01..R10** do backend sở hữu.
-3. Mỗi nhận định đi kèm chuỗi **quy tắc → dữ liệu quan sát → ngưỡng → giới hạn kết luận → việc cần làm → cổng duyệt**. Thiếu dữ liệu thì ghi *Chưa đánh giá được*, không suy đoán.
-4. AE xác minh bản nghiên cứu (HG4) mới chép vào hồ sơ; cơ hội mức Cao hoặc còn rủi ro phải qua QLKD (HG6).
-5. Mọi lần chạy để lại dấu vết: lần chạy, công cụ đã gọi, căn cứ đã xác thực, kết quả từng quy tắc và **hash bộ quy tắc** đang dùng.
+- Giá trị dự kiến: **420 000 000 ₫**, giai đoạn **Develop**, ngày chốt 13/12/2026
+- Nhu cầu: đội sales 15 người đang quản lý pipeline bằng Excel, cần dự báo doanh thu và nhắc follow-up
+- Điểm mở: chưa ghi nhận **người quyết định**, khách đang so sánh với **bảng tính nội bộ (Excel)**, giải pháp chưa được Presales xác nhận
+- Dữ kiện thay đổi: khách báo **ngân sách 300 000 000 ₫** — thấp hơn giá trị dự kiến
 
-Ranh giới cốt lõi: **LLM (OpenAI) chọn bước và diễn giải; backend sở hữu ngưỡng, trạng thái, quyền và cổng duyệt; con người quyết định.**
+Hệ thống biến kịch bản đó thành bản **Opportunity Research** có phiên bản. Phần trình diễn cho thấy bản #1, việc AE xác minh, dữ kiện ngân sách thay đổi và bản #2 với rủi ro mới được giải thích bằng quy tắc.
 
-## Whitepapers
+## Hệ thống làm gì
 
-| Tài liệu | Nội dung |
-| :---- | :---- |
-| [01 · Hai Agent và Harness](docs/whitepapers/01-agent-harness.md) | Các lớp của một Agent, vòng gọi công cụ có giới hạn, mock và OpenAI, Agent không được làm gì |
-| [02 · Bộ quy tắc và mô hình quyết định](docs/whitepapers/02-rules-and-decision-model.md) | OPP-R01..R10, trạng thái, độ bao phủ dữ liệu, ai sở hữu phần nào (BR-28) |
-| [03 · Dữ liệu của lớp AI](docs/whitepapers/03-ai-data-model.md) | Bảng AI, `ai_rule_evaluations`, hai đường truy vết |
-| [04 · Kiểm soát, con người duyệt, bảo mật](docs/whitepapers/04-control-hitl-security.md) | HG1–HG8, kill switch, ngân sách, căn cứ, OWASP |
-| [05 · Kịch bản test trên app](docs/whitepapers/05-demo-test-scenarios.md) | 7 ca thao tác để thấy dữ liệu chạy qua Agent |
-| [06 · Hỏi đáp kỹ thuật và bản đồ code](docs/whitepapers/06-technical-qa-and-implementation-map.md) | Câu hỏi thường gặp, màn hình → code → test, việc còn mở |
+Luồng chủ động được thiết kế để không chỉ là một lần gọi LLM:
 
-## Bắt đầu
+1. Lead vào hệ thống; **Sales Qualification Agent** chấm BANT có căn cứ, đề xuất làm giàu / loại / chuyển đổi, soạn email hỏi thêm.
+2. SDR duyệt từng đề xuất (HG1–HG3); chuyển đổi tạo cơ hội ở giai đoạn Develop.
+3. **Sales Opportunity Agent** chạy khi có sự kiện, theo lịch 6 giờ, hoặc khi AE bấm chạy.
+4. Agent đọc hồ sơ, email, ghi chú họp, nghiên cứu web qua công cụ được cấp quyền.
+5. Backend chạy **bộ quy tắc OPP-R01..R10** (BR-28): mức quan trọng, rủi ro, thứ tự hành động, cổng duyệt, độ bao phủ dữ liệu.
+6. OpenAI diễn giải kết quả đã khóa và viết insight; mọi nguồn dẫn được server xác thực.
+7. AE xác minh bản nghiên cứu (HG4) mới chép rủi ro vào hồ sơ; cơ hội mức Cao hoặc còn rủi ro phải qua QLKD (HG6).
+8. Dữ kiện trọng yếu thay đổi → Agent chạy lại, bản cũ vẫn giữ để so sánh.
+9. Mỗi lần chạy lưu lần chạy, công cụ đã gọi, căn cứ, kết quả từng quy tắc và hash bộ quy tắc.
+
+## Product walkthrough
+
+### 1. Bắt đầu từ dữ liệu thật của thương vụ
+
+AE ghi nhu cầu, ngân sách, ngày chốt, liên hệ, bảng giá và checklist 4 mục kiểm soát của giai đoạn Develop. Đây là dữ liệu Agent được phép đọc.
+
+![Input Data](assets/input-data.jpg)
+
+### 2. Làm cho từng bước của Agent nhìn thấy được
+
+Mỗi lần chạy ghi rõ công cụ đã gọi theo đúng thứ tự, trong đó có `evaluate_opportunity_rules` và công cụ ghi duy nhất `save_opportunity_research`. Công cụ sai quyền bị chặn và ghi DENIED.
+
+![Agent workflow](assets/agent-workflow.png)
+
+### 3. Giải thích kết luận bằng quy tắc
+
+Bảng **Căn cứ quy tắc** cho thấy quy tắc nào, giá trị quan sát, ngưỡng, kết quả, giới hạn kết luận, việc cần làm và cổng duyệt. Thiếu dữ liệu thì ghi *Chưa đánh giá được* thay vì đoán.
+
+![Rule evaluations](assets/rule-evaluations.jpg)
+
+### 4. Con người xác minh trước khi hồ sơ thay đổi
+
+AE chọn rủi ro nào được thêm vào hồ sơ. Rủi ro OPP-R02 vào tab Quản lý rủi ro (gắn nhãn AI) và **cổng QLKD rà soát (BR-06)** bật lên trước khi được chuyển sang Propose.
+
+![Human gate](assets/human-gate.png)
+
+### 5. Dữ kiện thay đổi được đánh giá lại
+
+Khách báo ngân sách 300 triệu. Agent chạy lại: độ bao phủ dữ liệu lên 100 %, **OPP-R07 chuyển thành vi phạm** (420 triệu > 300 triệu) và hành động "rà lại phạm vi hoặc chia giai đoạn" lên vị trí thứ hai. Bản #1 vẫn được giữ.
+
+![Research V2](assets/research-v2.png)
+
+### 6. Giữ dấu vết để kiểm tra lại
+
+Mỗi bản nghiên cứu gắn với lần chạy, phiên bản cấu hình Agent, `ruleset_version` + `ruleset_hash`, người xác minh và nhật ký audit (kể cả khi LLM đề xuất mức quan trọng khác quy tắc). Xem [03 · Bộ nhớ hồ sơ và truy xuất](docs/whitepapers/03-record-memory-and-retrieval.md).
+
+## Quyết định thiết kế
+
+<details>
+<summary>Kiến trúc đầy đủ và ranh giới dữ liệu</summary>
+
+```mermaid
+flowchart LR
+    subgraph UI[Giao diện Next.js]
+      A[Hồ sơ Lead / Cơ hội] --> B[Chạy Agent]
+      H[Tab Nghiên cứu AI · Căn cứ quy tắc]
+    end
+    subgraph Harness[Agent harness · server]
+      B --> C[Kiểm tra trước khi chạy: kill switch, ngân sách, model]
+      C --> D[Vòng gọi công cụ có giới hạn]
+      D --> E[invokeTool: quyền, schema, che log]
+      E --> F[Rule engine OPP-R01..R10]
+      E --> G[validateEvidence]
+    end
+    D <-->|function calling| O[OpenAI]
+    F --> S[(SQLite: ai_runs, tool_calls, opportunity_research, ai_rule_evaluations, ai_evidence)]
+    G --> S
+    S --> H
+    H --> V{AE xác minh HG4 · QLKD HG6}
+    V --> R[(Hồ sơ chính thức: rủi ro, mức quan trọng)]
+```
+
+</details>
+
+Ranh giới trung tâm rất đơn giản:
+
+- **Backend** sở hữu ngưỡng, trạng thái quy tắc, quyền công cụ, kiểm tra căn cứ, giới hạn chạy, lưu trữ và audit.
+- **OpenAI** chọn bước, gọi công cụ, diễn giải kết quả đã khóa và viết insight bằng structured output.
+- **Agent** bị giới hạn bởi danh sách công cụ, đúng một hồ sơ (`ctx.entityId`), schema đầu ra và bộ quy tắc.
+- **Con người** duyệt email, loại / chuyển đổi Lead, xác minh nghiên cứu, rà soát chuyển giai đoạn và chiết khấu.
+
+Thất bại an toàn là một kết quả hợp lệ: thiếu dữ liệu, căn cứ không xác thực được, lỗi provider, vượt ngân sách hay sai schema đều dừng hoặc chuyển người xem, không tạo ra một kết quả trông như chắc chắn.
+
+## Cấu trúc repository
+
+- `src/app/` – trang Next.js (App Router) và API route
+- `src/lib/agents/` – harness của 2 Agent: `runtime`, `tools`, `rules`, `evidence`, `prompts`, `mock`
+- `src/lib/services/` – nghiệp vụ Lead, cơ hội, báo giá, đơn hàng, hoá đơn, quản trị AI
+- `src/lib/db/` – schema SQLite, migration theo gói việc `wpXX_*`, dữ liệu mẫu
+- `src/components/` – thành phần giao diện, gồm bảng Căn cứ quy tắc
+- `tests/` – test Vitest theo gói việc (DB in-memory, AI mock)
+- `docs/whitepapers/` – 7 tài liệu kiến trúc; `docs/requirements/` – FR, BR, quyết định, mô hình dữ liệu
+- `assets/` – ảnh chụp walkthrough
+- `Dockerfile`, `.github/workflows/ci.yml` – build và CI
+
+## Chạy local
 
 ```sh
 npm ci
@@ -38,42 +124,19 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Mở [http\://localhost:3000](http://localhost:3000). Lần chạy đầu hệ thống tự tạo dữ liệu mẫu trong `data/sms.db`.
-
-## Tài liệu
-
-| Tài liệu | Nội dung |
-| :---- | :---- |
-| [AGENTS.md](http://AGENTS.md) | Điểm bắt đầu cho mọi AI và người code |
-| [docs/requirements/REQUIREMENTS.md](http://docs/requirements/REQUIREMENTS.md) | 100 yêu cầu chức năng, 15 yêu cầu phi chức năng |
-| [docs/requirements/BUSINESS-RULES.md](http://docs/requirements/BUSINESS-RULES.md) | Quy tắc nghiệp vụ và con số mặc định |
-| [docs/requirements/DECISIONS.md](http://docs/requirements/DECISIONS.md) | Quyết định thiết kế đã chốt và mặc định |
-| [docs/requirements/ROLES.md](http://docs/requirements/ROLES.md) | Vai trò, quyền, phạm vi dữ liệu |
-| [docs/requirements/DATA-MODEL.md](http://docs/requirements/DATA-MODEL.md) | Thực thể ERD của bài ↔ bảng trong code |
-| [docs/WORKPLAN.md](http://docs/WORKPLAN.md) | 12 gói việc và file thuộc từng gói |
-| [docs/COLLABORATION.md](http://docs/COLLABORATION.md) | Quy trình nhiều AI làm song song |
-| [docs/TASKBOARD.md](http://docs/TASKBOARD.md) | Bảng trạng thái các gói việc |
-| [docs/DEPLOY.md](http://docs/DEPLOY.md) | Đưa lên môi trường test |
-| [docs/VIBECODE-GUIDE.md](http://docs/VIBECODE-GUIDE.md) | Đặc tả kỹ thuật Agent và khung đánh giá |
-
-## Các lệnh kiểm tra và phát triển
+Mở [http://localhost:3000](http://localhost:3000). Lần chạy đầu hệ thống tự tạo dữ liệu mẫu trong `data/sms.db`. Không có `OPENAI_API_KEY` thì Agent chạy chế độ mock, đi đúng các công cụ, quyền và quy tắc như bản thật.
 
 ```sh
-npm run dev          # Khởi động máy chủ dev
 npm run typecheck    # Sinh type route và kiểm tra kiểu TypeScript
-npm run lint         # Kiểm tra chuẩn mã nguồn bằng ESLint
-npm test             # Chạy bộ test Vitest (DB in-memory, mock AI)
-npm run check        # Kiểm tra toàn diện (= typecheck + lint + test)
-npm run db:reset     # Xóa và tạo mới cơ sở dữ liệu mẫu
-npm run fr:coverage  # Báo cáo độ phủ kiểm thử các mã FR và HG
-npm run build        # Build ứng dụng cho môi trường production
+npm run lint         # ESLint
+npm test             # Vitest (DB in-memory, mock AI)
+npm run check        # typecheck + lint + test
+npm run db:reset     # Tạo lại cơ sở dữ liệu mẫu
+npm run fr:coverage  # Độ phủ kiểm thử theo mã FR và HG
+npm run build        # Build production
 ```
 
-## Tài khoản demo
-
-Đăng nhập bằng Email và Mật khẩu (DEC-14, FR-97) hoặc chọn nhanh tài khoản tại trang `/login`:
-
-**Mật khẩu dùng chung cho tất cả tài khoản demo:** `Password123!`
+Tài khoản demo (mật khẩu chung `Password123!`, hoặc chọn nhanh ở `/login`):
 
 | Vai trò | Nhãn hiển thị | Email | Họ và tên | Chức danh | Mã NV |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -85,3 +148,27 @@ npm run build        # Build ứng dụng cho môi trường production
 | `FINANCE` | Nhân viên Tài chính – Kế toán | `ha.vo@sms.local` | Võ Thu Hà | Kế toán công nợ | `EMP-006` |
 | `AI_MANAGER` | Người quản lý tác nhân AI | `tuan.le@sms.local` | Lê Hoàng Tuấn | Quản lý tác nhân AI | `EMP-007` |
 | `ADMIN` | Người quản trị hệ thống | `khanh.hoang@sms.local` | Hoàng Gia Khánh | Quản trị hệ thống | `EMP-008` |
+
+Kịch bản thao tác từng bước: [docs/demo-walkthrough.md](docs/demo-walkthrough.md).
+
+## Tài liệu kiến trúc
+
+| Whitepaper | Nội dung |
+| :---- | :---- |
+| [01 · Hai Agent và harness](docs/whitepapers/01-agent-harness.md) | Các lớp của một Agent, vòng gọi công cụ có giới hạn, mock và OpenAI |
+| [02 · Bảo vệ dữ liệu và đầu vào không tin cậy](docs/whitepapers/02-data-protection-and-untrusted-input.md) | Che log, `untrusted_data`, kiểm tra căn cứ, ranh giới tin cậy |
+| [03 · Bộ nhớ hồ sơ và truy xuất](docs/whitepapers/03-record-memory-and-retrieval.md) | Bảng dữ liệu AI, `ai_rule_evaluations`, hai đường truy vết |
+| [04 · Mô hình quyết định và quyền sở hữu](docs/whitepapers/04-decision-model-and-ownership.md) | OPP-R01..R10, trạng thái, độ bao phủ, ai sở hữu phần nào |
+| [05 · Cổng con người, chạy lại và quản trị](docs/whitepapers/05-human-gates-revision-and-governance.md) | HG1–HG8, kiểm soát vận hành, bản #1 / #2 trước–sau |
+| [06 · Hỏi đáp bảo vệ kỹ thuật](docs/whitepapers/06-technical-defense-qa.md) | Câu trả lời ngắn cho phần hỏi đáp |
+| [07 · Bản đồ triển khai](docs/whitepapers/07-implementation-map.md) | Màn hình → code → test, việc còn mở |
+
+Yêu cầu và quy ước của nhóm: [AGENTS.md](AGENTS.md), [REQUIREMENTS](docs/requirements/REQUIREMENTS.md), [BUSINESS-RULES](docs/requirements/BUSINESS-RULES.md), [DECISIONS](docs/requirements/DECISIONS.md), [ROLES](docs/requirements/ROLES.md), [DATA-MODEL](docs/requirements/DATA-MODEL.md), [WORKPLAN](docs/WORKPLAN.md), [DEPLOY](docs/DEPLOY.md), [VIBECODE-GUIDE](docs/VIBECODE-GUIDE.md).
+
+## Giới hạn
+
+Đây là prototype cho đồ án, không phải hệ thống vận hành thật. Chế độ mock dùng dữ liệu web mẫu (`mock://…`), không chứng minh Agent đã tra cứu Internet. Chưa có: bộ đánh giá 45 ca chạy với model OpenAI thật, bảng quy tắc riêng cho Qualification Agent, test tự động cho bước AE xác minh, SSO/MFA, quét mã độc tệp tải lên, sao lưu và chính sách xoá dữ liệu tự động. SQLite phù hợp một máy chủ; triển khai nhiều phiên bản cần cơ sở dữ liệu dùng chung.
+
+## License
+
+Chưa gắn license. Mã nguồn thuộc đồ án môn học của nhóm.

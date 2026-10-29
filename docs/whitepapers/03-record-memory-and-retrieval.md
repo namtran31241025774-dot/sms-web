@@ -1,4 +1,4 @@
-# 03 · Dữ liệu của lớp AI
+# 03 · Bộ nhớ hồ sơ và truy xuất dữ liệu
 
 > **Mục đích.** LLM không có bộ nhớ bền vững. Mọi thứ cần để truy vết "Agent đã làm gì, dựa vào đâu, ai duyệt" nằm trong cơ sở dữ liệu, gắn với hồ sơ nghiệp vụ (Lead / Opportunity).
 
@@ -61,3 +61,10 @@ Một hành động của Agent
 ## 5. Ranh giới "đề xuất" và "hồ sơ chính thức"
 
 Bản nghiên cứu và kết quả quy tắc là **đề xuất**. Đối thủ, rủi ro, mức quan trọng chính thức của cơ hội chỉ đổi khi AE bấm "Xác minh & cập nhật hồ sơ" (HG4). Vì vậy chạy Agent không bao giờ tự thêm đối thủ hay rủi ro vào hồ sơ.
+
+## 6. Truy xuất dữ liệu cho Agent
+
+- **Đúng hồ sơ, đúng khóa:** công cụ đọc theo `ctx.entityId` của lần chạy (`get_opportunity`, `get_recent_emails`, `get_meeting_notes`); model không truyền ID, nên không đọc được hồ sơ khác.
+- **Tra cứu chính xác, không tìm kiếm tương đồng** cho đường ra quyết định: bên liên quan, đối thủ, email trong cửa sổ BR-15, giải pháp mới nhất.
+- **Dữ liệu ngoài** (email, web) đi kèm nhãn `untrusted_data` và tham chiếu (`activity:<id>`, URL của chính lần chạy) để bản nghiên cứu trích dẫn lại được.
+- **Bộ nhớ thuộc về cơ sở dữ liệu**, không thuộc model: mỗi lần chạy mới đọc lại hồ sơ hiện hành rồi so với bản nghiên cứu trước (`changes_since_last`).
