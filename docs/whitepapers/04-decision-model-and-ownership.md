@@ -31,6 +31,8 @@ Nguồn          → opportunity.stakeholders tại thời điểm chạy
 
 Mọi ngưỡng đọc từ bảng `settings` (`src/lib/settings-defaults.ts`); không hard-code. Lỗi cũ "mock dùng 150 triệu, BR-08 ghi 100 triệu" đã hết vì mock gọi chính rule engine.
 
+Trên app, trang **AI Agent** (`/agents`) hiển thị bảng này dưới dạng ma trận màu "thiếu dữ liệu → vi phạm → cảnh báo → đạt" với ngưỡng đọc từ cấu hình (`assets/rule-logic.jpg`); mỗi thẻ nghiên cứu có thang mức quan trọng đánh dấu vị trí doanh thu của cơ hội.
+
 ## 3. Trạng thái là taxonomy đóng
 
 | Trạng thái | Ý nghĩa | Dashboard hiển thị |

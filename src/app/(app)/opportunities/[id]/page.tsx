@@ -7,7 +7,8 @@ import { formatDate, formatVnd, LEVEL, LOST_REASONS_BR27, OPP_STAGE, QUOTE_STATU
 import { can } from "@/lib/rbac";
 import { listRuns } from "@/lib/services/ai-review";
 import { approvalsFor } from "@/lib/services/approvals";
-import { activitiesFor, auditTrail, users } from "@/lib/services/core";
+import { activitiesFor, auditTrail, settingNumber, users } from "@/lib/services/core";
+import { ImportanceScale } from "@/components/agent-controls";
 import { contactsOf, listCompetitors, listPriceLists, listProducts } from "@/lib/services/master";
 import {
   checklistStatus,
@@ -787,6 +788,11 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                         {r.ruleset_hash && <code className="text-[11px] text-ink-3">{r.ruleset_version}#{r.ruleset_hash}</code>}
                       </div>
                       <ResearchFlow research={r} evals={evals} />
+                      {r.ruleset_version && (
+                        <div className="max-w-xl">
+                          <ImportanceScale medium={settingNumber("importance_medium_amount")} high={settingNumber("importance_high_amount")} amount={o.amount} />
+                        </div>
+                      )}
                       <p className="text-ink-2">{r.summary}</p>
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div>

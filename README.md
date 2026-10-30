@@ -45,6 +45,14 @@ Trang **Trung tâm AI Agent** (`/agents`) trình bày từng Agent theo 6 thành
 
 ![Agent center](assets/agent-center.jpg)
 
+Cùng trang có **6 lớp kiểm soát**: mỗi yêu cầu chạy Agent phải đi qua lần lượt kiểm tra trước khi chạy → giới hạn khi chạy → quyền công cụ → kiểm căn cứ → bộ quy tắc → con người; lớp nào không đạt thì dừng ở đó (dòng đỏ). Số liệu 7 ngày lấy từ dữ liệu thật và chỉ tính hồ sơ người xem được phép thấy.
+
+![Control layers](assets/control-layers.png)
+
+Và **ma trận logic quyết định** của 10 quy tắc: đọc từ trái sang phải — thiếu dữ liệu thì dừng ở cột 1, sau đó mới xét vi phạm, cảnh báo, đạt. Ngưỡng là giá trị cấu hình hiện hành.
+
+![Rule logic](assets/rule-logic.jpg)
+
 ### 3. Làm cho từng bước của một lần chạy nhìn thấy được
 
 Mỗi bản nghiên cứu có thanh **Workflow của lần chạy này**: bước nào đã xong, do ai làm, kết quả tóm tắt (số công cụ đã gọi, số vi phạm / cảnh báo / thiếu dữ liệu, số nguồn đã xác thực) và bước nào đang chờ con người.
@@ -104,6 +112,35 @@ flowchart LR
 ```
 
 </details>
+
+Logic của một quy tắc luôn đi theo cùng một thứ tự:
+
+```mermaid
+flowchart LR
+    D[Dữ liệu hồ sơ tại thời điểm chạy] --> Q1{Đủ dữ liệu?}
+    Q1 -- Không --> NE[Chưa đánh giá được<br/>nêu dữ liệu cần bổ sung]
+    Q1 -- Có --> Q2{Vi phạm ngưỡng?}
+    Q2 -- Có --> HIT[Vi phạm<br/>tạo rủi ro có mã OPP-Rxx]
+    Q2 -- Không --> Q3{Cần chú ý?}
+    Q3 -- Có --> W[Cảnh báo / bật cổng duyệt]
+    Q3 -- Không --> P[Đạt]
+    HIT & W & NE --> A[Xếp hành động: Vi phạm → Cảnh báo → Thiếu dữ liệu, rồi CAO › TB › THẤP]
+    A --> H{AE xác minh HG4}
+```
+
+Sáu lớp kiểm soát mà một lần chạy phải đi qua:
+
+```mermaid
+flowchart LR
+    R[Yêu cầu chạy] --> L1[1 Kiểm tra trước khi chạy]
+    L1 --> L2[2 Giới hạn khi chạy] --> L3[3 Quyền công cụ] --> L4[4 Kiểm căn cứ] --> L5[5 Bộ quy tắc] --> L6[6 Con người duyệt] --> OK[Hồ sơ chính thức thay đổi]
+    L1 -. không đạt .-> X1[Không tạo lần chạy]
+    L2 -. không đạt .-> X2[FAILED + lý do]
+    L3 -. không đạt .-> X3[DENIED]
+    L4 -. không đạt .-> X4[Không lưu kết quả]
+    L5 -. LLM khác quy tắc .-> X5[Thay bằng kết quả quy tắc]
+    L6 -. chưa duyệt .-> X6[Hồ sơ giữ nguyên]
+```
 
 Ranh giới trung tâm rất đơn giản:
 

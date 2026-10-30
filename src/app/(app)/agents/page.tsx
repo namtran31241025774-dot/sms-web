@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { formatDate } from "@/lib/domain";
-import { AGENT_PROFILES, agentLimits, agentRuntimeInfo, agentStats, agentTools, recentRuns, type AgentProfile } from "@/lib/agents/catalog";
+import { AGENT_PROFILES, agentLimits, agentRuntimeInfo, agentStats, agentTools, controlLayerStats, preRunStatus, recentRuns, type AgentProfile } from "@/lib/agents/catalog";
+import { OPPORTUNITY_RULES, fillLogic } from "@/lib/agents/rules";
+import { settingNumber } from "@/lib/services/core";
+import { ControlLayers, ImportanceScale, RuleLogicMatrix } from "@/components/agent-controls";
 import { Card, CommandBar, CommandLink, Kpi, PageTitle, StatusBadge } from "@/components/ui";
 import { OwnerBadge, WorkflowSteps, OWNER, type FlowOwner } from "@/components/agent-workflow";
 import { Icon } from "@/components/icons";
@@ -73,6 +76,42 @@ export default async function AgentsPage({ searchParams }: PageProps<"/agents">)
             ))}
           </div>
         </Card>
+
+        {/* 2b. Các lớp kiểm soát */}
+        <Card title="6 lớp kiểm soát Agent — yêu cầu đi qua lớp nào, bị chặn ở đâu">
+          <ControlLayers
+            stats={controlLayerStats(user)}
+            preRun={AGENT_PROFILES.map((a) => ({ name: a.title.replace("Sales ", ""), ...preRunStatus(a.name) }))}
+          />
+        </Card>
+
+        {/* 2c. Logic quyết định của Opportunity Agent */}
+        {current.name === "OPPORTUNITY" && (
+          <Card title={`Logic quyết định — bộ quy tắc ${info.ruleset} (backend tính, LLM không được đổi)`}>
+            <RuleLogicMatrix rules={OPPORTUNITY_RULES.map((r) => ({ id: r.id, br: r.br, title: r.title, logic: { input: r.logic.input, missing: "missing" in r.logic ? fillLogic(r.logic.missing) : undefined, hit: "hit" in r.logic ? fillLogic(r.logic.hit) : undefined, warn: "warn" in r.logic ? fillLogic(r.logic.warn) : undefined, pass: fillLogic(r.logic.pass) } }))} />
+            <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <div className="rounded-md border border-[#f0f0f0] p-3">
+                <div className="label">Mức quan trọng (OPP-R01, BR-08)</div>
+                <ImportanceScale medium={settingNumber("importance_medium_amount")} high={settingNumber("importance_high_amount")} />
+                <p className="text-[11px] text-ink-3">Khách ≥ {settingNumber("segment_enterprise_min_employees")} nhân sự (Enterprise) luôn là CAO.</p>
+              </div>
+              <div className="rounded-md border border-[#f0f0f0] p-3 text-sm">
+                <div className="label">3 hành động ưu tiên</div>
+                <ol className="list-decimal space-y-0.5 pl-5 text-[13px]">
+                  <li>Quy tắc <b className="text-[#a4262c]">Vi phạm</b> trước</li>
+                  <li>Rồi <b className="text-[#8a5300]">Cảnh báo</b>, <b className="text-[#605e5c]">Thiếu dữ liệu</b></li>
+                  <li>Cùng nhóm: mức CAO › TRUNG BÌNH › THẤP</li>
+                </ol>
+                <p className="mt-1 text-[11px] text-ink-3">Lấy 3 việc đầu; phần còn lại vào &ldquo;hành động bổ sung&rdquo;.</p>
+              </div>
+              <div className="rounded-md border border-[#f0f0f0] p-3 text-sm">
+                <div className="label">Độ bao phủ dữ liệu</div>
+                <div className="rounded bg-[#fafafa] px-2 py-1.5 text-center font-mono text-[13px]">quy tắc đánh giá được ÷ quy tắc áp dụng</div>
+                <p className="mt-1 text-[11px] text-ink-3">≥ 0,8 cao · ≥ {settingNumber("ai_min_confidence") || 0.6} trung bình · thấp hơn → gắn cờ cần bổ sung dữ liệu. Không phải &ldquo;xác suất AI đúng&rdquo;.</p>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* 3. Workflow của Agent đang chọn */}
         <Card title={<span>Workflow của {current.title}</span>}>

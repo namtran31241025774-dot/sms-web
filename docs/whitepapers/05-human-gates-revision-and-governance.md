@@ -2,6 +2,19 @@
 
 > **Mục đích.** Agent đề xuất; người có thẩm quyền quyết định. Khi dữ kiện thay đổi, hệ thống chạy lại Agent trên cùng hồ sơ, giữ bản cũ để so sánh trước/sau.
 
+## 0. Sáu lớp kiểm soát (hiển thị trên trang `/agents`)
+
+| Lớp | Chặn gì | Thực thi ở | Không đạt thì |
+|---|---|---|---|
+| 1 Kiểm tra trước khi chạy | Agent tắt, kill switch, hết ngân sách ngày, sai giai đoạn, chạy trùng, model ngoài danh sách | `runtime.ts` | Không tạo lần chạy |
+| 2 Giới hạn khi chạy | 15 vòng, 60 000 token, 5 lượt tìm web, 300 giây | `runtime.ts` | FAILED kèm lý do |
+| 3 Quyền công cụ | Công cụ ngoài danh sách, sai schema, ngoài hồ sơ đang chạy | `tools.ts` | DENIED / lỗi trả về model |
+| 4 Kiểm căn cứ | Nguồn không thuộc hồ sơ, URL ngoài lần chạy, trích dẫn sai | `evidence.ts` | Không lưu kết quả |
+| 5 Bộ quy tắc | Mức quan trọng, rủi ro, thứ tự hành động, cổng duyệt | `rules.ts` | Thay giá trị LLM bằng kết quả quy tắc |
+| 6 Con người | Email, loại / chuyển đổi, xác minh, rủi ro, chuyển giai đoạn | HG1–HG8 | Hồ sơ giữ nguyên |
+
+Ảnh: `assets/control-layers.png`. Số liệu trên trang là 7 ngày gần nhất, chỉ tính hồ sơ người xem được phép thấy.
+
 ## 1. Tám cổng con người (HG)
 
 | Cổng | Áp cho | Hệ thống chặn gì |

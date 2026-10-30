@@ -1,9 +1,9 @@
 // Hồ sơ mô tả 2 Agent cho trang Trung tâm AI Agent.
 // Công cụ, quy tắc và giới hạn đọc từ registry/cấu hình thật (TOOLS, OPPORTUNITY_RULES, settings) nên trang không mô tả sai code.
-import { all } from "../db";
+import { all, get } from "../db";
 import type { UserScope } from "../scope";
 import { recordVisible } from "../services/access";
-import { settingNumber } from "../services/core";
+import { setting, settingBool, settingNumber } from "../services/core";
 import { agentMode } from "./runtime";
 import { PROMPT_VERSION } from "./prompts";
 import { OPPORTUNITY_RULES, RULESET_VERSION } from "./rules";
@@ -134,4 +134,45 @@ export function recentRuns(user: UserScope, limit = 8) {
   return all<Visible & { id: number; agent: string; trigger: string; status: string; model: string; started_at: string; summary: string | null; error: string | null }>(
     "SELECT id, agent, trigger, status, entity_type, entity_id, model, started_at, summary, error FROM ai_runs ORDER BY id DESC LIMIT 200",
   ).filter(visibleTo(user)).slice(0, limit);
+}
+
+/** Số liệu 7 ngày cho từng lớp kiểm soát, chỉ trên hồ sơ người xem được thấy (FR-98). */
+export function controlLayerStats(user: UserScope) {
+  const runs = all<Visible & { status: string; denied: number; errors: number; evidence: number; hits: number; missing: number; overridden: number; research: string | null; suggestions: number; suggestions_pending: number }>(
+    `SELECT r.entity_type, r.entity_id, r.status,
+       (SELECT COUNT(*) FROM tool_calls t WHERE t.run_id = r.id AND t.outcome = 'DENIED') AS denied,
+       (SELECT COUNT(*) FROM tool_calls t WHERE t.run_id = r.id AND t.outcome = 'ERROR') AS errors,
+       (SELECT COUNT(*) FROM ai_evidence e WHERE e.run_id = r.id) AS evidence,
+       (SELECT COUNT(*) FROM ai_rule_evaluations v WHERE v.run_id = r.id AND v.status = 'HIT') AS hits,
+       (SELECT COUNT(*) FROM ai_rule_evaluations v WHERE v.run_id = r.id AND v.status = 'NOT_EVALUABLE') AS missing,
+       (SELECT COUNT(*) FROM opportunity_research o WHERE o.run_id = r.id AND o.llm_importance IS NOT NULL AND o.llm_importance <> o.importance) AS overridden,
+       (SELECT o.status FROM opportunity_research o WHERE o.run_id = r.id ORDER BY o.id DESC LIMIT 1) AS research,
+       (SELECT COUNT(*) FROM ai_suggestions s WHERE s.run_id = r.id) AS suggestions,
+       (SELECT COUNT(*) FROM ai_suggestions s WHERE s.run_id = r.id AND s.status = 'PENDING_REVIEW') AS suggestions_pending
+     FROM ai_runs r WHERE r.started_at >= datetime('now','-7 days')`,
+  ).filter(visibleTo(user));
+  const sum = (k: keyof (typeof runs)[number]) => runs.reduce((n, r) => n + Number(r[k] ?? 0), 0);
+  const results = runs.filter((r) => r.research).length + sum("suggestions");
+  const pending = runs.filter((r) => r.research === "PENDING_REVIEW").length + sum("suggestions_pending");
+  return {
+    runs: runs.length,
+    failed: runs.filter((r) => r.status === "FAILED").length,
+    denied: sum("denied"),
+    toolErrors: sum("errors"),
+    evidence: sum("evidence"),
+    hits: sum("hits"),
+    missing: sum("missing"),
+    overridden: sum("overridden"),
+    pending,
+    decided: results - pending,
+  };
+}
+
+/** Trạng thái lớp kiểm tra trước khi chạy (chỉ đọc — không gọi checkPreRunConstraints vì hàm đó gửi cảnh báo ngân sách). */
+export function preRunStatus(agent: AgentName) {
+  const killed = setting("ai_status") === "PAUSED" || setting("ai_emergency_kill") === "true";
+  const enabled = settingBool(agent === "QUALIFICATION" ? "agent_qualification_enabled" : "agent_opportunity_enabled");
+  const budget = settingNumber("ai_daily_token_budget");
+  const used = get<{ total: number }>("SELECT COALESCE(SUM(input_tokens + output_tokens),0) AS total FROM ai_runs WHERE agent=? AND date(started_at)=date('now')", agent)?.total ?? 0;
+  return { killed, enabled, used, budget, ok: !killed && enabled && used < budget };
 }

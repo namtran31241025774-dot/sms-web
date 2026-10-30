@@ -45,18 +45,40 @@ export type RuleOutcome = {
 };
 
 // Danh mục quy tắc: nguồn nghiệp vụ (BR) và tham số cấu hình đọc từ settings — không hard-code ngưỡng.
+export type RuleLogic = { input: string; missing?: string; hit?: string; warn?: string; pass: string };
+
+// Logic của từng quy tắc ở dạng "điều kiện → kết quả" để giao diện và tài liệu hiển thị.
+// {tên_tham_số} được thay bằng giá trị hiện hành trong settings khi hiển thị.
 export const OPPORTUNITY_RULES = [
-  { id: "OPP-R01", br: "BR-08", title: "Mức quan trọng của cơ hội", settings: ["importance_high_amount", "importance_medium_amount", "segment_enterprise_min_employees"] },
-  { id: "OPP-R02", br: "BR-01 (Authority)", title: "Đã ghi nhận người quyết định", settings: [] },
-  { id: "OPP-R03", br: "FR-37", title: "Đã ghi nhận và xác nhận nhu cầu khách hàng", settings: [] },
-  { id: "OPP-R04", br: "FR-40", title: "Đối thủ cạnh tranh trong thương vụ", settings: [] },
-  { id: "OPP-R05", br: "BR-15", title: "Tương tác email trong cửa sổ theo dõi", settings: ["email_window_days"] },
-  { id: "OPP-R06", br: "BR-15", title: "Áp lực ngày chốt so với giai đoạn", settings: ["opp_close_warning_days"] },
-  { id: "OPP-R07", br: "FR-35", title: "Doanh thu dự kiến so với ngân sách khách", settings: [] },
-  { id: "OPP-R08", br: "FR-41", title: "Giải pháp đã được xác nhận", settings: [] },
-  { id: "OPP-R09", br: "BR-06", title: "Cổng rà soát của QLKD", settings: ["manager_gate_mode"] },
-  { id: "OPP-R10", br: "BR-07", title: "Cổng rà soát chuyên môn", settings: ["expert_review_enabled", "expert_review_min_amount"] },
-] as const;
+  { id: "OPP-R01", br: "BR-08", title: "Mức quan trọng của cơ hội", settings: ["importance_high_amount", "importance_medium_amount", "segment_enterprise_min_employees"],
+    logic: { input: "Doanh thu dự kiến, quy mô nhân sự của khách", pass: "≥ {importance_high_amount} ₫ hoặc ≥ {segment_enterprise_min_employees} nhân sự → CAO · ≥ {importance_medium_amount} ₫ → TRUNG BÌNH · còn lại → THẤP" } },
+  { id: "OPP-R02", br: "BR-01 (Authority)", title: "Đã ghi nhận người quyết định", settings: [],
+    logic: { input: "Vai trò của bên liên quan", hit: "Không ai có vai trò Người quyết định → rủi ro CAO", pass: "Có ≥ 1 Người quyết định" } },
+  { id: "OPP-R03", br: "FR-37", title: "Đã ghi nhận và xác nhận nhu cầu khách hàng", settings: [],
+    logic: { input: "Nhu cầu khách hàng, mục kiểm soát Nhu cầu", hit: "Nhu cầu trống → rủi ro CAO", warn: "Có nhu cầu nhưng chưa xác nhận", pass: "Đã ghi và đã xác nhận" } },
+  { id: "OPP-R04", br: "FR-40", title: "Đối thủ cạnh tranh trong thương vụ", settings: [],
+    logic: { input: "Danh sách đối thủ do nhân viên ghi", missing: "Chưa ghi và chưa xác nhận 'không có đối thủ'", warn: "Có đối thủ → cảnh báo TRUNG BÌNH", pass: "Đã xác nhận không có đối thủ" } },
+  { id: "OPP-R05", br: "BR-15", title: "Tương tác email trong cửa sổ theo dõi", settings: ["email_window_days"],
+    logic: { input: "Email nhận từ người liên hệ đã liên kết", missing: "Chưa có email nào được đồng bộ", hit: "Có lịch sử nhưng 0 email trong {email_window_days} ngày → rủi ro TRUNG BÌNH", pass: "≥ 1 email nhận trong {email_window_days} ngày" } },
+  { id: "OPP-R06", br: "BR-15", title: "Áp lực ngày chốt so với giai đoạn", settings: ["opp_close_warning_days"],
+    logic: { input: "Ngày chốt, giai đoạn", missing: "Chưa có ngày chốt", hit: "Đã quá ngày chốt, hoặc còn < {opp_close_warning_days} ngày mà vẫn ở Develop → rủi ro CAO", pass: "Còn đủ thời gian" } },
+  { id: "OPP-R07", br: "FR-35", title: "Doanh thu dự kiến so với ngân sách khách", settings: [],
+    logic: { input: "Doanh thu dự kiến, ngân sách khách", missing: "Chưa có ngân sách", hit: "Doanh thu > ngân sách → rủi ro TRUNG BÌNH", pass: "Doanh thu ≤ ngân sách" } },
+  { id: "OPP-R08", br: "FR-41", title: "Giải pháp đã được xác nhận", settings: [],
+    logic: { input: "Mục kiểm soát Giải pháp", warn: "Chưa xác nhận → việc cho Presales", pass: "Presales đã xác nhận" } },
+  { id: "OPP-R09", br: "BR-06", title: "Cổng rà soát của QLKD", settings: ["manager_gate_mode"],
+    logic: { input: "Mức quan trọng, rủi ro mở và rủi ro vừa phát hiện", warn: "Mức CAO hoặc còn ≥ 1 rủi ro → bật cổng QLKD (HG6)", pass: "Không thuộc diện rà soát" } },
+  { id: "OPP-R10", br: "BR-07", title: "Cổng rà soát chuyên môn", settings: ["expert_review_enabled", "expert_review_min_amount"],
+    logic: { input: "Yêu cầu tích hợp, doanh thu dự kiến", warn: "Có tích hợp hoặc ≥ {expert_review_min_amount} ₫ → bật cổng chuyên môn", pass: "Không cần rà soát" } },
+] as const satisfies readonly { id: string; br: string; title: string; settings: readonly string[]; logic: RuleLogic }[];
+
+/** Thay {tham_số} trong mô tả logic bằng giá trị cấu hình hiện hành. */
+export function fillLogic(text: string): string {
+  return text.replace(/\{(\w+)\}/g, (_, key: string) => {
+    const v = setting(key);
+    return /^\d{4,}$/.test(v) ? Number(v).toLocaleString("vi-VN") : v;
+  });
+}
 
 const SEVERITY_ORDER: Record<Severity, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
 const vnd = (n: number) => `${n.toLocaleString("vi-VN")} ₫`;

@@ -9,6 +9,7 @@
 | Nút "Chạy Opportunity Agent", lịch sử lần chạy | `src/lib/agents/runtime.ts`, `triggers.ts` | `wp08-ai-agents.test.ts` |
 | Công cụ, quyền, DENIED, che log | `src/lib/agents/tools.ts` (`invokeTool`, `redactSensitive`) | `wp08-ai-agents.test.ts`, `review-runtime.test.ts` |
 | Trang **Trung tâm AI Agent** (thành phần, workflow, giới hạn, thống kê) | `src/app/(app)/agents/page.tsx`, `src/lib/agents/catalog.ts`, `src/components/agent-workflow.tsx` | Kiểm tra tay (docs/demo-walkthrough.md) |
+| **6 lớp kiểm soát**, **ma trận logic quyết định**, thang mức quan trọng | `src/components/agent-controls.tsx`, `controlLayerStats` trong `catalog.ts`, `logic` trong `OPPORTUNITY_RULES` (`rules.ts`) | Kiểm tra tay |
 | Thanh **Workflow của lần chạy này** | `src/components/research-flow.tsx` | Kiểm tra tay |
 | Bảng **Căn cứ quy tắc**, độ bao phủ, hash | `src/lib/agents/rules.ts`, `src/components/rule-evaluation-table.tsx` | `wp08-opportunity-rules.test.ts` |
 | Mức quan trọng / rủi ro / hành động ưu tiên | `rules.ts` → `save_opportunity_research` trong `tools.ts` | `wp08-opportunity-rules.test.ts` |
