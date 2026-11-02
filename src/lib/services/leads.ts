@@ -20,6 +20,8 @@ import type { UserScope } from "../scope";
 import { recordVisible } from "./access";
 import {bantQualified} from '../bant-policy';
 import {requireVietnamAddress} from './address-validation';
+import {validateVietnamAddress} from './address-validation';
+import {assignmentTeam} from './assignment-team';
 
 export type { DuplicateHit };
 export { findDuplicates, findOrCreateAccount, findOrCreateContact };
@@ -83,6 +85,7 @@ export type LeadInput = {
   notes?: string | null;
   topic?: string | null;
   owner_id?: number | null;
+  team_id?:number|null;
   account_id?: number | null;
   contact_id?: number | null;
   tag_ids?: number[];
@@ -258,8 +261,8 @@ export function createLead(actor: Actor, input: LeadInput): number {
   return tx(() => {
     const { id } = run(
       `INSERT INTO leads (company_name, company_norm, contact_name, contact_title, email, phone, address, address_normalized,
-         source, industry, notes, topic, owner_id, account_id, contact_id, rating, duplicate_flag, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         source, industry, notes, topic, owner_id, account_id, contact_id, rating, duplicate_flag, created_by,team_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       companyName,
       normalizeCompany(companyName),
       contactName,
@@ -278,6 +281,7 @@ export function createLead(actor: Actor, input: LeadInput): number {
       initialRating,
       dups.length ? 1 : 0,
       actorUserId(actor),
+      assignmentTeam(input.owner_id ?? actorUserId(actor),input.team_id),
     );
 
     // Gắn nhãn nếu có (FR-07)
@@ -310,6 +314,7 @@ const EDITABLE = [
 ] as const;
 
 export function updateLead(actor: Actor, id: number, input: Partial<LeadInput>) {
+  assert(actor.type!=='AI','Agent chỉ được đề xuất cập nhật Lead');
   if('address' in input) requireVietnamAddress(input.address);
   assertActorAccess(actor, "lead", id);
   const lead = getLead(id);
@@ -472,6 +477,7 @@ export function previewLeadImport(input: Record<string, string>[] | string): {
     const dups = company_name ? findDuplicates({ company_name, email, phone }) : [];
     if (dups.length > 0) duplicateCount++;
 
+    const addressCheck=validateVietnamAddress(address);if(!addressCheck.valid) errors.push(addressCheck.reason!);
     const valid = errors.length === 0;
     if (valid) validCount++;
 

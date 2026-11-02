@@ -39,6 +39,7 @@ describe("WP-07: Quản lý đội ngũ Sales (FR-75 → FR-87)", () => {
     db().exec("DELETE FROM work_participants");
     db().exec("DELETE FROM assignments");
     db().exec("UPDATE users SET team_id = NULL");
+    db().exec('UPDATE leads SET team_id=NULL; UPDATE opportunities SET team_id=NULL');
     db().exec("DELETE FROM team_members");
     db().exec("DELETE FROM teams");
     db().exec("DELETE FROM employees");

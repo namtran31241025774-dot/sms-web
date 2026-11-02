@@ -29,6 +29,10 @@ it('FR-32 Q1: total alone cannot qualify an influencer, arbitrary score levels a
  const result=invokeTool(ctx,'propose_bant_score',{budget:25,authority:15,need:25,timeline:25,outcome:'QUALIFIED',rationale:'Tổng cao nhưng chưa gặp người quyết định',evidence:[{ref:'lead.notes'}]},[]) as {outcome:string};
  expect(result.outcome).toBe('NEED_INFO');
  expect(()=>scoreBant(actor,id,{budget:20,authority:25,need:25,timeline:25})).toThrow(/0, 8, 15/);
+ expect(()=>scoreBant({type:'AI',agent:'QUALIFICATION',runId:0},id,{budget:25,authority:25,need:25,timeline:25})).toThrow(/đề xuất/);
+ const prior=get<{value:string}>("SELECT value FROM settings WHERE key='ai_auto_convert'")?.value ?? 'false';
+ run("UPDATE settings SET value='true' WHERE key='ai_auto_convert'");
+ try {expect(()=>convertLeadToOpportunity({type:'AI',agent:'QUALIFICATION',runId:0},id,{opportunity_name:'Blocked AI'})).toThrow(/DEC-03/);}finally{run("UPDATE settings SET value=? WHERE key='ai_auto_convert'",prior);}
  run('UPDATE leads SET bant_score=90,bant_authority=15 WHERE id=?',id);
  expect(()=>convertLeadToOpportunity(actor,id,{account_action:'new',contact_action:'new',opportunity_name:'Blocked'})).toThrow(/người quyết định/);
 });
