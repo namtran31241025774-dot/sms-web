@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./types";
+import { wp08_004_research_phases } from './wp08_004_research_phases';
 import { wp00_001_shared_schema } from "./wp00_001_shared_schema";
 import { wp01_001_customer_management } from "./wp01_001_customer_management";
 import { wp02_001_catalog } from "./wp02_001_catalog";
@@ -39,6 +40,7 @@ export const MIGRATIONS: readonly Migration[] = [
   wp11_003_document_items,
   wp12_001_backfill_quote_versions,
   wp12_002_backfill_quote_accounts,
+  wp08_004_research_phases,
 ] as const;
 
 /**

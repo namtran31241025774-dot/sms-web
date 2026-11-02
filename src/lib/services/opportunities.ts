@@ -6,7 +6,7 @@ import type { UserScope } from "../scope";
 import { recordVisible } from "./access";
 import { notifyDeciders, requestApproval } from "./approvals";
 import { actorUserId, audit, notify, setting, type Actor } from "./core";
-import { listRisks, type OpportunityRisk } from "./risks";
+import { listRisks, findMatchingRisk, type OpportunityRisk } from "./risks";
 
 export * from "./risks";
 
@@ -706,6 +706,8 @@ export function managerGate(o: Opportunity): { required: boolean; reasons: strin
   if (o.importance === "HIGH") reasons.push("Mức quan trọng Cao (HIGH)");
   const openRisks = listRisks(o.id).filter((r) => r.status === "OPEN").length;
   if (openRisks > 0) reasons.push(`${openRisks} rủi ro chưa xử lý (OPEN)`);
+  const flagged=get<{n:number}>("SELECT COUNT(*) n FROM ai_rule_evaluations WHERE opportunity_id=? AND status='HIT' AND human_action='FLAGGED'",o.id)?.n ?? 0;
+  if(flagged) reasons.push(`${flagged} vi phạm được nhân viên gắn cờ cần rà soát`);
 
   return { required: reasons.length > 0, reasons };
 }
@@ -721,7 +723,8 @@ export function gateFingerprint(id: number): string {
   const risks=listRisks(id).map(r=>({id:r.id,status:r.status,severity:r.severity,description:r.description})).sort((a,b)=>a.id-b.id);
   const reopen=get<{id:number}>("SELECT id FROM opportunity_stage_history WHERE opportunity_id=? AND from_stage IN ('WON','LOST') AND to_stage='DEVELOP' ORDER BY id DESC LIMIT 1",id)?.id ?? 0;
   const revision=get<{id:number|null}>("SELECT MAX(id) id FROM audit_log WHERE (entity_type='opportunity' AND entity_id=? AND action IN ('UPDATE','RISK_ADD','RISK_STATUS','OPPORTUNITY_REOPEN')) OR (entity_type IN ('risk','opportunity_risk') AND entity_id IN (SELECT id FROM opportunity_risks WHERE opportunity_id=?))",id,id)?.id ?? 0;
-  return JSON.stringify({importance:opp?.importance,mode:setting('manager_gate_mode'),risks,reopen,revision});
+  const flags=all("SELECT id,acted_at,action_note FROM ai_rule_evaluations WHERE opportunity_id=? AND human_action='FLAGGED' ORDER BY id",id);
+  return JSON.stringify({importance:opp?.importance,mode:setting('manager_gate_mode'),risks,reopen,revision,flags});
 }
 
 export function gateState(o: Opportunity) {
@@ -986,6 +989,7 @@ export function researchOf(id: number) {
 /** Kết quả từng quy tắc OPP-R01..R10 đã khóa cho một bản nghiên cứu (BR-28). */
 export function ruleEvaluationsOf(researchId: number) {
   return all<{
+    id:number; human_action:'ACKNOWLEDGED'|'FLAGGED'|'RISK'|'TASK'|null;acted_by:number|null;acted_at:string|null;action_note:string|null;linked_risk_id:number|null;linked_task_id:number|null;
     rule_id: string; br_ref: string; status: string; severity: string | null; raw_value: string | null;
     threshold: string | null; rationale: string; limitation: string | null; evidence_refs_json: string;
     required_action: string | null; human_gate: string | null;
@@ -1000,6 +1004,7 @@ export function setProposedSolution(actor: Actor, id: number, solution: string) 
 export function verifyResearch(actor: Actor, researchId: number, opts: { applyImportance: boolean; riskIndexes: number[] }) {
   assertActorAccess(actor, "research", researchId);
   assert(actor.type === "USER", "Chỉ nhân viên xác minh nghiên cứu");
+  assert(actor.role==='SALES' || actor.role==='SALES_MANAGER','Chỉ nhân viên kinh doanh hoặc quản lý được xác minh');
   const r = get<{ id: number; opportunity_id: number; importance: string; risks_json: string; status: string }>(
     "SELECT * FROM opportunity_research WHERE id = ?",
     researchId,
@@ -1015,7 +1020,7 @@ export function verifyResearch(actor: Actor, researchId: number, opts: { applyIm
     }
     for (const i of opts.riskIndexes) {
       const risk = risks[i];
-      if (risk) {
+      if (risk && !findMatchingRisk(o.id,risk.description)) {
         run(
           "INSERT INTO opportunity_risks (opportunity_id, description, severity, source, created_by) VALUES (?,?,?,?,?)",
           o.id,

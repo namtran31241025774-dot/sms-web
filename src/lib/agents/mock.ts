@@ -4,6 +4,8 @@ import { stripAccents } from "../domain";
 import { get } from "../db";
 import { invokeTool, type ToolCallLog, type ToolContext } from "./tools";
 import type { RuleOutcome } from "./rules";
+import type { opportunityResearchContext } from './research-context';
+import type { InsightItem, OpportunityResearch } from './schemas';
 
 type Research = { untrusted_data: true; data: { title: string; snippet: string; source: string }[] };
 type Wrapped<T> = { data: T };
@@ -177,6 +179,8 @@ export function mockOpportunityAgent(ctx: ToolContext, log: ToolCallLog[]): stri
     checklist: Record<string, boolean>;
     stakeholders: { name: string; role: string }[];
     competitors: { name: string; strengths: string | null }[];
+    context: ReturnType<typeof opportunityResearchContext>;
+    research_phase: 'INITIAL'|'POST_SURVEY';
   };
   call("get_admin_criteria");
   const emailRes = call("get_recent_emails") as {
@@ -195,7 +199,6 @@ export function mockOpportunityAgent(ctx: ToolContext, log: ToolCallLog[]): stri
   // Mức quan trọng, rủi ro và thứ tự hành động lấy từ rule engine (BR-28) — mock không tự đặt ngưỡng.
   const rules = call("evaluate_opportunity_rules") as RuleOutcome;
   const risks = rules.risks.map(({ category, severity, description }) => ({ category, severity, description }));
-  const actions = [...rules.next_actions, ...rules.additional_actions].map(({ action, owner_role, why }) => ({ action, owner_role, why }));
   const sources: { ref: string; detail: string; quote: string }[] = [];
 
   emailsData.emails.slice(0, 3).forEach((e) => sources.push({ ref: e.ref, detail: e.subject, quote: e.subject }));
@@ -203,8 +206,30 @@ export function mockOpportunityAgent(ctx: ToolContext, log: ToolCallLog[]): stri
   web.forEach((w) => sources.push({ ref: w.source, detail: w.title, quote: w.title }));
 
   if (sources.length === 0) {
-    sources.push({ ref: "web_research", detail: "Nghiên cứu thị trường", quote: o.account });
+    sources.push({ ref: "opportunity.code", detail: "Hồ sơ cơ hội", quote: o.code });
   }
+
+  const c=o.context;
+  const no=(reason:string):InsightItem=>({status:'NO_INSIGHT',reason});
+  const info=(text:string,refs:string[]):InsightItem=>({text:text.slice(0,1000),sources:refs.map(ref=>({ref}))});
+  const opp=c.opportunity;
+  const surveyKeys=['business_goals','current_process','pain_points','software_needs','expected_outcomes','technical_requirements'];
+  const survey=surveyKeys.filter(k=>opp[k]).map(k=>`${k}: ${String(opp[k])}`);
+  const budgetRule=rules.evaluations.find(e=>e.rule_id==='OPP-R07')!;
+  const missing=[!opp.budget && 'Chưa có ngân sách khách xác nhận',!c.bant && 'Chưa có kết quả BANT từ Lead nguồn',!c.interactions.length && 'Chưa có lịch sử tương tác',...surveyKeys.filter(k=>!opp[k]).map(k=>`Cần làm rõ ${k}`)].filter((v):v is string=>!!v);
+  const insights:NonNullable<OpportunityResearch['insights']>={
+    account_overview:c.account ? info(`Doanh nghiệp: ${String(c.account.name)}; ngành: ${String(c.account.industry ?? 'chưa ghi')}; quy mô: ${String(c.account.employee_size ?? 'chưa ghi')}.`,['account.name']) : no('Chưa có doanh nghiệp được liên kết'),
+    opportunity_info:info(`Chủ đề: ${String(opp.name)}; nguồn: ${String(c.lead?.source ?? 'chưa ghi')}; doanh thu dự kiến: ${String(opp.amount)}; thời điểm dự kiến: ${String(opp.close_date ?? 'chưa ghi')}.`,['opportunity.code','opportunity.amount']),
+    bant_result:c.bant ? info(`BANT đã ghi: Budget ${c.bant.bant_budget}/25, Authority ${c.bant.bant_authority}/25, Need ${c.bant.bant_need}/25, Timeline ${c.bant.bant_timeline}/25. Trạng thái: ${c.bant.status}. ${String(c.bant.notes ?? '')}`,[`bant:${c.bant.id}`]) : no('Cơ hội chưa có đánh giá BANT từ Lead nguồn; cần NVKD bổ sung, không suy đoán điểm'),
+    interaction_history:c.interactions.length ? info(c.interactions.slice(0,6).map(a=>`${a.occurred_at}: ${a.subject}. ${a.body ?? ''}`).join('\n'),c.interactions.slice(0,6).map(a=>`activity:${a.id}`)) : no('Chưa có tương tác đã ghi nhận hoặc đồng bộ cho cơ hội và Lead nguồn'),
+    pain_need:opp.customer_need ? info(`Nhu cầu: ${String(opp.customer_need)}. ${survey.join('; ')}`,['opportunity.customer_need']) : no('Chưa có nhu cầu khách được ghi nhận'),
+    scope_summary:survey.length ? info(`Tổng hợp để NVKD đối chiếu biên bản phạm vi, không tự xác nhận: ${survey.join('; ')}. Tài liệu đã đọc: ${c.documents.filter(d=>d.fields_json).map(d=>d.name).join(', ') || 'chưa có'}.`,surveyKeys.filter(k=>!!opp[k]).map(k=>`opportunity.${k}`)) : no('Cần hoàn thành khảo sát trước khi tổng hợp phạm vi và ràng buộc'),
+    product:c.products.length ? info(c.products.map(p=>`${p.name}: số lượng ${p.quantity}. ${p.description ?? 'Chưa có đặc tả năng lực; chuyên viên phải kiểm tra khả năng đáp ứng'}`).join('; '),c.products.map(p=>`product:${p.id}`)) : no('Chưa có cấu hình dự kiến; không khẳng định sản phẩm phù hợp khi thiếu căn cứ'),
+    stakeholder:o.stakeholders.length ? info(`Đã ghi: ${o.stakeholders.map(s=>`${s.name} (${s.role})`).join('; ')}. Cần đối chiếu người dùng trực tiếp, IT, mua hàng/pháp chế, người kiểm soát ngân sách và người quyết định cuối; không suy đoán vai trò chưa được xác nhận.`,['opportunity.stakeholders']) : no('Chưa thiết lập bên liên quan; cần làm rõ người quyết định, đánh giá kỹ thuật, mua kinh tế, người ủng hộ và người dùng cuối'),
+    competitor:o.competitors.length ? info(o.competitors.map(x=>`${x.name}; điểm mạnh đã ghi: ${x.strengths ?? 'chưa có nguồn'}. Cần kiểm chứng sản phẩm, giá, tính năng, tích hợp, chi phí, thời gian triển khai và hỗ trợ trước khi kết luận lợi thế.`).join('; '),['opportunity.competitors']) : no('Chưa có đối thủ được ghi nhận; dữ liệu công khai trong mock chưa đủ để khẳng định khách đang so sánh với nhà cung cấp nào'),
+    budget_check:info(`${budgetRule.rationale}. ${budgetRule.status==='HIT' ? 'Khuyến nghị xem lại mô-đun, số người dùng hoặc phạm vi dịch vụ.' : budgetRule.status==='NOT_EVALUABLE' ? 'Đây là thông tin còn thiếu cần hỏi khách.' : 'Không có cờ không thay thế việc NVKD tự kiểm tra ngân sách.'}`,budgetRule.evidence_refs),
+    health:info(`Giai đoạn ${o.stage}; ${risks.length} đề xuất rủi ro, chưa ghi vào hồ sơ.`,['opportunity.stage']),
+  };
 
   const importance = rules.importance;
   const importanceReason = rules.importance_reason;
@@ -219,25 +244,11 @@ export function mockOpportunityAgent(ctx: ToolContext, log: ToolCallLog[]): stri
     importance_reason: importanceReason,
     summary,
     changes_since_last: null,
-    insights: {
-      stakeholder: o.stakeholders.length > 0
-        ? { text: `Đã xác định ${o.stakeholders.length} bên liên quan`, sources }
-        : { status: "NO_INSIGHT", reason: "Chưa thiết lập bên liên quan" },
-      competitor: o.competitors.length > 0
-        ? { text: `Cạnh tranh với ${o.competitors.map((c) => c.name).join(", ")}`, sources }
-        : { status: "NO_INSIGHT", reason: "Chưa phát hiện đối thủ cạnh tranh" },
-      account_overview: web.length > 0
-        ? { text: `Tổng quan doanh nghiệp: ${web[0].title}`, sources }
-        : { status: "NO_INSIGHT", reason: "Chưa có thông tin công khai về tài khoản" },
-      health: { text: `Giai đoạn ${o.stage}, ${risks.length} rủi ro được phát hiện`, sources },
-      pain_need: o.customer_need.data
-        ? { text: `Nhu cầu khách hàng: ${String(o.customer_need.data)}`, sources: [{ ref: "opportunity.customer_need", quote: "Nhu cầu", detail: "Nhu cầu" }] }
-        : { status: "NO_INSIGHT", reason: "Chưa ghi nhận nhu cầu chi tiết" },
-      product: { text: "Giải pháp SaaS B2B và dịch vụ triển khai phù hợp", sources },
-    },
+    insights,
+    missing_info:missing,
     risks: [], // rủi ro của quy tắc do server tự thêm khi lưu; mock không có rủi ro ngoài quy tắc
-    next_actions: actions.slice(0, 3),
-    additional_actions: actions.slice(3),
+    next_actions: [], // Backend derives recommendations, rule IDs and evidence together.
+    additional_actions: [],
     email_insight_status: emailsData.email_insight_status,
     sources,
   });
@@ -246,5 +257,5 @@ export function mockOpportunityAgent(ctx: ToolContext, log: ToolCallLog[]): stri
     call("notify_owner", { message: `Có ${risks.filter((r) => r.severity === "HIGH").length} rủi ro mức Cao cần xử lý` });
   }
 
-  return `Đã cập nhật Opportunity Research cho ${o.code}: mức ${importance}, ${risks.length} rủi ro, ${Math.min(actions.length, 3)} hành động ưu tiên. Chờ AE xác minh.`;
+  return `Đã tạo bản nghiên cứu ${o.research_phase==='INITIAL' ? 'lần 1' : 'lần 2'} cho ${o.code}: mức ${importance}, ${risks.length} đề xuất rủi ro, ${rules.next_actions.length} hành động ưu tiên. Chờ nhân viên xác minh.`;
 }

@@ -83,6 +83,8 @@ export const ActionItemSchema = z.union([
     action: z.string().min(1).max(300),
     owner_role: z.string().max(100).optional(),
     why: z.string().max(500).optional(),
+    evidence_refs: z.array(RefSchema).optional(),
+    rule_id: z.string().max(100).nullable().optional(),
   }),
 ]);
 
@@ -98,7 +100,13 @@ export const OpportunityResearchSchema = z.object({
     health: InsightItemSchema.optional(),
     pain_need: InsightItemSchema.optional(),
     product: InsightItemSchema.optional(),
+    opportunity_info: InsightItemSchema.optional(),
+    bant_result: InsightItemSchema.optional(),
+    interaction_history: InsightItemSchema.optional(),
+    scope_summary: InsightItemSchema.optional(),
+    budget_check: InsightItemSchema.optional(),
   }).optional(),
+  missing_info: z.array(z.string().min(1).max(500)).max(30).default([]),
   risks: z.array(OpportunityRiskSchema).max(15),
   next_actions: z.array(ActionItemSchema).max(3),
   additional_actions: z.array(ActionItemSchema).optional(),

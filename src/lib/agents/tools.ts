@@ -2,7 +2,8 @@
 // Quyền được kiểm ở SERVER theo bảng TOOL_ACCESS — không dựa vào việc prompt "dặn" model.
 // Mọi công cụ chỉ thao tác trên bản ghi đã kích hoạt lần chạy (ctx.entityId), không nhận ID từ model.
 import { z } from "zod";
-import { all, get, run } from "../db";
+import { all, get, run, tx } from "../db";
+import { opportunityResearchContext, type ResearchPhase } from './research-context';
 import { bantScore, clampBant } from "../domain";
 import { maps, webResearch } from "../integrations";
 import { createSuggestion } from "../services/ai-review";
@@ -28,6 +29,7 @@ export type ToolContext = {
   webSources?: { source: string; title: string; snippet: string }[];
   /** Kết quả bộ quy tắc trong lần chạy; Agent không ghi được hồ sơ nên tái dùng khi lưu nghiên cứu. */
   ruleOutcome?: RuleOutcome;
+  researchPhase?: ResearchPhase;
 };
 
 export class AgentPermissionError extends Error {}
@@ -370,6 +372,8 @@ export const TOOLS = {
         competitors: competitorsOf(o.id).map((c) => ({ name: c.name, strengths: c.strengths, weaknesses: c.weaknesses })),
         open_risks: risksOf(o.id).filter((r) => r.status === "OPEN").map((r) => ({ description: r.description, severity: r.severity })),
         quotes: all("SELECT code, revision, status, total FROM quotes WHERE opportunity_id = ? ORDER BY id DESC LIMIT 3", o.id),
+        research_phase: ctx.researchPhase ?? 'INITIAL',
+        context: opportunityResearchContext(o.id),
       };
     },
   }),
@@ -487,13 +491,17 @@ export const TOOLS = {
     access: "WRITE",
     agents: ["OPPORTUNITY"],
     input: OpportunityResearchSchema,
-    run: (ctx, input) => {
+    run: (ctx, input) => tx(() => {
       const o = oppOf(ctx);
-
+      const actions = [...input.next_actions, ...(input.additional_actions ?? [])].map(a => {
+        const normalized = typeof a === 'string' ? { action:a, evidence_refs: input.sources, rule_id:null } : a;
+        const refs = validateEvidence(ctx, normalized.evidence_refs ?? [], {required:true});
+        return {...normalized,evidence_refs:refs};
+      });
       // Validate sources
       const insightSources=Object.values(input.insights ?? {}).flatMap(item=>item && 'sources' in item ? item.sources ?? [] : []);
       const riskSources=input.risks.flatMap(r=>r.sources ?? []);
-      const normSources = normalizeRefs([...input.sources,...insightSources,...riskSources]);
+      const normSources = normalizeRefs([...input.sources,...insightSources,...riskSources,...actions.flatMap(a=>a.evidence_refs)]);
       const verifiedSources = validateEvidence(ctx, normSources);
 
       // Chỉ giữ một bản nghiên cứu chờ duyệt mới nhất
@@ -506,6 +514,7 @@ export const TOOLS = {
       // BR-28: backend chạy lại bộ quy tắc và khóa mức quan trọng, rủi ro có mã rule, thứ tự hành động.
       // Phần của LLM được giữ nhưng tách riêng: rủi ro không có rule = "chưa phân loại", hành động thêm = additional.
       const rules = ctx.ruleOutcome ?? evaluateOpportunityRules(o.id);
+      for(const action of [...rules.next_actions,...rules.additional_actions]) validateEvidence(ctx,action.evidence_refs,{required:true,allowMissingSnapshot:true});
       // OTHER là nhóm chung, không coi là trùng với rủi ro của quy tắc.
       const ruleCategories = new Set<RiskCategory>(rules.risks.map((r) => r.category).filter((c) => c !== "OTHER"));
       const llmRisks = input.risks
@@ -513,7 +522,7 @@ export const TOOLS = {
         .map((r) => ({ ...r, rule_id: null, unclassified: true }));
       const actionText = (a: string | { action: string }) => (typeof a === "string" ? a : a.action);
       const ruleActions = new Set(rules.next_actions.concat(rules.additional_actions).map((a) => a.action));
-      const llmActions = [...input.next_actions, ...(input.additional_actions ?? [])]
+      const llmActions = actions
         .filter((a) => !ruleActions.has(actionText(a)));
 
       const { id } = run(
@@ -554,6 +563,10 @@ export const TOOLS = {
         );
       }
 
+      const requiredSections=['account_overview','opportunity_info','bant_result','interaction_history','pain_need','scope_summary','product','stakeholder','competitor','budget_check'] as const;
+      const insights={...input.insights};
+      for (const key of requiredSections) if(!insights[key]) insights[key]={status:'NO_INSIGHT',reason:'Chưa có căn cứ được cung cấp cho mục này'};
+      run('UPDATE opportunity_research SET research_phase=?,missing_info_json=?,insights_json=? WHERE id=?',ctx.researchPhase ?? 'INITIAL',JSON.stringify(input.missing_info),JSON.stringify(insights),id);
       recordAiEvidence({ runId: ctx.runId, researchId: id, refs: verifiedSources });
       audit({ type: "AI", agent: ctx.agent, runId: ctx.runId }, "opportunity_research", id, "CREATE", {
         to: "PENDING_REVIEW",
@@ -563,7 +576,7 @@ export const TOOLS = {
         },
       });
       return { research_id: id, status: "PENDING_REVIEW", importance: rules.importance, confidence: rules.confidence, gates: rules.gates };
-    },
+    }),
   }),
   notify_owner: tool({
     description: "Gửi thông báo trong hệ thống cho AE phụ trách Opportunity.",

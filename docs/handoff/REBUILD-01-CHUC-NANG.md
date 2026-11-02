@@ -110,11 +110,11 @@ Ghi tên hàm, tệp và kiểu trả về vào đây khi làm xong, để AI gi
 
 | Dữ liệu | Hàm đề xuất | Trạng thái |
 |---|---|---|
-| Các bước Develop và trạng thái từng bước | `opportunityFlow(o)` | chưa có |
-| Các bước Propose | `proposeFlow(o)` | chưa có |
-| Bản nghiên cứu theo tên mục trong bài, loại lần chạy | `researchView(researchId)` | chưa có |
-| Kết quả quy tắc kèm thao tác đã chọn | mở rộng `ruleEvaluationsOf` | chưa có |
-| Điểm BANT từng tiêu chí, lý do, căn cứ | `bantBreakdown(leadId)` | chưa có |
+| Các bước Develop và trạng thái từng bước | `opportunityFlow(o, user?)` — `src/lib/services/sales-flow.ts`, trả `ProcessFlow` (9 bước, nextStepId/nextAction) | có; truyền Opportunity đã kiểm scope hoặc truyền user |
+| Các bước Propose | `proposeFlow(o, user?)` — `src/lib/services/sales-flow.ts`, trả `ProcessFlow` (6 bước) | có; trạng thái suy từ dữ liệu, không ghi hồ sơ |
+| Bản nghiên cứu theo tên mục trong bài, loại lần chạy | `researchView(researchId, user)` — `src/lib/services/sales-flow.ts`, trả `ResearchView` | có; 10 mục, INITIAL/POST_SURVEY/LEGACY, sources, missingInfo, recommendations, evaluations |
+| Kết quả quy tắc kèm thao tác đã chọn | `ruleEvaluationsOf(researchId)` — `src/lib/services/opportunities.ts`; `actOnRuleEvaluation(actor,id,input)` — `research-actions.ts` | có; human_action/by/time/note, linked risk/task; xử lý chỉ người có quyền |
+| Điểm BANT từng tiêu chí, lý do, căn cứ | `bantBreakdown(leadId,user)` — `src/lib/services/sales-flow.ts`, trả `BantBreakdown` | có; phân biệt đề xuất và hồ sơ đã áp dụng, đánh dấu điểm lịch sử ngoài thang |
 | Lộ trình một lần chạy Agent | mở rộng `runForWorkflow` | đã có một phần |
 | Dòng tiền dự tính | `cashflowForecast(user)` | chưa có |
 | Trạng thái cổng QLKD rà soát | `stageGateStatus(o)` trong `approvals.ts` | đã có |

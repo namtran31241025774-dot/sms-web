@@ -137,6 +137,6 @@ describe("WP-08 BR-28: Bộ quy tắc Opportunity Agent (OPP-R01..R10)", () => {
     expect(res.status).toBe("SUCCEEDED");
     const r = get<{ importance: string; ruleset_version: string }>("SELECT importance, ruleset_version FROM opportunity_research WHERE opportunity_id = ? ORDER BY id DESC", oppId);
     expect(r?.importance).toBe("MEDIUM");
-    expect(r?.ruleset_version).toBe("opp-rules-v1");
+    expect(r?.ruleset_version).toBe("opp-rules-v2");
   });
 });

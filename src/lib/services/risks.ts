@@ -1,7 +1,7 @@
 import { assertActorAccess } from "./access";
 // Quản lý rủi ro cơ hội (FR-43, HG5)
 import { all, get, run, tx } from "../db";
-import { assert } from "../domain";
+import { assert, stripAccents } from "../domain";
 import { actorUserId, audit, type Actor } from "./core";
 
 export type RiskStatus = "OPEN" | "MITIGATED" | "RESOLVED" | "DISMISSED";
@@ -59,6 +59,7 @@ export function addRisk(
   input: { description: string; severity?: RiskSeverity; source?: "USER" | "AI" },
 ): { id: number } {
   assertActorAccess(actor, "opportunity", opportunityId);
+  assert(actor.type==='USER' && ['SALES','SALES_MANAGER','PRESALES'].includes(actor.role),'Agent không được tự thêm rủi ro');
   assert(input.description?.trim(), "Mô tả rủi ro không được để trống");
   const severity: RiskSeverity = input.severity ?? "MEDIUM";
   const source = input.source ?? "USER";
@@ -78,6 +79,12 @@ export function addRisk(
   });
 
   return { id };
+}
+
+/** Keep handled risks too: a refreshed research must not silently reopen an existing issue. */
+export function findMatchingRisk(opportunityId:number,description:string) {
+  const normalize=(s:string)=>stripAccents(s.normalize('NFKC').toLowerCase()).replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+  return listRisks(opportunityId).find(r=>normalize(r.description)===normalize(description));
 }
 
 export function updateRiskStatus(

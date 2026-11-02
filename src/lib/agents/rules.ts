@@ -7,7 +7,7 @@ import { setting, settingBool, settingNumber } from "../services/core";
 import { SETTING_DEFAULTS } from "../settings-defaults";
 import { competitorsOf, getOpportunity, risksOf, stakeholdersOf } from "../services/opportunities";
 
-export const RULESET_VERSION = "opp-rules-v1";
+export const RULESET_VERSION = "opp-rules-v2";
 
 export type RuleStatus = "PASSED" | "WARNING" | "HIT" | "NOT_EVALUABLE" | "NOT_APPLICABLE";
 export type Severity = "LOW" | "MEDIUM" | "HIGH";
@@ -37,8 +37,8 @@ export type RuleOutcome = {
   importance: Severity;
   importance_reason: string;
   risks: { rule_id: string; category: RiskCategory; severity: Severity; description: string; sources: { ref: string }[] }[];
-  next_actions: { action: string; owner_role: string; why: string; rule_id: string }[];
-  additional_actions: { action: string; owner_role: string; why: string; rule_id: string }[];
+  next_actions: { action: string; owner_role: string; why: string; rule_id: string; evidence_refs:{ref:string}[] }[];
+  additional_actions: { action: string; owner_role: string; why: string; rule_id: string; evidence_refs:{ref:string}[] }[];
   gates: HumanGate[];
   confidence: number;
   confidence_band: "HIGH" | "MEDIUM" | "LOW";
@@ -259,7 +259,7 @@ function derive(ev: RuleEvaluation[], importance: Severity, importanceReason: st
   // Ưu tiên: HIT trước WARNING/NOT_EVALUABLE, rồi theo mức độ — không lấy "3 câu đầu theo thứ tự code".
   const rank = (e: RuleEvaluation) => (e.status === "HIT" ? 0 : e.status === "WARNING" ? 10 : 20) + SEVERITY_ORDER[e.severity ?? "LOW"];
   const actions = ev.filter((e) => e.required_action).sort((a, b) => rank(a) - rank(b))
-    .map((e) => ({ ...e.required_action!, why: `${e.rule_id}: ${e.rationale}`, rule_id: e.rule_id }));
+    .map((e) => ({ ...e.required_action!, why: `${e.rule_id}: ${e.rationale}`, rule_id: e.rule_id, evidence_refs:e.evidence_refs.map(ref=>({ref})) }));
   const applicable = ev.filter((e) => e.status !== "NOT_APPLICABLE");
   const evaluable = applicable.filter((e) => e.status !== "NOT_EVALUABLE").length;
   // Độ chắc chắn = mức bao phủ dữ liệu của các quy tắc, không phải xác suất "AI nói đúng".
