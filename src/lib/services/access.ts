@@ -35,6 +35,7 @@ function scopeRecord(kind: RecordKind, id: number): ScopeRecord|undefined {
 }
 export function recordVisible(user: UserScope, kind: RecordKind, id: number): boolean {
   const record=scopeRecord(kind,id);
+  if(kind==='lead' && record && !record.owner_id && !record.team_id && user.role==='SALES_MANAGER') return true; // FR-82 unassigned intake queue only.
   return !!record && canSee(resolvedScope(user),record);
 }
 export function assertRecordAccess(user: UserScope, kind: RecordKind, id: number) {

@@ -1,4 +1,4 @@
-import { get, run } from "../db";
+import { all, get, run } from "../db";
 import type { ToolContext } from "./tools";
 import type { Ref } from "./schemas";
 
@@ -14,7 +14,7 @@ export class InvalidEvidenceError extends Error {}
 export function validateEvidence(
   ctx: ToolContext,
   refs: Ref[],
-  options: { min?: number; required?: boolean } = {},
+  options: { min?: number; required?: boolean; allowMissingSnapshot?: boolean } = {},
 ): Ref[] {
   const minRequired = options.min ?? (options.required ? 1 : 0);
 
@@ -43,6 +43,42 @@ export function validateEvidence(
       throw new InvalidEvidenceError("Ref căn cứ không được để trống");
     }
 
+    const sourceTables: Record<string,string> = {account:'accounts',contact:'contacts'};
+    const prefix=ref.split('.')[0];
+    if(opp && sourceTables[prefix]) {
+      const row=get<Record<string,unknown>>(`SELECT * FROM ${sourceTables[prefix]} WHERE id=?`,Number(prefix==='account' ? opp.account_id : opp.primary_contact_id ?? 0));
+      const value=row?.[ref.slice(prefix.length+1)];
+      if(value===undefined || value===null || value==='') throw new InvalidEvidenceError('Trường nguồn không có dữ liệu');
+      verifyQuote(item.quote,value);continue;
+    }
+    if(ref.startsWith('bant:')) {
+      const row=get<Record<string,unknown>>('SELECT * FROM lead_assessments WHERE id=? AND lead_id=?',Number(ref.slice(5)),Number(lead?.id ?? opp?.lead_id ?? 0));
+      if(!row) throw new InvalidEvidenceError('Đánh giá BANT không thuộc hồ sơ');
+      verifyQuote(item.quote,JSON.stringify(row));continue;
+    }
+    if(opp && ref.startsWith('document:')) {
+      const row=get<{name:string;fields_json:string|null}>(`SELECT d.name,(SELECT fields_json FROM document_extractions e WHERE e.document_id=d.id ORDER BY e.id DESC LIMIT 1) fields_json FROM documents d
+        JOIN document_links l ON l.document_id=d.id WHERE d.id=? AND l.entity_type='opportunity' AND l.entity_id=?`,Number(ref.slice(9)),ctx.entityId);
+      if(!row) throw new InvalidEvidenceError('Tài liệu không thuộc cơ hội');
+      verifyQuote(item.quote,`${row.name}\n${row.fields_json ?? ''}`);continue;
+    }
+    if(opp && ref.startsWith('product:')) {
+      const row=get<{name:string;description:string|null}>('SELECT p.name,p.description FROM products p JOIN opportunity_items i ON i.product_id=p.id WHERE p.id=? AND i.opportunity_id=?',Number(ref.slice(8)),ctx.entityId);
+      if(!row) throw new InvalidEvidenceError('Sản phẩm không thuộc cấu hình cơ hội');
+      verifyQuote(item.quote,`${row.name}\n${row.description ?? ''}`);continue;
+    }
+    const aggregateQueries:Record<string,string>={
+      'opportunity.stakeholders':'SELECT name,role FROM stakeholders WHERE opportunity_id=?',
+      'opportunity.competitors':'SELECT c.name FROM competitors c JOIN opportunity_competitors x ON x.competitor_id=c.id WHERE x.opportunity_id=?',
+      'opportunity.risks':'SELECT description,status FROM opportunity_risks WHERE opportunity_id=?',
+      'activities.email':"SELECT subject,body FROM activities WHERE entity_type='opportunity' AND entity_id=? AND type='EMAIL'",
+      'solution.integration_required':'SELECT integration_required FROM solutions WHERE opportunity_id=? ORDER BY id DESC LIMIT 1',
+    };
+    if(opp && aggregateQueries[ref]) {
+      const rows=all(aggregateQueries[ref],ctx.entityId);
+      if(!rows.length && !options.allowMissingSnapshot) throw new InvalidEvidenceError('Nguồn chưa có dữ liệu');
+      verifyQuote(item.quote,JSON.stringify(rows));continue;
+    }
     // 1. Trường Lead: lead.<field>
     if (ref.startsWith("lead.")) {
       if (ctx.entityType !== "lead" || !lead) {
@@ -51,6 +87,7 @@ export function validateEvidence(
       const field = ref.slice(5);
       const val = lead[field];
       if (val === undefined || val === null || val === "") {
+        if(options.allowMissingSnapshot && field in lead && !item.quote) continue;
         throw new InvalidEvidenceError(`Trường ${field} của Lead #${ctx.entityId} không tồn tại hoặc không có dữ liệu`);
       }
       verifyQuote(item.quote, val);
@@ -65,6 +102,7 @@ export function validateEvidence(
       const field = ref.slice(12);
       const val = opp[field];
       if (val === undefined || val === null || val === "") {
+        if(options.allowMissingSnapshot && field in opp && !item.quote) continue;
         throw new InvalidEvidenceError(`Trường ${field} của Opportunity #${ctx.entityId} không tồn tại hoặc không có dữ liệu`);
       }
       verifyQuote(item.quote, val);
@@ -79,8 +117,8 @@ export function validateEvidence(
         throw new InvalidEvidenceError(`Mã activity không hợp lệ: ${ref}`);
       }
       const act = get<{ id: number; subject:string; body:string|null }>(
-        "SELECT id,subject,body FROM activities WHERE id = ? AND entity_type = ? AND entity_id = ?",
-        actId, ctx.entityType, ctx.entityId,
+        "SELECT id,subject,body FROM activities WHERE id = ? AND ((entity_type = ? AND entity_id = ?) OR (entity_type='lead' AND entity_id=?))",
+        actId, ctx.entityType, ctx.entityId,Number(opp?.lead_id ?? 0),
       );
       if (!act) {
         throw new InvalidEvidenceError(

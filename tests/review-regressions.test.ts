@@ -119,7 +119,7 @@ describe("Regression review 27/10", () => {
   });
   it("FR-31: BUG-022 AI-approved BANT writes the canonical assessment",()=>{
     const lead=run("INSERT INTO leads(company_name,company_norm,contact_name,owner_id) VALUES ('BANT','bant','Contact',901)").id;
-    const sug=createSuggestion({runId:0,agent:'QUALIFICATION',kind:'BANT_SCORE',entityType:'lead',entityId:lead,title:'BANT',payload:{scores:{budget:20,authority:20,need:20,timeline:20},rationale:'Review'},evidence:[]});
+    const sug=createSuggestion({runId:0,agent:'QUALIFICATION',kind:'BANT_SCORE',entityType:'lead',entityId:lead,title:'BANT',payload:{scores:{budget:15,authority:25,need:15,timeline:25},rationale:'Review'},evidence:[]});
     approveSuggestion(sales,sug);
     expect(get<{bant_score:number}>('SELECT bant_score FROM lead_assessments WHERE lead_id=?',lead)?.bant_score).toBe(80);
   });
@@ -134,7 +134,7 @@ describe("Regression review 27/10", () => {
   it("FR-31: BUG-041 honors configured zero BANT thresholds",()=>{
     const lead=run("INSERT INTO leads(company_name,company_norm,contact_name,owner_id) VALUES ('Zero','zero','Contact',901)").id;
     run("INSERT OR REPLACE INTO settings(key,value) VALUES ('bant_threshold','0')");
-    expect(scoreBant(sales,lead,{budget:0,authority:1,need:0,timeline:0,timeline_frame:'IN_MONTH'}).rating).toBe('HOT');
+    expect(scoreBant(sales,lead,{budget:0,authority:25,need:0,timeline:0,timeline_frame:'IN_MONTH'}).rating).toBe('HOT');
     run("UPDATE settings SET value='60' WHERE key='bant_threshold'");
   });
   it("FR-98: BUG-014 filters lists, direct IDs and child records and blocks out-of-scope writes", () => {

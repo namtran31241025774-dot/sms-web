@@ -118,12 +118,12 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
   describe("FR-31: Đánh giá BANT theo thang 0–100 & Xếp hạng Lead (BR-01, BR-02)", () => {
     it("tính toán xếp hạng HOT/WARM/COLD theo đúng chuẩn BR-01 và BR-02", () => {
       // HOT: Đạt chuẩn (tổng >= 60 và authority > 0) và mua trong tháng / cuối quý
-      expect(calculateLeadRating(70, 20, "IN_MONTH", 60, 40)).toBe("HOT");
-      expect(calculateLeadRating(60, 15, "END_OF_QUARTER", 60, 40)).toBe("HOT");
+      expect(calculateLeadRating(70, 25, "IN_MONTH", 60, 40)).toBe("HOT");
+      expect(calculateLeadRating(60, 25, "END_OF_QUARTER", 60, 40)).toBe("HOT");
 
       // WARM: 40-59, hoặc đạt chuẩn nhưng mua năm sau
       expect(calculateLeadRating(50, 15, "IN_MONTH", 60, 40)).toBe("WARM");
-      expect(calculateLeadRating(80, 20, "NEXT_YEAR", 60, 40)).toBe("WARM");
+      expect(calculateLeadRating(80, 25, "NEXT_YEAR", 60, 40)).toBe("WARM");
 
       // COLD: Tổng < 40 hoặc authority = 0 hoặc chưa rõ
       expect(calculateLeadRating(35, 10, "IN_MONTH", 60, 40)).toBe("COLD");
@@ -132,21 +132,21 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
 
     it("chấm điểm BANT và cập nhật điểm số cùng xếp hạng vào Lead", () => {
       const res = scoreBant(salesActor, testLeadId, {
-        budget: 20,
-        authority: 20,
-        need: 20,
+        budget: 15,
+        authority: 25,
+        need: 15,
         timeline: 15,
         timeline_frame: "END_OF_QUARTER",
         notes: "Khách có ngân sách rõ ràng, dự kiến mua cuối quý này",
       });
 
-      expect(res.totalScore).toBe(75);
+      expect(res.totalScore).toBe(70);
       expect(res.rating).toBe("HOT");
 
       const lead = db().prepare("SELECT bant_score, status FROM leads WHERE id = ?").get(testLeadId) as
         | { bant_score: number; status: string }
         | undefined;
-      expect(lead?.bant_score).toBe(75);
+      expect(lead?.bant_score).toBe(70);
     });
   });
 
@@ -154,8 +154,8 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
   describe("FR-33: Chuyển đổi Lead thành Cơ hội (Cổng HG3)", () => {
     it("chuyển đổi thành công khi BANT đạt chuẩn và tạo cơ hội ở giai đoạn DEVELOP", () => {
       scoreBant(salesActor, testLeadId, {
-        budget: 20,
-        authority: 20,
+        budget: 15,
+        authority: 25,
         need: 15,
         timeline: 15,
       });
@@ -197,8 +197,8 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
     });
 
     it("hỗ trợ chuyển đổi hàng loạt (batchConvertLeads)", () => {
-      const l2 = Number(db().prepare("INSERT INTO leads (company_name, company_norm, contact_name, status, bant_score, bant_authority,owner_id,team_id) VALUES ('Cty XYZ', 'cty xyz', 'Anh C', 'OPEN', 70, 20,1,991)").run().lastInsertRowid);
-      const l3 = Number(db().prepare("INSERT INTO leads (company_name, company_norm, contact_name, status, bant_score, bant_authority,owner_id,team_id) VALUES ('Cty DEF', 'cty def', 'Chị D', 'OPEN', 65, 15,1,991)").run().lastInsertRowid);
+      const l2 = Number(db().prepare("INSERT INTO leads (company_name, company_norm, contact_name, status, bant_score, bant_authority,owner_id,team_id) VALUES ('Cty XYZ', 'cty xyz', 'Anh C', 'OPEN', 70, 25,1,991)").run().lastInsertRowid);
+      const l3 = Number(db().prepare("INSERT INTO leads (company_name, company_norm, contact_name, status, bant_score, bant_authority,owner_id,team_id) VALUES ('Cty DEF', 'cty def', 'Chị D', 'OPEN', 65, 25,1,991)").run().lastInsertRowid);
 
       const batch = batchConvertLeads(salesActor, [l2, l3]);
       expect(batch.successCount).toBe(2);
@@ -237,7 +237,7 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
     let oppId: number;
 
     beforeEach(() => {
-      scoreBant(salesActor, testLeadId, { budget: 20, authority: 20, need: 20, timeline: 20 });
+      scoreBant(salesActor, testLeadId, { budget: 15, authority: 25, need: 15, timeline: 25 });
       const conv = convertLeadToOpportunity(salesActor, testLeadId, {
         account_action: "new",
         contact_action: "new",
@@ -291,15 +291,15 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
         product_id: testProductId,
         quantity: 2,
         unit_price: 50000000,
-        discount_pct: 10, // 2 * 50,000,000 * 0.9 = 90,000,000
+        discount_pct: 0, // Develop chỉ ước tính, chưa chiết khấu
       });
 
       const items = listOpportunityItems(oppId);
       expect(items.length).toBe(1);
-      expect(items[0].amount).toBe(90000000);
+      expect(items[0].amount).toBe(100000000);
 
       const opp = getOpportunity(oppId);
-      expect(opp?.amount).toBe(90000000);
+      expect(opp?.amount).toBe(100000000);
 
       // Thêm sản phẩm thứ 2
       addOpportunityItem(salesActor, oppId, {
@@ -310,13 +310,13 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
       });
 
       const opp2 = getOpportunity(oppId);
-      expect(opp2?.amount).toBe(120000000);
+      expect(opp2?.amount).toBe(130000000);
 
       // Xóa sản phẩm thứ 2
       const itemsAfter = listOpportunityItems(oppId);
       removeOpportunityItem(salesActor, itemsAfter[1].id);
       const opp3 = getOpportunity(oppId);
-      expect(opp3?.amount).toBe(90000000);
+      expect(opp3?.amount).toBe(100000000);
     });
   });
 
@@ -325,7 +325,7 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
     let oppId: number;
 
     beforeEach(() => {
-      scoreBant(salesActor, testLeadId, { budget: 20, authority: 20, need: 20, timeline: 20 });
+      scoreBant(salesActor, testLeadId, { budget: 15, authority: 25, need: 15, timeline: 25 });
       const conv = convertLeadToOpportunity(salesActor, testLeadId, {
         account_action: "new",
         contact_action: "new",
@@ -430,7 +430,7 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
     let oppId: number;
 
     beforeEach(() => {
-      scoreBant(salesActor, testLeadId, { budget: 20, authority: 20, need: 20, timeline: 20 });
+      scoreBant(salesActor, testLeadId, { budget: 15, authority: 25, need: 15, timeline: 25 });
       const conv = convertLeadToOpportunity(salesActor, testLeadId, {
         account_action: "new",
         contact_action: "new",

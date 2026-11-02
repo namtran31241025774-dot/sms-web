@@ -238,7 +238,7 @@ describe("WP-01: Quản lý khách hàng tiềm năng & Doanh nghiệp", () => {
         bant_score: 70,
         bant_authority: 25,
         bant_need: 15,
-        bant_timeline: 20, // >= 18
+        bant_timeline: 25, // trong tháng hoặc cuối quý
       });
       expect(rating).toBe("HOT");
     });

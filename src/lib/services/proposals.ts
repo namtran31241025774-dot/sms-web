@@ -4,6 +4,8 @@ import { email } from "../integrations";
 import { generateProposalPdf } from "../pdf";
 import { actorUserId, addActivity, audit, type Actor } from "./core";
 import { getOpportunity, listSolutions } from "./opportunities";
+import {assertActorAccess} from './access';
+import {can} from '../rbac';
 
 export interface Proposal {
   id: number;
@@ -77,6 +79,8 @@ export function listProposals(filter: { opportunityId?: number; accountId?: numb
  * FR-48: Lập bản đề xuất giải pháp gửi khách từ nhu cầu và hồ sơ giải pháp nội bộ
  */
 export function createProposal(actor: Actor, input: CreateProposalInput): number {
+  assert(actor.type==='USER' && can(actor.role,'quote.write'),'Chỉ kinh doanh được lập bản đề xuất gửi khách');
+  assertActorAccess(actor,'opportunity',input.opportunityId);
   const o = getOpportunity(input.opportunityId);
   assert(o, "Không tìm thấy cơ hội");
 

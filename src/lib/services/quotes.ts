@@ -10,8 +10,9 @@ import { email, esign } from "../integrations";
 import { generateQuotePdf } from "../pdf";
 import { requestApproval } from "./approvals";
 import { actorUserId, addActivity, audit, settingNumber, type Actor } from "./core";
-import { getOpportunity, moveStage } from "./opportunities";
+import { getOpportunity, listOpportunityItems, moveStage } from "./opportunities";
 import { checkDiscount, priceFor } from "./pricing";
+import {can} from '../rbac';
 
 export type QuoteStatus =
   | "DRAFT"
@@ -96,6 +97,7 @@ export interface QuoteLine {
 }
 
 export interface QuoteResponseRecord {
+  respondent_name:string|null;
   id: number;
   quote_version_id: number;
   response_type: "ACCEPTED" | "REJECTED" | "REVISION_REQUESTED";
@@ -406,6 +408,24 @@ export function addLine(
     audit(actor, "quote_version", versionId, "LINE_ADD", {
       details: { productId, quantity, discountPct, taxPct },
     });
+  });
+}
+
+/** Snapshot Develop quantities into a draft, repricing against the selected approved price list. */
+export function createQuoteFromConfiguration(actor:Actor,oppId:number,options:{notes?:string;validDays?:number;priceListId?:number}={}) {
+  assert(actor.type==='USER' && can(actor.role,'quote.write'),'Chỉ kinh doanh được lập báo giá');
+  assertActorAccess(actor,'opportunity',oppId);
+  const o=getOpportunity(oppId);assert(o?.solution_confirmed,'Cần xác nhận cấu hình và giải pháp từ Develop');
+  const items=listOpportunityItems(oppId);assert(items.length,'Cơ hội chưa có cấu hình dự kiến');
+  return tx(()=>{
+    const q=createQuote(actor,oppId,options);
+    for(const i of items){
+      const p=get<{type:string}>('SELECT type FROM products WHERE id=?',i.product_id)!;
+      const term=get<{duration_months:number}>('SELECT duration_months FROM opportunity_items WHERE id=?',i.id)?.duration_months ?? 12;
+      addLine(actor,q.versionId,i.product_id,i.quantity,0,{licenseCount:['SUBSCRIPTION','MODULE'].includes(p.type)?i.quantity:undefined,termMonths:['SUBSCRIPTION','MODULE'].includes(p.type)?term:undefined});
+    }
+    audit(actor,'quote',q.quoteId,'INHERIT_CONFIGURATION',{details:{opportunityId:oppId,itemIds:items.map(i=>i.id),pricing:'CURRENT_PRICE_LIST'}});
+    return q;
   });
 }
 
@@ -828,9 +848,15 @@ export function recordCustomerResponse(
 ) {
   assertActorAccess(actor, "quote_version", versionId);
   assert(actor.type === "USER", "Chỉ nhân viên được ghi nhận phản hồi của khách hàng");
+  assert(can(actor.role,'quote.write'),'Không có quyền ghi phản hồi khách hàng');
   const v = getQuoteVersion(versionId);
   assert(v, "Không tìm thấy phiên bản báo giá");
   assert(v.status === "SENT", "Chỉ ghi nhận phản hồi cho báo giá đã gửi khách hàng");
+  const parent=getQuote(v.quote_id)!;
+  assert(!['SUPERSEDED','REJECTED','EXPIRED'].includes(parent.status),'Báo giá đã bị thu hồi hoặc thay thế');
+  assert(['PROPOSE','CLOSE'].includes(getOpportunity(parent.opportunity_id)?.stage ?? ''),'Cơ hội đã đóng, không ghi nhận phản hồi báo giá mới');
+  assert(getLatestQuoteVersion(v.quote_id)?.id===v.id,'Phiên bản báo giá đã bị thay thế');
+  if(contactId) assert(get('SELECT c.id FROM contacts c JOIN opportunities o ON o.account_id=c.account_id JOIN quotes q ON q.opportunity_id=o.id WHERE q.id=? AND c.id=?',v.quote_id,contactId),'Người phản hồi không thuộc doanh nghiệp của báo giá');
 
   // Kiểm tra hiệu lực (BR-09): Báo giá hết hạn không nhận chấp thuận mới
   if (responseType === "ACCEPTED" && isQuoteExpired(v)) {
@@ -912,6 +938,25 @@ export function recordCustomerResponse(
  * - Tạo phiên bản mới (version_no + 1) ở trạng thái DRAFT.
  * - Sao chép toàn bộ các dòng sản phẩm sang phiên bản mới.
  */
+export function recordCustomerFeedback(actor:Actor,versionId:number,input:{responseType:'ACCEPTED'|'REJECTED'|'REVISION_REQUESTED';respondentName?:string;contactId?:number;respondedAt:string;content:string}) {
+  assert(actor.type==='USER' && can(actor.role,'quote.write'),'Chỉ kinh doanh được ghi nhận phản hồi');
+  assertActorAccess(actor,'quote_version',versionId);
+  const contact=input.contactId?get<{full_name:string}>('SELECT full_name FROM contacts WHERE id=?',input.contactId):undefined;
+  const name=input.respondentName?.trim() || contact?.full_name;
+  assert(name && input.content?.trim(),'Cần người phản hồi và nội dung phản hồi của khách');
+  const time=Date.parse(input.respondedAt);
+  assert(Number.isFinite(time) && time<=Date.now()+60000,'Thời điểm phản hồi không hợp lệ hoặc ở tương lai');
+  const v=getQuoteVersion(versionId);
+  assert(v,'Không tìm thấy phiên bản');
+  if(v.sent_at) assert(time>=Date.parse(v.sent_at.includes('T')?v.sent_at:v.sent_at.replace(' ','T')+'Z'),'Phản hồi phải sau thời điểm gửi báo giá');
+  return tx(()=>{
+    recordCustomerResponse(actor,versionId,input.responseType,input.content.trim(),input.contactId);
+    const r=get<{id:number}>('SELECT id FROM quote_responses WHERE quote_version_id=? ORDER BY id DESC LIMIT 1',versionId)!;
+    run('UPDATE quote_responses SET respondent_name=?,responded_at=? WHERE id=?',name,new Date(time).toISOString(),r.id);
+    return {id:r.id,versionId,respondentName:name,respondedAt:new Date(time).toISOString(),content:input.content.trim()};
+  });
+}
+
 export function reviseQuote(actor: Actor, versionId: number, revisionNote: string | null = null): number {
   assertActorAccess(actor, "quote_version", versionId);
   const v = getQuoteVersion(versionId);

@@ -9,7 +9,7 @@ import {
   applyDiscountDecision,
   checkQuoteEsignStatus,
   createQuote,
-  recordCustomerResponse,
+  recordCustomerFeedback,
   removeLine,
   requestQuoteEsign,
   reviseQuote,
@@ -170,7 +170,7 @@ export async function recordCustomerResponseAction(formData: FormData): Promise<
     `/quotes/${quoteId}?v=${versionId}`,
     async () => {
       const u = await requirePermission("quote.write");
-      recordCustomerResponse(userActor(u), versionId, responseType, note);
+      recordCustomerFeedback(userActor(u),versionId,{responseType,content:note ?? '',respondentName:String(formData.get('respondent_name') ?? ''),contactId:formData.get('contact_id')?Number(formData.get('contact_id')):undefined,respondedAt:String(formData.get('responded_at') ?? new Date().toISOString())});
     },
     "Đã ghi nhận phản hồi của khách hàng thành công",
   );

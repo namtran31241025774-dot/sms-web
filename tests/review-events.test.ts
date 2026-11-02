@@ -29,7 +29,7 @@ describe('Automatic Agent scheduling',()=>{
     expect(jobs).toHaveLength(1);
     run("UPDATE opportunities SET ai_refresh_due_at=datetime('now','-1 minute') WHERE id=?",opp);
     await runScheduledAgents();
-    expect(runAgent).toHaveBeenCalledWith('OPPORTUNITY',{type:'opportunity',id:opp},'SCHEDULED_REFRESH',null);
+    expect(runAgent).toHaveBeenCalledWith('OPPORTUNITY',{type:'opportunity',id:opp},'SCHEDULED_POST_SURVEY',null);
     expect(get<{ai_refresh_due_at:string|null}>('SELECT ai_refresh_due_at FROM opportunities WHERE id=?',opp)?.ai_refresh_due_at).toBeNull();
   });
 });

@@ -52,7 +52,7 @@ export function audit(
     opts.reason ?? null,
     opts.details === undefined ? null : JSON.stringify(opts.details),
   );
-  if(entityType==='opportunity' && ['UPDATE','SOLUTION_CREATE','SOLUTION_UPDATE','STAKEHOLDER_ADD','STAKEHOLDER_REMOVE','COMPETITOR_ADD','COMPETITOR_REMOVE','ITEM_ADD','ITEM_UPDATE','ITEM_REMOVE','SCOPE_DOC_UPDATE'].includes(action)) emitEvent('opportunity.key_field_changed',{opportunityId:entityId,actorUserId:actorUserId(actor)});
+  if(entityType==='opportunity' && ['UPDATE','DOCUMENT_UPLOAD','SOLUTION_CREATE','SOLUTION_UPDATE','STAKEHOLDER_ADD','STAKEHOLDER_REMOVE','COMPETITOR_ADD','COMPETITOR_REMOVE','ITEM_ADD','ITEM_UPDATE','ITEM_REMOVE','SCOPE_DOC_UPDATE'].includes(action)) emitEvent('opportunity.key_field_changed',{opportunityId:entityId,actorUserId:actorUserId(actor)});
   if(entityType==='lead' && action==='BANT_SCORE') emitEvent('lead.bant_updated',{leadId:entityId,actorUserId:actorUserId(actor)});
 }
 

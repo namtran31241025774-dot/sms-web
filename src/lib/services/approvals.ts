@@ -6,6 +6,7 @@ import { advanceStage, gateFingerprint, gateState, getOpportunity, type Opportun
 import { applyDiscountDecision, getQuote } from "./quotes";
 import {assertActorAccess, recordVisible, type RecordKind} from './access';
 import type { UserScope } from "../scope";
+import {rebuildPolicy} from '../rebuild-policy';
 
 export type ApprovalKind = "QUOTE_DISCOUNT" | "OPP_STAGE_GATE" | "LEGAL_REVIEW";
 
@@ -134,7 +135,7 @@ export function pendingExpertReviews(user: UserScope): ExpertReviewRow[] {
   return all<ExpertReviewRow>(
     `SELECT o.id, o.code, o.name, u.name AS owner_name, o.updated_at FROM opportunities o
      LEFT JOIN users u ON u.id = o.owner_id
-     WHERE o.expert_review_status = 'PENDING' ORDER BY o.updated_at DESC`,
+     WHERE o.expert_review_status = 'PENDING' AND o.stage='DEVELOP' ORDER BY o.updated_at DESC`,
   ).filter((o) => recordVisible(user, "opportunity", o.id));
 }
 
@@ -155,6 +156,7 @@ export function decideApproval(actor: Actor, approvalId: number, approved: boole
   );
   assert(a, "Không tìm thấy yêu cầu");
   assert(a.status === "PENDING", "Yêu cầu đã được xử lý");
+  if(a.kind==='OPP_STAGE_GATE' && !rebuildPolicy().allowStageSelfApproval) assert(actor.id!==a.requested_by,'Cần quản lý khác duyệt yêu cầu do chính mình gửi');
   if(a.kind==='OPP_STAGE_GATE') assertActorAccess(actor,'opportunity',a.entity_id);
   assert(actor.role === DECIDER[a.kind], "Vai trò của bạn không duyệt loại yêu cầu này");
   if (!approved) assert(comment?.trim(), "Từ chối cần ghi lý do");

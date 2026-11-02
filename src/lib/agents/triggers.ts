@@ -37,7 +37,7 @@ export async function runScheduledAgents() {
   for(const item of work) {
     if(get("SELECT id FROM ai_runs WHERE agent=? AND entity_type=? AND entity_id=? AND status='RUNNING'",item.agent,item.type,item.id)) continue;
     try {
-      const result=await runAgent(item.agent,{type:item.type,id:item.id},'SCHEDULED_REFRESH',null);
+      const result=await runAgent(item.agent,{type:item.type,id:item.id},item.type==='opportunity' && item.due?'SCHEDULED_POST_SURVEY':'SCHEDULED_REFRESH',null);
       if(result.status==='SUCCEEDED') {
         succeeded++;
         if(item.type==='opportunity' && item.due) run('UPDATE opportunities SET ai_refresh_due_at=NULL WHERE id=? AND ai_refresh_due_at=?',item.id,item.due);

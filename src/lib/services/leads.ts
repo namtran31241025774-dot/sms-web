@@ -18,6 +18,10 @@ import { findOrCreateContact } from "./contacts";
 import { emitEvent } from "../events";
 import type { UserScope } from "../scope";
 import { recordVisible } from "./access";
+import {bantQualified} from '../bant-policy';
+import {requireVietnamAddress} from './address-validation';
+import {validateVietnamAddress} from './address-validation';
+import {assignmentTeam} from './assignment-team';
 
 export type { DuplicateHit };
 export { findDuplicates, findOrCreateAccount, findOrCreateContact };
@@ -81,6 +85,7 @@ export type LeadInput = {
   notes?: string | null;
   topic?: string | null;
   owner_id?: number | null;
+  team_id?:number|null;
   account_id?: number | null;
   contact_id?: number | null;
   tag_ids?: number[];
@@ -106,7 +111,7 @@ export function calculateLeadRating(lead: {
   const threshold = settingNumber("bant_threshold");
   const warmMin = settingNumber("lead_rating_warm_min");
 
-  if (score >= threshold && authority > 0 && timeline >= 18) {
+  if (bantQualified(score,authority,threshold) && timeline===25) {
     return "HOT";
   }
 
@@ -200,6 +205,7 @@ export function getLead(id: number, user?: UserScope): Lead | undefined {
  * FR-01 & FR-11: Tạo Lead thủ công, tự động điền khi chọn Account hoặc Contact có sẵn.
  */
 export function createLead(actor: Actor, input: LeadInput): number {
+  requireVietnamAddress(input.address);
   let companyName = input.company_name?.trim();
   let contactName = input.contact_name?.trim();
   let email = normalizeEmail(input.email);
@@ -255,8 +261,8 @@ export function createLead(actor: Actor, input: LeadInput): number {
   return tx(() => {
     const { id } = run(
       `INSERT INTO leads (company_name, company_norm, contact_name, contact_title, email, phone, address, address_normalized,
-         source, industry, notes, topic, owner_id, account_id, contact_id, rating, duplicate_flag, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         source, industry, notes, topic, owner_id, account_id, contact_id, rating, duplicate_flag, created_by,team_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       companyName,
       normalizeCompany(companyName),
       contactName,
@@ -275,6 +281,7 @@ export function createLead(actor: Actor, input: LeadInput): number {
       initialRating,
       dups.length ? 1 : 0,
       actorUserId(actor),
+      assignmentTeam(input.owner_id ?? actorUserId(actor),input.team_id),
     );
 
     // Gắn nhãn nếu có (FR-07)
@@ -307,6 +314,8 @@ const EDITABLE = [
 ] as const;
 
 export function updateLead(actor: Actor, id: number, input: Partial<LeadInput>) {
+  assert(actor.type!=='AI','Agent chỉ được đề xuất cập nhật Lead');
+  if('address' in input) requireVietnamAddress(input.address);
   assertActorAccess(actor, "lead", id);
   const lead = getLead(id);
   assert(lead, "Không tìm thấy Lead");
@@ -468,6 +477,7 @@ export function previewLeadImport(input: Record<string, string>[] | string): {
     const dups = company_name ? findDuplicates({ company_name, email, phone }) : [];
     if (dups.length > 0) duplicateCount++;
 
+    const addressCheck=validateVietnamAddress(address);if(!addressCheck.valid) errors.push(addressCheck.reason!);
     const valid = errors.length === 0;
     if (valid) validCount++;
 

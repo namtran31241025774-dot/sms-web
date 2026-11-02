@@ -1,4 +1,5 @@
 import type { Role } from "./domain";
+import {rebuildPolicy} from './rebuild-policy';
 
 // Ma trận phân quyền theo vai trò (đặc tả tại docs/requirements/ROLES.md).
 // Kiểm tra ở server trong mọi Server Action và Route Handler.
@@ -81,6 +82,7 @@ const MATRIX = {
   "admin.settings": ["ADMIN"],
   "admin.logs": ["ADMIN", "SALES_MANAGER"],
   "report.funnel": ["SALES", "SALES_MANAGER"],
+  "report.cashflow": [], // C3: server checks explicitly configured roles; no implicit grant.
 
   // Tương thích ngược
   "approval.manager": ["SALES_MANAGER"],
@@ -89,6 +91,8 @@ const MATRIX = {
 export type Permission = keyof typeof MATRIX;
 
 export function can(role: Role, permission: Permission): boolean {
+  if(permission==='opp.expert_review') return role===rebuildPolicy().expertReviewerRole;
+  if(permission==='report.cashflow') return rebuildPolicy().cashflowRoles.includes(role);
   const allowed = MATRIX[permission] as readonly Role[] | undefined;
   if (!allowed) return false;
   return allowed.includes(role);

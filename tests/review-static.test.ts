@@ -3,7 +3,7 @@ import {describe,it,expect} from 'vitest';
 import {QUALIFICATION_SYSTEM,OPPORTUNITY_SYSTEM} from '@/lib/agents/prompts';
 describe('Review static contracts',()=>{
   it('FR-89: BUG-038 prompt includes qualification uncertainty and no-insight rules',()=>{
-    expect(QUALIFICATION_SYSTEM).toContain('Authority > 0');
+    expect(QUALIFICATION_SYSTEM).toContain('Authority = 25');
     expect(QUALIFICATION_SYSTEM).toContain('confidence < 0.6');
     expect(OPPORTUNITY_SYSTEM).toContain('NO_INSIGHT');
     expect(OPPORTUNITY_SYSTEM).toContain('TỐI ĐA 3');

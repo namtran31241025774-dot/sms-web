@@ -1,10 +1,12 @@
 import { assertActorAccess } from "./access";
 import { get, nextCode, run, tx } from "../db";
 import { assert, type Role } from "../domain";
-import { actorUserId, audit, settingBool, settingNumber, type Actor } from "./core";
+import { actorUserId, audit, settingNumber, type Actor } from "./core";
 import { findOrCreateAccount } from "./accounts";
 import { findOrCreateContact } from "./contacts";
 import { emitEvent } from "../events";
+import {bantQualified,requireBantLevel} from '../bant-policy';
+import {can} from '../rbac';
 
 export type TimelineFrame = "IN_MONTH" | "END_OF_QUARTER" | "NEXT_YEAR" | "UNKNOWN";
 export type LeadRating = "HOT" | "WARM" | "COLD";
@@ -61,7 +63,7 @@ export function calculateLeadRating(
   threshold = 60,
   warmMin = 40,
 ): LeadRating {
-  const isQualified = totalScore >= threshold && authorityScore > 0;
+  const isQualified = bantQualified(totalScore,authorityScore,threshold);
 
   if (isQualified && (timelineFrame === "IN_MONTH" || timelineFrame === "END_OF_QUARTER")) {
     return "HOT";
@@ -78,6 +80,7 @@ export function calculateLeadRating(
  * Ghi nhận kết quả khảo sát sơ bộ nhu cầu khách hàng (FR-30).
  */
 export function recordSurvey(actor: Actor, leadId: number, data: SurveyInput) {
+  assert(actor.type==='USER' && can(actor.role,'lead.qualify'),'Chỉ người có quyền đánh giá mới được ghi khảo sát Lead');
   assertActorAccess(actor, "lead", leadId);
   const lead = get<{ id: number; status: string }>("SELECT id, status FROM leads WHERE id = ?", leadId);
   assert(lead, "Không tìm thấy khách hàng tiềm năng (Lead)");
@@ -124,12 +127,13 @@ export function recordSurvey(actor: Actor, leadId: number, data: SurveyInput) {
  * Đánh giá sàng lọc theo tiêu chí BANT (FR-31, BR-01, BR-02).
  */
 export function scoreBant(actor: Actor, leadId: number, input: BantScoresInput): { totalScore: number; rating: LeadRating } {
+  assert(actor.type==='USER' && can(actor.role,'lead.qualify'),'Agent chỉ được đề xuất BANT; cần người có quyền xác nhận');
   assertActorAccess(actor, "lead", leadId);
   const lead = get<{ id: number; status: string }>("SELECT id, status FROM leads WHERE id = ?", leadId);
   assert(lead, "Không tìm thấy khách hàng tiềm năng");
   assert(lead.status !== "CONVERTED" && lead.status !== "DISQUALIFIED", "Lead đã đóng");
 
-  const clamp = (val: number) => Math.max(0, Math.min(25, Math.round(val)));
+  const clamp = requireBantLevel;
   const b = clamp(input.budget);
   const a = clamp(input.authority);
   const n = clamp(input.need);
@@ -245,9 +249,7 @@ export function convertLeadToOpportunity(
 ): { opportunityId: number; opportunity_id: number; accountId: number; account_id: number; contactId: number; contact_id: number; code: string } {
   assertActorAccess(actor, "lead", leadId);
   // Cổng HG3: Kiểm tra quyền kích hoạt chuyển đổi của con người
-  if (actor.type === "AI") {
-    assert(settingBool("ai_auto_convert"), "DEC-03: AI Agent không được phép tự động chuyển đổi Lead thành Cơ hội khi chưa có phê duyệt của con người");
-  }
+  assert(actor.type==='USER' && can(actor.role,'lead.convert'),'DEC-03: AI Agent không được phép tự động chuyển đổi Lead; cần người có quyền xác nhận');
 
   const lead = get<{
     id: number;
@@ -265,7 +267,7 @@ export function convertLeadToOpportunity(
 
   assert(lead, "Không tìm thấy khách hàng tiềm năng");
   assert(lead.status === "OPEN" || lead.status === "WORKING", "Lead không ở trạng thái mở");
-  assert(lead.bant_authority > 0, "Chưa xác định người quyết định: Authority phải lớn hơn 0 để chuyển đổi");
+  assert(lead.bant_authority===25, "Chưa xác định người quyết định: Authority phải đạt mức 25 để chuyển đổi");
 
   // Kiểm tra ngưỡng BANT
   const threshold = settingNumber("bant_threshold");
@@ -420,6 +422,7 @@ export function batchConvertLeads(
 export function disqualifyLeadWithReason(actor: Actor, leadId: number, reason: string, note?: string) {
   assertActorAccess(actor, "lead", leadId);
   assert(actor.type === "USER", "Chỉ con người mới có quyền xác nhận loại khách hàng (Cổng HG2)");
+  assert(can(actor.role,'lead.disqualify'),'Không có quyền loại Lead');
   assert(reason?.trim(), "Bắt buộc phải nhập lý do loại khách hàng");
 
   if (reason.trim() === "Khác") {

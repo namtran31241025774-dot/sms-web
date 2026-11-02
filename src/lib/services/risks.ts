@@ -1,7 +1,7 @@
 import { assertActorAccess } from "./access";
 // Quản lý rủi ro cơ hội (FR-43, HG5)
 import { all, get, run, tx } from "../db";
-import { assert } from "../domain";
+import { assert, stripAccents } from "../domain";
 import { actorUserId, audit, type Actor } from "./core";
 
 export type RiskStatus = "OPEN" | "MITIGATED" | "RESOLVED" | "DISMISSED";
@@ -21,15 +21,18 @@ export type OpportunityRisk = {
   resolved_by: number | null;
   resolved_at: string | null;
   creator_name?: string | null;
+  responsible_user_id:number|null;
+  responsible_name?:string|null;
   resolver_name?: string | null;
 };
 
 export function listRisks(opportunityId: number): OpportunityRisk[] {
   return all<OpportunityRisk>(
-    `SELECT r.*, u1.name AS creator_name, u2.name AS resolver_name
+    `SELECT r.*, u1.name AS creator_name, u2.name AS resolver_name, u3.name AS responsible_name
      FROM opportunity_risks r
      LEFT JOIN users u1 ON u1.id = r.created_by
      LEFT JOIN users u2 ON u2.id = r.resolved_by
+     LEFT JOIN users u3 ON u3.id = r.responsible_user_id
      WHERE r.opportunity_id = ?
      ORDER BY CASE r.status
        WHEN 'OPEN' THEN 1
@@ -59,6 +62,7 @@ export function addRisk(
   input: { description: string; severity?: RiskSeverity; source?: "USER" | "AI" },
 ): { id: number } {
   assertActorAccess(actor, "opportunity", opportunityId);
+  assert(actor.type==='USER' && ['SALES','SALES_MANAGER','PRESALES'].includes(actor.role),'Agent không được tự thêm rủi ro');
   assert(input.description?.trim(), "Mô tả rủi ro không được để trống");
   const severity: RiskSeverity = input.severity ?? "MEDIUM";
   const source = input.source ?? "USER";
@@ -78,6 +82,12 @@ export function addRisk(
   });
 
   return { id };
+}
+
+/** Keep handled risks too: a refreshed research must not silently reopen an existing issue. */
+export function findMatchingRisk(opportunityId:number,description:string) {
+  const normalize=(s:string)=>stripAccents(s.normalize('NFKC').toLowerCase()).replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+  return listRisks(opportunityId).find(r=>normalize(r.description)===normalize(description));
 }
 
 export function updateRiskStatus(

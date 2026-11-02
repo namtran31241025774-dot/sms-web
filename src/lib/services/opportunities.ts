@@ -6,7 +6,8 @@ import type { UserScope } from "../scope";
 import { recordVisible } from "./access";
 import { notifyDeciders, requestApproval } from "./approvals";
 import { actorUserId, audit, notify, setting, type Actor } from "./core";
-import { listRisks, type OpportunityRisk } from "./risks";
+import { listRisks, findMatchingRisk, type OpportunityRisk } from "./risks";
+import {rebuildPolicy} from '../rebuild-policy';
 
 export * from "./risks";
 
@@ -236,7 +237,12 @@ export function updateScopeDocument(
       ...keys.map((k) => (input[k] ?? null) as string | number | null),
       docId,
     );
-    if (input.status === "CONFIRMED") {
+    const changed=['title','content','deliverables'].some(k=>input[k as keyof typeof input]!==undefined && input[k as keyof typeof input]!==doc[k as keyof ScopeDocument]);
+    if(changed) {
+      run("UPDATE scope_documents SET status='DRAFT',confirmed_by=NULL,confirmed_at=NULL WHERE id=?",docId);
+      run("UPDATE opportunities SET need_confirmed=0,updated_at=datetime('now') WHERE id=?",doc.opportunity_id);
+    }
+    if (input.status === "CONFIRMED" && !changed) {
       run("UPDATE scope_documents SET confirmed_by = ?, confirmed_at = datetime('now') WHERE id = ?", actorUserId(actor), docId);
       run("UPDATE opportunities SET need_confirmed = 1, updated_at = datetime('now') WHERE id = ?", doc.opportunity_id);
     }
@@ -279,6 +285,7 @@ export function addOpportunityItem(
   assertActorAccess(actor, "opportunity", opportunityId);
   assert(actor.type === "USER", "Chỉ nhân viên được cấu hình sản phẩm cho cơ hội");
   const o = mustOpen(opportunityId);
+  if(o.stage==='DEVELOP') assert(!input.discount_pct,'Cấu hình dự kiến ở Develop không áp chiết khấu; lập báo giá tại Propose');
   assert(input.quantity > 0, "Số lượng sản phẩm phải lớn hơn 0");
 
   let unitPrice = input.unit_price;
@@ -325,11 +332,12 @@ export function updateOpportunityItem(
   assert(actor.type === "USER", "Chỉ nhân viên được cập nhật sản phẩm");
   const item = get<OpportunityItem>("SELECT * FROM opportunity_items WHERE id = ?", itemId);
   assert(item, "Không tìm thấy dòng sản phẩm");
-  mustOpen(item.opportunity_id);
+  const itemOpp=mustOpen(item.opportunity_id);
+  if(itemOpp.stage==='DEVELOP') assert(!input.discount_pct,'Cấu hình dự kiến ở Develop không áp chiết khấu; lập báo giá tại Propose');
 
   const quantity = input.quantity !== undefined ? input.quantity : item.quantity;
   const unitPrice = input.unit_price !== undefined ? input.unit_price : item.unit_price;
-  const discountPct = input.discount_pct !== undefined ? input.discount_pct : item.discount_pct;
+  const discountPct = itemOpp.stage==='DEVELOP'?0:input.discount_pct !== undefined ? input.discount_pct : item.discount_pct;
   assert(quantity > 0, "Số lượng sản phẩm phải lớn hơn 0");
   assert(unitPrice >= 0, "Đơn giá không hợp lệ");
   assert(discountPct >= 0 && discountPct <= 100, "Tỷ lệ chiết khấu phải từ 0 đến 100%");
@@ -548,7 +556,7 @@ export function submitExpertReview(actor: Actor, opportunityId: number) {
   tx(() => {
     run("UPDATE opportunities SET expert_review_status = 'PENDING', updated_at = datetime('now') WHERE id = ?", opportunityId);
     audit(actor, "opportunity", opportunityId, "EXPERT_REVIEW_SUBMIT", { details: { reason: check.reason } });
-    notifyDeciders("SALES_MANAGER", "opportunity", opportunityId, `Cơ hội ${o.code} yêu cầu Quản lý kinh doanh duyệt chuyên môn (${check.reason})`, `/opportunities/${opportunityId}?tab=solution`);
+    notifyDeciders(rebuildPolicy().expertReviewerRole, "opportunity", opportunityId, `Cơ hội ${o.code} yêu cầu duyệt chuyên môn (${check.reason})`, `/opportunities/${opportunityId}?tab=solution`);
   });
 }
 
@@ -561,7 +569,7 @@ export function reviewExpertSolution(
   assertActorAccess(actor, "opportunity", opportunityId);
   assert(actor.type === "USER", "Chỉ nhân viên được thực hiện duyệt chuyên môn");
   assert(
-    actor.role === "SALES_MANAGER",
+    actor.role === rebuildPolicy().expertReviewerRole,
     "Cổng kiểm soát FR-42: Chỉ Quản lý kinh doanh mới có quyền duyệt chuyên môn",
   );
   const o = mustOpen(opportunityId);
@@ -597,6 +605,7 @@ export function addStakeholder(
   id: number,
   input: { name: string; role: string; notes?: string | null; contact_id?: number | null },
 ) {
+  assert(actor.type==='USER','Agent không được tự thêm bên liên quan');
   assertActorAccess(actor, "opportunity", id);
   mustOpen(id);
   assert(input.name?.trim(), "Thiếu tên bên liên quan");
@@ -639,6 +648,7 @@ export function competitorsOf(id: number) {
 }
 
 export function addCompetitor(actor: Actor, id: number, competitorId: number, notes: string | null) {
+  assert(actor.type==='USER','Agent không được tự thêm đối thủ');
   assertActorAccess(actor, "opportunity", id);
   mustOpen(id);
   assert(get("SELECT id FROM competitors WHERE id = ?", competitorId), "Đối thủ không tồn tại");
@@ -706,6 +716,8 @@ export function managerGate(o: Opportunity): { required: boolean; reasons: strin
   if (o.importance === "HIGH") reasons.push("Mức quan trọng Cao (HIGH)");
   const openRisks = listRisks(o.id).filter((r) => r.status === "OPEN").length;
   if (openRisks > 0) reasons.push(`${openRisks} rủi ro chưa xử lý (OPEN)`);
+  const flagged=get<{n:number}>("SELECT COUNT(*) n FROM ai_rule_evaluations WHERE opportunity_id=? AND status='HIT' AND human_action='FLAGGED'",o.id)?.n ?? 0;
+  if(flagged) reasons.push(`${flagged} vi phạm được nhân viên gắn cờ cần rà soát`);
 
   return { required: reasons.length > 0, reasons };
 }
@@ -721,7 +733,8 @@ export function gateFingerprint(id: number): string {
   const risks=listRisks(id).map(r=>({id:r.id,status:r.status,severity:r.severity,description:r.description})).sort((a,b)=>a.id-b.id);
   const reopen=get<{id:number}>("SELECT id FROM opportunity_stage_history WHERE opportunity_id=? AND from_stage IN ('WON','LOST') AND to_stage='DEVELOP' ORDER BY id DESC LIMIT 1",id)?.id ?? 0;
   const revision=get<{id:number|null}>("SELECT MAX(id) id FROM audit_log WHERE (entity_type='opportunity' AND entity_id=? AND action IN ('UPDATE','RISK_ADD','RISK_STATUS','OPPORTUNITY_REOPEN')) OR (entity_type IN ('risk','opportunity_risk') AND entity_id IN (SELECT id FROM opportunity_risks WHERE opportunity_id=?))",id,id)?.id ?? 0;
-  return JSON.stringify({importance:opp?.importance,mode:setting('manager_gate_mode'),risks,reopen,revision});
+  const flags=all("SELECT id,acted_at,action_note FROM ai_rule_evaluations WHERE opportunity_id=? AND human_action='FLAGGED' ORDER BY id",id);
+  return JSON.stringify({importance:opp?.importance,mode:setting('manager_gate_mode'),risks,reopen,revision,flags});
 }
 
 export function gateState(o: Opportunity) {
@@ -755,6 +768,7 @@ export function moveStage(actor: Actor, id: number, to: Opportunity["stage"], re
       to,
       id,
     );
+    if(to!=='DEVELOP') run("UPDATE opportunities SET expert_review_status='NONE' WHERE id=? AND expert_review_status='PENDING'",id);
     run(
       `INSERT INTO opportunity_stage_history (opportunity_id, from_stage, to_stage, moved_by, reason)
        VALUES (?, ?, ?, ?, ?)`,
@@ -853,7 +867,7 @@ export function markLost(actor: Actor, id: number, reasonCode: string, note?: st
 
   tx(() => {
     run(
-      "UPDATE opportunities SET stage = 'LOST', lost_reason = ?, lost_reason_code = ?, closed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
+      "UPDATE opportunities SET stage = 'LOST', expert_review_status=CASE WHEN expert_review_status='PENDING' THEN 'NONE' ELSE expert_review_status END, lost_reason = ?, lost_reason_code = ?, closed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
       finalReason,
       reasonCode.trim(),
       id,
@@ -986,6 +1000,7 @@ export function researchOf(id: number) {
 /** Kết quả từng quy tắc OPP-R01..R10 đã khóa cho một bản nghiên cứu (BR-28). */
 export function ruleEvaluationsOf(researchId: number) {
   return all<{
+    id:number; human_action:'ACKNOWLEDGED'|'FLAGGED'|'RISK'|'TASK'|null;acted_by:number|null;acted_at:string|null;action_note:string|null;linked_risk_id:number|null;linked_task_id:number|null;
     rule_id: string; br_ref: string; status: string; severity: string | null; raw_value: string | null;
     threshold: string | null; rationale: string; limitation: string | null; evidence_refs_json: string;
     required_action: string | null; human_gate: string | null;
@@ -1000,6 +1015,7 @@ export function setProposedSolution(actor: Actor, id: number, solution: string) 
 export function verifyResearch(actor: Actor, researchId: number, opts: { applyImportance: boolean; riskIndexes: number[] }) {
   assertActorAccess(actor, "research", researchId);
   assert(actor.type === "USER", "Chỉ nhân viên xác minh nghiên cứu");
+  assert(actor.role==='SALES' || actor.role==='SALES_MANAGER','Chỉ nhân viên kinh doanh hoặc quản lý được xác minh');
   const r = get<{ id: number; opportunity_id: number; importance: string; risks_json: string; status: string }>(
     "SELECT * FROM opportunity_research WHERE id = ?",
     researchId,
@@ -1015,7 +1031,7 @@ export function verifyResearch(actor: Actor, researchId: number, opts: { applyIm
     }
     for (const i of opts.riskIndexes) {
       const risk = risks[i];
-      if (risk) {
+      if (risk && !findMatchingRisk(o.id,risk.description)) {
         run(
           "INSERT INTO opportunity_risks (opportunity_id, description, severity, source, created_by) VALUES (?,?,?,?,?)",
           o.id,

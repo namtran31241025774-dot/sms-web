@@ -5,6 +5,8 @@ import { seedWp02 } from "./wp02";
 import { seedWp07 } from "./wp07";
 import { seedWp09 } from "./wp09";
 import { seedWp03 } from "./wp03";
+import {seedTanCang} from './rebuild-tan-cang';
+import {backfillAssignedTeams} from './rebuild-team-backfill';
 
 /**
  * Điều phối toàn bộ dữ liệu mẫu (seeds) của các gói việc.
@@ -28,4 +30,6 @@ export function runAllSeeds(db: DatabaseSync) {
 
   // 6. Seed Đánh giá khách hàng & Phát triển cơ hội (WP-03)
   seedWp03(db);
+  seedTanCang(db);
+  backfillAssignedTeams(db);
 }

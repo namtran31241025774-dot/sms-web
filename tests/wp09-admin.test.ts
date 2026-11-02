@@ -294,6 +294,7 @@ describe("WP-09: Quản trị hệ thống & Phân quyền (FR-96 → FR-100)", 
     it("FR-99: tính toán phễu cơ hội và dự báo doanh thu Pipeline chuẩn xác theo BR-14", () => {
       // Dọn dẹp cơ hội cũ để có số liệu kiểm thử chính xác
       db().exec("DELETE FROM opportunities WHERE code LIKE 'TEST-OPP-%'");
+      const baseline=getPipelineFunnelReport({owner_id:1});
 
       const account = db().prepare("SELECT id FROM accounts LIMIT 1").get() as { id: number };
       const accountId = account?.id ?? 1;
@@ -325,15 +326,15 @@ describe("WP-09: Quản trị hệ thống & Phân quyền (FR-96 → FR-100)", 
       const report = getPipelineFunnelReport({ owner_id: 1 });
 
       // Dự báo Pipeline mở: 100m * 0.2 + 200m * 0.5 + 100m * 0.8 = 20m + 100m + 80m = 200,000,000 VND
-      expect(report.totalPipelineValue).toBe(400000000);
-      expect(report.weightedForecastRevenue).toBe(200000000);
-      expect(report.wonValue).toBe(50000000);
+      expect(report.totalPipelineValue-baseline.totalPipelineValue).toBe(400000000);
+      expect(report.weightedForecastRevenue-baseline.weightedForecastRevenue).toBe(200000000);
+      expect(report.wonValue-baseline.wonValue).toBe(50000000);
 
       // Kiểm tra trích xuất CSV
       const csv = exportPipelineReportCsv(report);
       expect(csv).toContain("BÁO CÁO PHỄU BÁN HÀNG VÀ DỰ BÁO DOANH THU (BR-14)");
-      expect(csv).toContain("400000000");
-      expect(csv).toContain("200000000");
+      expect(csv).toContain(String(report.totalPipelineValue));
+      expect(csv).toContain(String(report.weightedForecastRevenue));
     });
   });
 

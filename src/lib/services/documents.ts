@@ -13,7 +13,7 @@ import {
   documentExtractPrompt, documentFullText, DOCUMENT_EXTRACT_SYSTEM, DOC_FIELDS, matchCatalogItems, mergeAiResult, missingFields,
   parseLabeledFields, parseVndAmount, readDocx, readPdf, validateFields, type CatalogProduct, type DocFieldKey, type ExtractedField, type ProposedItem,
 } from "./document-extract";
-import { addOpportunityItem, createScopeDocument, createSolution, getOpportunity, getScopeDocument, listSolutions, updateOpportunity, updateScopeDocument } from "./opportunities";
+import { addOpportunityItem, createScopeDocument, createSolution, getOpportunity, getScopeDocument, listSolutions, updateOpportunity, updateScopeDocument, updateSolution } from "./opportunities";
 
 export const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
 
@@ -24,7 +24,9 @@ const FILE_TYPES: Record<string, { mime: string; magic: string }> = {
 
 export type OpportunityDocument = {
   id: number; name: string; file_size: number; version_no: number; created_at: string; uploader_name: string | null;
+  document_kind:DocumentKind; solution_id:number|null;
 };
+export type DocumentKind='SURVEY'|'SCOPE'|'SOLUTION'|'COMPETITOR'|'OTHER';
 
 export type DocumentExtraction = {
   id: number; document_id: number; document_name: string; opportunity_id: number; mode: string;
@@ -47,7 +49,7 @@ function requireUser(actor: Actor) {
 
 export function listOpportunityDocuments(opportunityId: number): OpportunityDocument[] {
   return all<OpportunityDocument>(
-    `SELECT d.id, d.name, d.file_size, d.version_no, d.created_at, u.name AS uploader_name
+    `SELECT d.id, d.name, d.file_size, d.version_no, d.created_at, d.document_kind, l.solution_id, u.name AS uploader_name
      FROM documents d
      JOIN document_links l ON l.document_id = d.id AND l.entity_type = 'opportunity'
      LEFT JOIN users u ON u.id = d.created_by
@@ -56,9 +58,15 @@ export function listOpportunityDocuments(opportunityId: number): OpportunityDocu
   );
 }
 
-export function saveOpportunityDocument(actor: Actor, opportunityId: number, file: { name: string; bytes: Buffer }): number {
+export function saveOpportunityDocument(actor: Actor, opportunityId: number, file: { name: string; bytes: Buffer },options:{kind?:DocumentKind;solutionId?:number}={}): number {
   const user = requireUser(actor);
+  assert(can(user.role,'document.write'),'Không có quyền tải tài liệu');
   assertActorAccess(actor, "opportunity", opportunityId);
+  assert(['SURVEY','SCOPE','SOLUTION','COMPETITOR','OTHER'].includes(options.kind ?? 'OTHER'),'Loại tài liệu không hợp lệ');
+  if(options.solutionId) {
+    assert(can(user.role,'opp.solution'),'Chỉ người có quyền hồ sơ kỹ thuật được gắn tài liệu giải pháp');
+    assert(get('SELECT id FROM solutions WHERE id=? AND opportunity_id=?',options.solutionId,opportunityId),'Hồ sơ giải pháp không thuộc cơ hội này');
+  }
   const name = path.basename(file.name.replace(/\\/g, "/")).trim();
   const ext = path.extname(name).toLowerCase();
   const type = FILE_TYPES[ext];
@@ -86,6 +94,8 @@ export function saveOpportunityDocument(actor: Actor, opportunityId: number, fil
       createHash("sha256").update(file.bytes).digest("hex"), user.id,
     );
     run("INSERT INTO document_links (document_id, entity_type, entity_id) VALUES (?, 'opportunity', ?)", id, opportunityId);
+    run('UPDATE documents SET document_kind=? WHERE id=?',options.kind ?? (options.solutionId?'SOLUTION':'OTHER'),id);
+    if(options.solutionId) run("UPDATE document_links SET solution_id=? WHERE document_id=? AND entity_type='opportunity' AND entity_id=?",options.solutionId,id,opportunityId);
     audit(actor, "opportunity", opportunityId, "DOCUMENT_UPLOAD", { details: { document_id: id, name } });
     return id;
   });
@@ -268,7 +278,7 @@ export function applyExtraction(
       const exists = get("SELECT id FROM opportunity_items WHERE opportunity_id = ? AND product_id = ?", o.id, item.product_id);
       if (!exists) addOpportunityItem(actor, o.id, item);
     }
-    if (hasTech && canSolution) createSolutionFromValues(actor, o.id, e, v);
+    const technicalApplied=hasTech && canSolution ? createSolutionFromValues(actor,o.id,e,v) : false;
     if (v("need") || budget !== undefined) {
       updateOpportunity(actor, o.id, { ...(v("need") ? { customer_need: v("need") } : {}), ...(budget !== undefined ? { budget } : {}) });
     }
@@ -284,7 +294,7 @@ export function applyExtraction(
         createScopeDocument(actor, o.id, { title: `Phạm vi theo ${e.document_name}`, content: scopeText, deliverables: v("services") || undefined });
       }
     }
-    const solution = !hasTech ? "NONE" : canSolution ? "CREATED" : "PENDING";
+    const solution = !hasTech ? "NONE" : technicalApplied ? "CREATED" : "PENDING";
     run(
       "UPDATE document_extractions SET status='APPLIED', solution_status=?, fields_json=?, reviewed_by=?, reviewed_at=datetime('now') WHERE id=?",
       solution, JSON.stringify(edited), actor.type === "USER" ? actor.id : null, e.id,
@@ -294,7 +304,7 @@ export function applyExtraction(
   });
 }
 
-function createSolutionFromValues(actor: Actor, opportunityId: number, e: DocumentExtraction, v: (k: DocFieldKey) => string) {
+function createSolutionFromValues(actor: Actor, opportunityId: number, e: DocumentExtraction, v: (k: DocFieldKey) => string,replaceId?:number):boolean {
   const effort = v("effort").match(/\d+/);
   const input = {
     title: v("modules") ? `Giải pháp ${v("modules")}` : `Giải pháp theo ${e.document_name}`,
@@ -305,24 +315,35 @@ function createSolutionFromValues(actor: Actor, opportunityId: number, e: Docume
     risks: v("tech_risks") || undefined,
   };
   // Hồ sơ giống hệt bản đã có thì không tạo thêm, nên cũng không làm mất kết quả duyệt chuyên môn.
-  const duplicate = listSolutions(opportunityId).some((s) =>
+  const existing=listSolutions(opportunityId);
+  const duplicate = existing.some((s) =>
     s.title === input.title
     && (s.technical_approach ?? "") === (input.technical_approach ?? "")
     && (s.architecture ?? "") === (input.architecture ?? "")
     && s.estimated_effort_mandays === (input.estimated_effort_mandays ?? 0)
     && Boolean(s.integration_required) === input.integration_required
     && (s.risks ?? "") === (input.risks ?? ""));
-  if (!duplicate) createSolution(actor, opportunityId, input);
+  if(duplicate) return true;
+  if(replaceId) {
+    assert(existing.some(s=>s.id===replaceId),'Hồ sơ thay thế phải thuộc cùng cơ hội');
+    updateSolution(actor,replaceId,{...input,technical_approach:input.technical_approach ?? '',architecture:input.architecture ?? '',risks:input.risks ?? '',estimated_effort_mandays:input.estimated_effort_mandays ?? 0});
+    return true;
+  }
+  if(existing.length) return false;
+  createSolution(actor,opportunityId,input);
+  return true;
 }
 
 /** Hồ sơ kỹ thuật do NVKD chuyển từ tệp, chờ tư vấn giải pháp xác nhận. */
-export function pendingSolutionExtraction(opportunityId: number): DocumentExtraction | undefined {
+export function pendingSolutionExtraction(opportunityId: number): (DocumentExtraction & {existingSolutionIds:number[];requiresChoice:boolean}) | undefined {
   const r = get<ExtractionRow>(`${EXTRACTION_SELECT} WHERE e.opportunity_id = ? AND e.solution_status = 'PENDING' ORDER BY e.id DESC LIMIT 1`, opportunityId);
-  return r && toExtraction(r);
+  const ids=listSolutions(opportunityId).map(s=>s.id);
+  return r && {...toExtraction(r),existingSolutionIds:ids,requiresChoice:ids.length>0};
 }
 
-export function applySolutionExtraction(actor: Actor, extractionId: number, values: Partial<Record<DocFieldKey, string>>) {
-  requireUser(actor);
+export function applySolutionExtraction(actor: Actor, extractionId: number, values: Partial<Record<DocFieldKey, string>>,choice?:{action:'SKIP'|'REPLACE';solutionId?:number}) {
+  const user=requireUser(actor);
+  assert(can(user.role,'opp.solution'),'Không có quyền xác nhận hồ sơ kỹ thuật');
   const e = getExtraction(extractionId);
   assert(e, "Không tìm thấy kết quả đọc tài liệu");
   assertActorAccess(actor, "opportunity", e.opportunity_id);
@@ -330,7 +351,13 @@ export function applySolutionExtraction(actor: Actor, extractionId: number, valu
   const stored = (k: DocFieldKey) => e.fields.find((f) => f.key === k)?.value ?? "";
   const v = (k: DocFieldKey) => (values[k] !== undefined ? values[k]!.trim() : stored(k));
   tx(() => {
-    createSolutionFromValues(actor, e.opportunity_id, e, v);
+    if(choice?.action==='SKIP') {
+      run("UPDATE document_extractions SET solution_status='SKIPPED' WHERE id=?",e.id);
+      audit(actor,'opportunity',e.opportunity_id,'DOCUMENT_SOLUTION_SKIP',{details:{extraction_id:e.id}});
+      return;
+    }
+    if(choice?.action==='REPLACE') assert(choice.solutionId,'Chọn hồ sơ cần thay thế');
+    assert(createSolutionFromValues(actor, e.opportunity_id, e, v,choice?.solutionId),'Đã có hồ sơ kỹ thuật; chọn bỏ qua hoặc thay thế một hồ sơ cụ thể');
     run("UPDATE document_extractions SET solution_status='CREATED' WHERE id=?", e.id);
     audit(actor, "opportunity", e.opportunity_id, "DOCUMENT_SOLUTION_APPLY", { details: { extraction_id: e.id } });
   });

@@ -39,6 +39,7 @@ export function canSee(
 
   // Quản lý kinh doanh (SALES_MANAGER): thấy nếu trong nhóm quản lý hoặc nếu là quản lý chung
   if (user.role === "SALES_MANAGER") {
+    if(record.owner_id===user.id) return true;
     const managed = managedTeamIds.length ? managedTeamIds : user.teamIds ?? [];
     return recordTeams(record).some((t) => managed.includes(t));
   }
@@ -88,8 +89,8 @@ export function scopeFilterSql(
     const teamParams = user.teamIds ?? [];
 
     return {
-      sql: user.role === "SALES" ? `(${prefix}owner_id = ?${teamClause})` : (teamClause ? `(${prefix}team_id IN (${teamParams.map(()=>'?').join(',')}))` : '0=1'),
-      params: user.role === "SALES" ? [user.id,...teamParams] : teamParams,
+      sql: `(${prefix}owner_id = ?${teamClause})`,
+      params: [user.id,...teamParams],
     };
   }
 

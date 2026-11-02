@@ -5,7 +5,8 @@ import { all, get, run, tx } from "../db";
 import { assert, BANT_KEYS, type BantKey } from "../domain";
 import { email } from "../integrations";
 import { can } from "../rbac";
-import { recordVisible } from "./access";
+import { assertRecordAccess,recordVisible } from "./access";
+import type {UserScope} from '../scope';
 import { actorUserId, addActivity, audit, type Actor } from "./core";
 import { getLead } from "./leads";
 import { scoreBant, disqualifyLeadWithReason } from "./qualification";
@@ -118,7 +119,7 @@ export function createSuggestion(input: {
 
 const ENRICHABLE = ["industry", "address", "contact_title", "notes"] as const;
 type EnrichmentPayload = { fields: Partial<Record<"industry" | "address" | "contact_title" | "notes", string>> };
-type BantPayload = { scores: Record<BantKey, number>; rationale: string };
+type BantPayload = { scores: Record<BantKey, number>; rationale: string;timeline_bucket?:string };
 type EmailPayload = { to: string; subject: string; body: string };
 type DisqualifyPayload = { reason: string };
 
@@ -191,7 +192,9 @@ export function approveSuggestion(actor: Actor, id: number, edits: Record<string
         const scores = Object.fromEntries(
           BANT_KEYS.map((k) => [k, edits[`bant_${k}`] !== undefined ? Number(edits[`bant_${k}`]) : p.scores[k]]),
         ) as Record<BantKey, number>;
-        const {totalScore:total} = scoreBant(actor,s.entity_id,{...scores,notes:edits.rationale ?? p.rationale});
+        const bucket=p.timeline_bucket==='THIS_MONTH'?'IN_MONTH':p.timeline_bucket;
+        const timeline_frame=bucket==='IN_MONTH'||bucket==='END_OF_QUARTER'||bucket==='NEXT_YEAR'?bucket:'UNKNOWN';
+        const {totalScore:total} = scoreBant(actor,s.entity_id,{...scores,timeline_frame,notes:edits.rationale ?? p.rationale});
         result = `Đã cập nhật BANT = ${total}/100`;
         break;
       }
@@ -296,9 +299,17 @@ export function editSuggestion(actor: Actor, id: number, payloadUpdates: Record<
 }
 
 /** Thông tin một lần chạy để dựng workflow trên thẻ nghiên cứu (component không gọi thẳng db). */
-export function runForWorkflow(runId: number) {
-  return get<{ trigger: string; model: string; status: string; tool_calls_json: string | null; input_tokens: number | null; output_tokens: number | null; name: string | null }>(
-    "SELECT r.trigger, r.model, r.status, r.tool_calls_json, r.input_tokens, r.output_tokens, u.name FROM ai_runs r LEFT JOIN users u ON u.id = r.triggered_by WHERE r.id = ?",
+export function runForWorkflow(runId: number,user?:UserScope) {
+  const result=get<{ entity_type:'lead'|'opportunity';entity_id:number;research_phase:string|null;trigger: string; model: string; status: string; tool_calls_json: string | null; input_tokens: number | null; output_tokens: number | null; name: string | null }>(
+    "SELECT r.entity_type,r.entity_id,r.research_phase,r.trigger, r.model, r.status, r.tool_calls_json, r.input_tokens, r.output_tokens, u.name FROM ai_runs r LEFT JOIN users u ON u.id = r.triggered_by WHERE r.id = ?",
     runId,
   );
+  if(!result) return undefined;
+  if(user){assert(can(user.role,result.entity_type==='lead'?'lead.read':'opp.read'),'Không có quyền đọc lần chạy');assertRecordAccess(user,result.entity_type,result.entity_id);}
+  return {...result,trace:all<{id:number;tool_name:string;outcome:string;input_redacted:string;output_summary:string|null;duration_ms:number;created_at:string}>('SELECT id,tool_name,outcome,input_redacted,output_summary,duration_ms,created_at FROM tool_calls WHERE run_id=? ORDER BY id',runId),ruleResults:all<{rule_id:string;status:string;rationale:string;evidence_refs_json:string}>('SELECT rule_id,status,rationale,evidence_refs_json FROM ai_rule_evaluations WHERE run_id=? ORDER BY id',runId)};
+}
+export type AgentWorkflow=ReturnType<typeof runForWorkflow>;
+export function leadEmailDrafts(leadId:number,user:UserScope){
+  assert(can(user.role,'lead.read'),'Không có quyền xem Lead');assertRecordAccess(user,'lead',leadId);
+  return all<{id:number;status:string;payload_json:string;reviewed_at:string|null;review_note:string|null;delivery_status:string|null;sent_at:string|null}>(`SELECT s.id,s.status,s.payload_json,s.reviewed_at,s.review_note,m.status delivery_status,m.sent_at FROM ai_suggestions s LEFT JOIN email_messages m ON m.id=(SELECT MAX(x.id) FROM email_messages x WHERE x.suggestion_id=s.id) WHERE s.entity_type='lead' AND s.entity_id=? AND s.kind='EMAIL_DRAFT' ORDER BY s.id DESC`,leadId);
 }
