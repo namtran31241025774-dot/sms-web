@@ -118,6 +118,8 @@ Ghi tên hàm, tệp và kiểu trả về vào đây khi làm xong, để AI gi
 | Lộ trình một lần chạy Agent | mở rộng `runForWorkflow` | đã có một phần |
 | Dòng tiền dự tính | `cashflowForecast(user)` | chưa có |
 | Trạng thái cổng QLKD rà soát | `stageGateStatus(o)` trong `approvals.ts` | đã có |
+| Khảo sát và lịch hẹn | `discoverySurvey(id)`, `updateDiscoverySurvey(actor,id,input)`, `updateTechnicalSurvey(actor,id,input)`, `createDiscoveryAppointment(actor,id,input)` trong `src/lib/services/discovery.ts` | có; kiểu `SurveyUpdate`, `TechnicalUpdate`, `DiscoveryAppointmentInput`; actions tương ứng `saveDiscoverySurveyAction`, `createDiscoveryAppointmentAction` |
+| Tài liệu theo hồ sơ kỹ thuật | `saveOpportunityDocument(actor,oppId,file,{kind,solutionId})`, `listOpportunityDocuments(oppId)` trong `src/lib/services/documents.ts` | có; `DocumentKind`, trả `number` / `OpportunityDocument[]` thêm document_kind, solution_id |
 
 ## 10. Nghiệm thu
 

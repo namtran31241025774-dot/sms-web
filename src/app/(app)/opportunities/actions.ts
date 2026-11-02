@@ -34,6 +34,32 @@ import {
   verifyResearch,
 } from "@/lib/services/opportunities";
 import { createQuote } from "@/lib/services/quotes";
+import {createDiscoveryAppointment,updateDiscoverySurvey,updateTechnicalSurvey,SURVEY_FIELDS,TECHNICAL_FIELDS} from '@/lib/services/discovery';
+import {actOnRuleEvaluation,type RuleAction} from '@/lib/services/research-actions';
+
+export async function saveDiscoverySurveyAction(fd:FormData) {
+  const oppId=id(fd);const technical=fd.get('section')==='technical';
+  await act(back(oppId),async()=>{
+    const u=await requirePermission(technical?'opp.solution':'opp.write');
+    const fields=technical?TECHNICAL_FIELDS:SURVEY_FIELDS;
+    const input=Object.fromEntries(fields.filter(k=>fd.has(k)).map(k=>[k,str(fd,k)]));
+    return technical?updateTechnicalSurvey(userActor(u),oppId,input):updateDiscoverySurvey(userActor(u),oppId,input);
+  },'Đã lưu khảo sát');
+}
+export async function createDiscoveryAppointmentAction(fd:FormData) {
+  const oppId=id(fd);
+  await act(back(oppId,'activities'),async()=>{
+    const u=await requirePermission('opp.write');
+    return createDiscoveryAppointment(userActor(u),oppId,{startsAt:str(fd,'starts_at'),method:str(fd,'meeting_method'),presalesId:id(fd,'presales_id'),contactIds:fd.getAll('contact_id').map(Number),note:optStr(fd,'note') ?? undefined});
+  },'Đã hẹn khảo sát và phân công tư vấn');
+}
+export async function actOnRuleEvaluationAction(fd:FormData) {
+  const oppId=id(fd);
+  await act(back(oppId,'research'),async()=>{
+    const u=await requirePermission('ai.review');
+    return actOnRuleEvaluation(userActor(u),id(fd,'evaluation_id'),{action:str(fd,'action') as RuleAction,note:str(fd,'note'),assigneeId:fd.get('assignee_id')?id(fd,'assignee_id'):undefined});
+  },'Đã ghi nhận xử lý quy tắc');
+}
 
 const back = (oppId: number, tab = "summary") => `/opportunities/${oppId}?tab=${tab}`;
 

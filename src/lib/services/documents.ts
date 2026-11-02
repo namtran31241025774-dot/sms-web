@@ -24,7 +24,9 @@ const FILE_TYPES: Record<string, { mime: string; magic: string }> = {
 
 export type OpportunityDocument = {
   id: number; name: string; file_size: number; version_no: number; created_at: string; uploader_name: string | null;
+  document_kind:DocumentKind; solution_id:number|null;
 };
+export type DocumentKind='SURVEY'|'SCOPE'|'SOLUTION'|'COMPETITOR'|'OTHER';
 
 export type DocumentExtraction = {
   id: number; document_id: number; document_name: string; opportunity_id: number; mode: string;
@@ -47,7 +49,7 @@ function requireUser(actor: Actor) {
 
 export function listOpportunityDocuments(opportunityId: number): OpportunityDocument[] {
   return all<OpportunityDocument>(
-    `SELECT d.id, d.name, d.file_size, d.version_no, d.created_at, u.name AS uploader_name
+    `SELECT d.id, d.name, d.file_size, d.version_no, d.created_at, d.document_kind, l.solution_id, u.name AS uploader_name
      FROM documents d
      JOIN document_links l ON l.document_id = d.id AND l.entity_type = 'opportunity'
      LEFT JOIN users u ON u.id = d.created_by
@@ -56,9 +58,15 @@ export function listOpportunityDocuments(opportunityId: number): OpportunityDocu
   );
 }
 
-export function saveOpportunityDocument(actor: Actor, opportunityId: number, file: { name: string; bytes: Buffer }): number {
+export function saveOpportunityDocument(actor: Actor, opportunityId: number, file: { name: string; bytes: Buffer },options:{kind?:DocumentKind;solutionId?:number}={}): number {
   const user = requireUser(actor);
+  assert(can(user.role,'document.write'),'Không có quyền tải tài liệu');
   assertActorAccess(actor, "opportunity", opportunityId);
+  assert(['SURVEY','SCOPE','SOLUTION','COMPETITOR','OTHER'].includes(options.kind ?? 'OTHER'),'Loại tài liệu không hợp lệ');
+  if(options.solutionId) {
+    assert(can(user.role,'opp.solution'),'Chỉ người có quyền hồ sơ kỹ thuật được gắn tài liệu giải pháp');
+    assert(get('SELECT id FROM solutions WHERE id=? AND opportunity_id=?',options.solutionId,opportunityId),'Hồ sơ giải pháp không thuộc cơ hội này');
+  }
   const name = path.basename(file.name.replace(/\\/g, "/")).trim();
   const ext = path.extname(name).toLowerCase();
   const type = FILE_TYPES[ext];
@@ -86,6 +94,8 @@ export function saveOpportunityDocument(actor: Actor, opportunityId: number, fil
       createHash("sha256").update(file.bytes).digest("hex"), user.id,
     );
     run("INSERT INTO document_links (document_id, entity_type, entity_id) VALUES (?, 'opportunity', ?)", id, opportunityId);
+    run('UPDATE documents SET document_kind=? WHERE id=?',options.kind ?? (options.solutionId?'SOLUTION':'OTHER'),id);
+    if(options.solutionId) run("UPDATE document_links SET solution_id=? WHERE document_id=? AND entity_type='opportunity' AND entity_id=?",options.solutionId,id,opportunityId);
     audit(actor, "opportunity", opportunityId, "DOCUMENT_UPLOAD", { details: { document_id: id, name } });
     return id;
   });
