@@ -116,12 +116,16 @@ Ghi tên hàm, tệp và kiểu trả về vào đây khi làm xong, để AI gi
 | Kết quả quy tắc kèm thao tác đã chọn | `ruleEvaluationsOf(researchId)` — `src/lib/services/opportunities.ts`; `actOnRuleEvaluation(actor,id,input)` — `research-actions.ts` | có; human_action/by/time/note, linked risk/task; xử lý chỉ người có quyền |
 | Điểm BANT từng tiêu chí, lý do, căn cứ | `bantBreakdown(leadId,user)` — `src/lib/services/sales-flow.ts`, trả `BantBreakdown` | có; phân biệt đề xuất và hồ sơ đã áp dụng, đánh dấu điểm lịch sử ngoài thang |
 | Lộ trình một lần chạy Agent | `runForWorkflow(runId,user?)` trong `src/lib/services/ai-review.ts`, trả `AgentWorkflow` | có; trace công cụ theo thứ tự, kết quả/nguồn quy tắc, model, phase; truyền user hoặc dùng ID đã kiểm quyền |
-| Dòng tiền dự tính | `cashflowForecast(user)` | chưa có |
+| Dòng tiền dự tính | `cashflowForecast(user)` — `src/lib/services/cashflow.ts`, trả `CashflowForecast` | có; months/undated/total, ba nguồn không đếm trùng; permission `report.cashflow`, mặc định khóa, cấu hình `SMS_CASHFLOW_ROLES` sau khi nhóm chốt C3 |
 | Trạng thái cổng QLKD rà soát | `stageGateStatus(o)` trong `approvals.ts` | đã có |
 | Khảo sát và lịch hẹn | `discoverySurvey(id)`, `updateDiscoverySurvey(actor,id,input)`, `updateTechnicalSurvey(actor,id,input)`, `createDiscoveryAppointment(actor,id,input)` trong `src/lib/services/discovery.ts` | có; kiểu `SurveyUpdate`, `TechnicalUpdate`, `DiscoveryAppointmentInput`; actions tương ứng `saveDiscoverySurveyAction`, `createDiscoveryAppointmentAction` |
 | Tài liệu theo hồ sơ kỹ thuật | `saveOpportunityDocument(actor,oppId,file,{kind,solutionId})`, `listOpportunityDocuments(oppId)` trong `src/lib/services/documents.ts` | có; `DocumentKind`, trả `number` / `OpportunityDocument[]` thêm document_kind, solution_id |
 | Email nháp tại Lead | `leadEmailDrafts(leadId,user)` trong `src/lib/services/ai-review.ts` | có; id/status/payload_json/reviewed_at/review_note/delivery_status/sent_at; duyệt vẫn qua approveSuggestion (HG1) |
 | Kiểm tra địa chỉ offline | `validateVietnamAddress(raw)` trong `src/lib/services/address-validation.ts` | có; valid/normalized/province/reason; danh mục 34 tỉnh hiện hành; không xác minh vị trí thực tế |
+| Phản hồi khách theo phiên bản | `recordCustomerFeedback(actor,versionId,input)` — `src/lib/services/quotes.ts` | có; input responseType/respondentName hoặc contactId/respondedAt/content; trả id/versionId/respondentName/respondedAt/content. `recordCustomerResponseAction` nhận thêm respondent_name/contact_id/responded_at. Giao diện cần bổ sung các ô này. |
+| Tệp kỹ thuật cũ chờ xác nhận | `pendingSolutionExtraction(oppId)`, `applySolutionExtraction(actor,id,values,choice?)` — `documents.ts` | có; thêm requiresChoice/existingSolutionIds; choice `{action:'SKIP'}` hoặc `{action:'REPLACE',solutionId}`; không tạo chồng hồ sơ lập tay |
+
+C4: lớp `src/lib/llm/privacy.ts` đặt ngay trước payload OpenAI, dùng danh sách bảo vệ tạm thời, cho bổ sung bằng `SMS_AI_PRIVATE_FIELDS`. Che trường có cấu trúc và mẫu email/điện thoại/định danh có nhãn trong văn bản; không cam kết nhận diện mọi PII tự do. Danh sách cuối cùng vẫn chờ nhóm chốt. C6: `SMS_ALLOW_STAGE_SELF_APPROVAL=false` chặn tự duyệt; mặc định giữ hành vi hiện hữu chờ quyết định.
 
 Lưu ý Q1: đề bài này yêu cầu xác định người quyết định (Authority=25), chặt hơn câu Authority>0 còn trong DEC-31. Backend mới theo Q1; không tự sửa tài liệu yêu cầu. Điểm lịch sử giữ nguyên, muốn chuyển đổi phải đánh giá lại đúng thang.
 
