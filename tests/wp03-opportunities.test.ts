@@ -291,15 +291,15 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
         product_id: testProductId,
         quantity: 2,
         unit_price: 50000000,
-        discount_pct: 10, // 2 * 50,000,000 * 0.9 = 90,000,000
+        discount_pct: 0, // Develop chỉ ước tính, chưa chiết khấu
       });
 
       const items = listOpportunityItems(oppId);
       expect(items.length).toBe(1);
-      expect(items[0].amount).toBe(90000000);
+      expect(items[0].amount).toBe(100000000);
 
       const opp = getOpportunity(oppId);
-      expect(opp?.amount).toBe(90000000);
+      expect(opp?.amount).toBe(100000000);
 
       // Thêm sản phẩm thứ 2
       addOpportunityItem(salesActor, oppId, {
@@ -310,13 +310,13 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
       });
 
       const opp2 = getOpportunity(oppId);
-      expect(opp2?.amount).toBe(120000000);
+      expect(opp2?.amount).toBe(130000000);
 
       // Xóa sản phẩm thứ 2
       const itemsAfter = listOpportunityItems(oppId);
       removeOpportunityItem(salesActor, itemsAfter[1].id);
       const opp3 = getOpportunity(oppId);
-      expect(opp3?.amount).toBe(90000000);
+      expect(opp3?.amount).toBe(100000000);
     });
   });
 

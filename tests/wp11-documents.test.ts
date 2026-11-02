@@ -11,7 +11,7 @@ import {
 import {
   applyExtraction, applySolutionExtraction, extractDocument, listOpportunityDocuments, pendingExtraction, pendingSolutionExtraction, readDocumentFile, rejectExtraction, removeOpportunityDocument, saveOpportunityDocument,
 } from "@/lib/services/documents";
-import { getOpportunity, getScopeDocument, listOpportunityItems, listSolutions } from "@/lib/services/opportunities";
+import { createSolution, getOpportunity, getScopeDocument, listOpportunityItems, listSolutions } from "@/lib/services/opportunities";
 
 process.env.SMS_UPLOAD_DIR = mkdtempSync(path.join(tmpdir(), "sms-docs-"));
 
@@ -246,6 +246,20 @@ describe("WP-11: Tài liệu và Agent đọc tệp", () => {
     expect(sol.technical_approach).toBe("Cloud, kết nối ERP qua API");
     expect(sol.estimated_effort_mandays).toBe(20);
     expect(sol.integration_required).toBe(1);
+    expect(pendingSolutionExtraction(oppId)).toBeUndefined();
+  });
+  it('FR-41 BUG-054: manual technical dossier requires explicit skip or replacement of pending extraction',async()=>{
+    run('UPDATE opportunities SET presales_id=3 WHERE id=?',oppId);
+    const presales:Actor={type:'USER',id:3,name:'Châu',role:'PRESALES'};
+    const doc=saveOpportunityDocument(sales,oppId,{name:'pending.docx',bytes:docx(FULL)});
+    const e=await extractDocument(sales,doc,{useAi:false});
+    applyExtraction(sales,e.id,Object.fromEntries(e.fields.map(f=>[f.key,f.value ?? ''])));
+    const s=createSolution(presales,oppId,{title:'Hồ sơ lập tay'});
+    expect(pendingSolutionExtraction(oppId)?.requiresChoice).toBe(true);
+    expect(()=>applySolutionExtraction(presales,e.id,{})).toThrow(/bỏ qua hoặc thay thế/);
+    expect(listSolutions(oppId)).toHaveLength(1);
+    applySolutionExtraction(presales,e.id,{}, {action:'REPLACE',solutionId:s.id});
+    expect(listSolutions(oppId)).toHaveLength(1);expect(listSolutions(oppId)[0].technical_approach).toContain('ERP');
     expect(pendingSolutionExtraction(oppId)).toBeUndefined();
   });
   it("xóa tài liệu chỉ gỡ khỏi cơ hội: dữ liệu đã xác nhận còn nguyên, có nhật ký, người ngoài không xóa được", async () => {

@@ -237,8 +237,8 @@ export function evaluateOpportunityRules(opportunityId: number): RuleOutcome {
     const integ = all<{ integration_required: number }>("SELECT integration_required FROM solutions WHERE opportunity_id=? ORDER BY id DESC LIMIT 1", o.id)[0]?.integration_required;
     const min = settingNumber("expert_review_min_amount");
     const need = !!integ || o.amount >= min;
-    ev.push({ ...base("OPP-R10"), ...empty, status: need ? "WARNING" : "PASSED", raw_value: `${integ ? "Có" : "Không"} tích hợp; ${vnd(o.amount)}`, threshold: `Tích hợp hoặc ≥ ${vnd(min)}`,
-      rationale: need ? "Hồ sơ giải pháp cần rà soát chuyên môn" : "Không cần rà soát chuyên môn", evidence_refs: ["solution.integration_required", "opportunity.amount"],
+    ev.push({ ...base("OPP-R10"), ...empty, status: need ? "WARNING" : integ===undefined ? "NOT_EVALUABLE" : "PASSED", raw_value: `${integ===undefined ? 'Chưa có hồ sơ giải pháp' : integ ? 'Có tích hợp' : 'Không tích hợp'}; ${vnd(o.amount)}`, threshold: `Tích hợp hoặc ≥ ${vnd(min)}`,
+      rationale: need ? "Hồ sơ giải pháp cần rà soát chuyên môn" : integ===undefined ? 'Chưa có hồ sơ giải pháp để kiểm tra tích hợp' : "Không cần rà soát chuyên môn", evidence_refs: ["solution.integration_required", "opportunity.amount"],
       human_gate: need ? "EXPERT_REVIEW" : null });
   }
 

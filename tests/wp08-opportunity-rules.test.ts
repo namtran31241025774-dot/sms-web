@@ -47,16 +47,16 @@ describe("WP-08 BR-28: Bộ quy tắc Opportunity Agent (OPP-R01..R10)", () => {
   it("Thiếu dữ liệu thì NOT_EVALUABLE thay vì kết luận (email, ngân sách, ngày chốt, đối thủ)", () => {
     const o = evaluateOpportunityRules(makeOpp({ amount: 50_000_000 }));
     for (const id of ["OPP-R04", "OPP-R05", "OPP-R06", "OPP-R07"]) expect(byId(o, id).status).toBe("NOT_EVALUABLE");
-    // 4/10 quy tắc thiếu dữ liệu → độ bao phủ 0,6 = đúng ngưỡng ai_min_confidence
-    expect(o.confidence).toBe(0.6);
-    expect(o.confidence_band).toBe("MEDIUM");
+    // Thiếu cả hồ sơ giải pháp: 5/10 quy tắc không đủ dữ liệu.
+    expect(o.confidence).toBe(0.5);
+    expect(o.confidence_band).toBe("LOW");
     withSetting("ai_min_confidence", "0.7", () => {
       expect(evaluateOpportunityRules(makeOpp({ amount: 50_000_000 })).confidence_band).toBe("LOW");
     });
     // Tham số bị xoá trắng thì dùng mặc định 0,6 chứ không tắt cờ LOW
     withSetting("ai_min_confidence", "", () => {
       run("UPDATE settings SET value = '' WHERE key = 'ai_min_confidence'");
-      expect(evaluateOpportunityRules(makeOpp({ amount: 50_000_000 })).confidence).toBe(0.6);
+      expect(evaluateOpportunityRules(makeOpp({ amount: 50_000_000 })).confidence).toBe(0.5);
     });
   });
 

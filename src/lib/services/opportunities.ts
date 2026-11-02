@@ -236,7 +236,12 @@ export function updateScopeDocument(
       ...keys.map((k) => (input[k] ?? null) as string | number | null),
       docId,
     );
-    if (input.status === "CONFIRMED") {
+    const changed=['title','content','deliverables'].some(k=>input[k as keyof typeof input]!==undefined && input[k as keyof typeof input]!==doc[k as keyof ScopeDocument]);
+    if(changed) {
+      run("UPDATE scope_documents SET status='DRAFT',confirmed_by=NULL,confirmed_at=NULL WHERE id=?",docId);
+      run("UPDATE opportunities SET need_confirmed=0,updated_at=datetime('now') WHERE id=?",doc.opportunity_id);
+    }
+    if (input.status === "CONFIRMED" && !changed) {
       run("UPDATE scope_documents SET confirmed_by = ?, confirmed_at = datetime('now') WHERE id = ?", actorUserId(actor), docId);
       run("UPDATE opportunities SET need_confirmed = 1, updated_at = datetime('now') WHERE id = ?", doc.opportunity_id);
     }
@@ -279,6 +284,7 @@ export function addOpportunityItem(
   assertActorAccess(actor, "opportunity", opportunityId);
   assert(actor.type === "USER", "Chỉ nhân viên được cấu hình sản phẩm cho cơ hội");
   const o = mustOpen(opportunityId);
+  if(o.stage==='DEVELOP') assert(!input.discount_pct,'Cấu hình dự kiến ở Develop không áp chiết khấu; lập báo giá tại Propose');
   assert(input.quantity > 0, "Số lượng sản phẩm phải lớn hơn 0");
 
   let unitPrice = input.unit_price;
@@ -325,7 +331,8 @@ export function updateOpportunityItem(
   assert(actor.type === "USER", "Chỉ nhân viên được cập nhật sản phẩm");
   const item = get<OpportunityItem>("SELECT * FROM opportunity_items WHERE id = ?", itemId);
   assert(item, "Không tìm thấy dòng sản phẩm");
-  mustOpen(item.opportunity_id);
+  const itemOpp=mustOpen(item.opportunity_id);
+  if(itemOpp.stage==='DEVELOP') assert(!input.discount_pct,'Cấu hình dự kiến ở Develop không áp chiết khấu; lập báo giá tại Propose');
 
   const quantity = input.quantity !== undefined ? input.quantity : item.quantity;
   const unitPrice = input.unit_price !== undefined ? input.unit_price : item.unit_price;
@@ -758,6 +765,7 @@ export function moveStage(actor: Actor, id: number, to: Opportunity["stage"], re
       to,
       id,
     );
+    if(to!=='DEVELOP') run("UPDATE opportunities SET expert_review_status='NONE' WHERE id=? AND expert_review_status='PENDING'",id);
     run(
       `INSERT INTO opportunity_stage_history (opportunity_id, from_stage, to_stage, moved_by, reason)
        VALUES (?, ?, ?, ?, ?)`,
