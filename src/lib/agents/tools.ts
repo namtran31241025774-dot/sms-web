@@ -380,7 +380,7 @@ export const TOOLS = {
         open_risks: risksOf(o.id).filter((r) => r.status === "OPEN").map((r) => ({ description: r.description, severity: r.severity })),
         quotes: all("SELECT code, revision, status, total FROM quotes WHERE opportunity_id = ? ORDER BY id DESC LIMIT 3", o.id),
         research_phase: ctx.researchPhase ?? 'INITIAL',
-        context: opportunityResearchContext(o.id),
+        context: untrusted('opportunity_context',opportunityResearchContext(o.id)),
       };
     },
   }),

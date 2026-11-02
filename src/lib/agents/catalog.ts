@@ -27,7 +27,7 @@ export type AgentProfile = {
 };
 
 const QUALIFICATION_RULES = [
-  { id: "BANT", source: "BR-01", title: "Chấm 4 tiêu chí 0–25; tổng do server tính; đạt chuẩn khi ≥ ngưỡng và Authority > 0" },
+  { id: "BANT", source: "REBUILD-01 Q1 (BR-01 cần đồng bộ)", title: "Chấm 0/8/15/25; tổng do server tính; đạt chuẩn khi ≥ ngưỡng và Authority = 25 (đã xác định người quyết định)" },
   { id: "RATING", source: "BR-02", title: "Mức Nóng / Ấm / Lạnh chỉ thành chính thức khi NVKD xác nhận" },
   { id: "NEED_INFO", source: "BUG-010", title: "Confidence < 0,6 hoặc dữ liệu mâu thuẫn → ép NEED_INFO, chuyển người" },
   { id: "EVIDENCE", source: "BUG-006/007", title: "Mỗi đề xuất cần ≥ 1 căn cứ server xác thực được" },

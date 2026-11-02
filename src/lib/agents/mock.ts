@@ -1,5 +1,5 @@
 // Chế độ mô phỏng (không cần API key): Agent đi theo kịch bản cố định, dùng ĐÚNG các công cụ
-// và kiểm tra quyền như khi chạy bằng Claude, nên luồng kiểm duyệt/log giống hệt bản thật.
+// và kiểm tra quyền như khi chạy bằng OpenAI, nên luồng kiểm duyệt/log giống hệt bản thật.
 import { stripAccents } from "../domain";
 import { get } from "../db";
 import { invokeTool, type ToolCallLog, type ToolContext } from "./tools";
@@ -147,8 +147,8 @@ export function mockOpportunityAgent(ctx: ToolContext, log: ToolCallLog[]): stri
     customer_need: Wrapped<string | null>;
     checklist: Record<string, boolean>;
     stakeholders: { name: string; role: string }[];
-    competitors: { name: string; strengths: string | null }[];
-    context: ReturnType<typeof opportunityResearchContext>;
+    competitors: { name: string; strengths: string | null;weaknesses:string|null }[];
+    context: Wrapped<ReturnType<typeof opportunityResearchContext>>;
     research_phase: 'INITIAL'|'POST_SURVEY';
   };
   call("get_admin_criteria");
@@ -178,12 +178,19 @@ export function mockOpportunityAgent(ctx: ToolContext, log: ToolCallLog[]): stri
     sources.push({ ref: "opportunity.code", detail: "Hồ sơ cơ hội", quote: o.code });
   }
 
-  const c=o.context;
+  const c=o.context.data;
   const no=(reason:string):InsightItem=>({status:'NO_INSIGHT',reason});
   const info=(text:string,refs:string[]):InsightItem=>({text:text.slice(0,1000),sources:refs.map(ref=>({ref}))});
   const opp=c.opportunity;
-  const surveyKeys=['business_goals','current_process','pain_points','software_needs','expected_outcomes','technical_requirements'];
-  const survey=surveyKeys.filter(k=>opp[k]).map(k=>`${k}: ${String(opp[k])}`);
+  const labels:Record<string,string>={business_goals:'Mục tiêu',current_process:'Quy trình hiện tại',pain_points:'Khó khăn',software_needs:'Nhu cầu phần mềm',expected_outcomes:'Kết quả kỳ vọng',technical_integration:'Tích hợp',technical_infrastructure:'Hạ tầng',technical_security:'Bảo mật',technical_access:'Phân quyền'};
+  const surveyKeys=Object.keys(labels);
+  const survey=surveyKeys.filter(k=>opp[k]).map(k=>`${labels[k]}: ${String(opp[k])}`);
+  const documentScope=c.documents.filter(d=>d.fields_json).map(d=>{
+    let fields:Array<{key:string;value?:string|null}>=[];try{fields=JSON.parse(d.fields_json!);}catch{}
+    return `${d.name}: ${fields.filter(f=>['scope','user_count','duration','modules','integration','constraints'].includes(f.key) && f.value).map(f=>`${f.key}: ${f.value}`).join('; ')} (nội dung trích xuất, cần người đối chiếu)`;
+  });
+  const qualifyChanged=!!c.bant?.business_problem && stripAccents(String(c.bant.business_problem).toLowerCase())!==stripAccents(String(opp.customer_need ?? '').toLowerCase());
+  const qualifyComparison=qualifyChanged?`Nội dung Qualify: ${String(c.bant!.business_problem)}. Nội dung hiện tại khác bản Qualify; cần đối chiếu thay đổi phạm vi, không mặc định đây là mâu thuẫn.`:'Chưa phát hiện khác biệt văn bản nhu cầu, không thay thế xác minh của NVKD.';
   const budgetRule=rules.evaluations.find(e=>e.rule_id==='OPP-R07')!;
   const missing=[!opp.budget && 'Chưa có ngân sách khách xác nhận',!c.bant && 'Chưa có kết quả BANT từ Lead nguồn',!c.interactions.length && 'Chưa có lịch sử tương tác',...surveyKeys.filter(k=>!opp[k]).map(k=>`Cần làm rõ ${k}`)].filter((v):v is string=>!!v);
   const insights:NonNullable<OpportunityResearch['insights']>={
@@ -191,11 +198,11 @@ export function mockOpportunityAgent(ctx: ToolContext, log: ToolCallLog[]): stri
     opportunity_info:info(`Chủ đề: ${String(opp.name)}; nguồn: ${String(c.lead?.source ?? 'chưa ghi')}; doanh thu dự kiến: ${String(opp.amount)}; thời điểm dự kiến: ${String(opp.close_date ?? 'chưa ghi')}.`,['opportunity.code','opportunity.amount']),
     bant_result:c.bant ? info(`BANT đã ghi: Budget ${c.bant.bant_budget}/25, Authority ${c.bant.bant_authority}/25, Need ${c.bant.bant_need}/25, Timeline ${c.bant.bant_timeline}/25. Trạng thái: ${c.bant.status}. ${String(c.bant.notes ?? '')}`,[`bant:${c.bant.id}`]) : no('Cơ hội chưa có đánh giá BANT từ Lead nguồn; cần NVKD bổ sung, không suy đoán điểm'),
     interaction_history:c.interactions.length ? info(c.interactions.slice(0,6).map(a=>`${a.occurred_at}: ${a.subject}. ${a.body ?? ''}`).join('\n'),c.interactions.slice(0,6).map(a=>`activity:${a.id}`)) : no('Chưa có tương tác đã ghi nhận hoặc đồng bộ cho cơ hội và Lead nguồn'),
-    pain_need:opp.customer_need ? info(`Nhu cầu: ${String(opp.customer_need)}. ${survey.join('; ')}`,['opportunity.customer_need']) : no('Chưa có nhu cầu khách được ghi nhận'),
-    scope_summary:survey.length ? info(`Tổng hợp để NVKD đối chiếu biên bản phạm vi, không tự xác nhận: ${survey.join('; ')}. Tài liệu đã đọc: ${c.documents.filter(d=>d.fields_json).map(d=>d.name).join(', ') || 'chưa có'}.`,surveyKeys.filter(k=>!!opp[k]).map(k=>`opportunity.${k}`)) : no('Cần hoàn thành khảo sát trước khi tổng hợp phạm vi và ràng buộc'),
+    pain_need:opp.customer_need ? info(`Nhu cầu: ${String(opp.customer_need)}. ${qualifyComparison} ${missing.filter(Boolean).join('; ')}`,['opportunity.customer_need',...(qualifyChanged?[`bant:${c.bant!.id}`]:[])]) : no('Chưa có nhu cầu khách được ghi nhận'),
+    scope_summary:survey.length || documentScope.length ? info(`Tổng hợp để NVKD đối chiếu, không tự xác nhận: ${survey.join('; ')}. ${documentScope.join('; ')}`, [...surveyKeys.filter(k=>!!opp[k]).map(k=>`opportunity.${k}`),...c.documents.filter(d=>d.fields_json).map(d=>`document:${d.id}`)]) : no('Cần hoàn thành khảo sát trước khi tổng hợp phạm vi và ràng buộc'),
     product:c.products.length ? info(c.products.map(p=>`${p.name}: số lượng ${p.quantity}. ${p.description ?? 'Chưa có đặc tả năng lực; chuyên viên phải kiểm tra khả năng đáp ứng'}`).join('; '),c.products.map(p=>`product:${p.id}`)) : no('Chưa có cấu hình dự kiến; không khẳng định sản phẩm phù hợp khi thiếu căn cứ'),
-    stakeholder:o.stakeholders.length ? info(`Đã ghi: ${o.stakeholders.map(s=>`${s.name} (${s.role})`).join('; ')}. Cần đối chiếu người dùng trực tiếp, IT, mua hàng/pháp chế, người kiểm soát ngân sách và người quyết định cuối; không suy đoán vai trò chưa được xác nhận.`,['opportunity.stakeholders']) : no('Chưa thiết lập bên liên quan; cần làm rõ người quyết định, đánh giá kỹ thuật, mua kinh tế, người ủng hộ và người dùng cuối'),
-    competitor:o.competitors.length ? info(o.competitors.map(x=>`${x.name}; điểm mạnh đã ghi: ${x.strengths ?? 'chưa có nguồn'}. Cần kiểm chứng sản phẩm, giá, tính năng, tích hợp, chi phí, thời gian triển khai và hỗ trợ trước khi kết luận lợi thế.`).join('; '),['opportunity.competitors']) : no('Chưa có đối thủ được ghi nhận; dữ liệu công khai trong mock chưa đủ để khẳng định khách đang so sánh với nhà cung cấp nào'),
+    stakeholder:o.stakeholders.length ? info(`Đã ghi: ${o.stakeholders.map(s=>`${s.name} (${s.role})`).join('; ')}. Cần đối chiếu người dùng trực tiếp, IT, mua hàng/pháp chế, người kiểm soát ngân sách và người quyết định cuối. Các vai trò cần có: người quyết định, đánh giá kỹ thuật, người mua kinh tế, người ủng hộ, người dùng cuối. Chưa có chuỗi tương tác theo từng người nên không kết luận giảm tương tác cá nhân.`,['opportunity.stakeholders']) : no('Chưa thiết lập bên liên quan; cần làm rõ người quyết định, đánh giá kỹ thuật, mua kinh tế, người ủng hộ và người dùng cuối'),
+    competitor:o.competitors.length ? info(o.competitors.map(x=>`${x.name}; điểm mạnh trong danh mục: ${x.strengths ?? 'chưa có nguồn'}; điểm yếu: ${x.weaknesses ?? 'chưa có nguồn'}. Sản phẩm, chiến lược giá, tính năng, tích hợp, chi phí, thời gian triển khai và hỗ trợ cần nguồn công khai để kiểm chứng. Mock không tự nhận đã xác minh lợi thế cạnh tranh.`).join('; '),['opportunity.competitors']) : no('Chưa có đối thủ được ghi nhận; dữ liệu công khai trong mock chưa đủ để khẳng định khách đang so sánh với nhà cung cấp nào'),
     budget_check:info(`${budgetRule.rationale}. ${budgetRule.status==='HIT' ? 'Khuyến nghị xem lại mô-đun, số người dùng hoặc phạm vi dịch vụ.' : budgetRule.status==='NOT_EVALUABLE' ? 'Đây là thông tin còn thiếu cần hỏi khách.' : 'Không có cờ không thay thế việc NVKD tự kiểm tra ngân sách.'}`,budgetRule.evidence_refs),
     health:info(`Giai đoạn ${o.stage}; ${risks.length} đề xuất rủi ro, chưa ghi vào hồ sơ.`,['opportunity.stage']),
   };
