@@ -18,6 +18,8 @@ import { findOrCreateContact } from "./contacts";
 import { emitEvent } from "../events";
 import type { UserScope } from "../scope";
 import { recordVisible } from "./access";
+import {bantQualified} from '../bant-policy';
+import {requireVietnamAddress} from './address-validation';
 
 export type { DuplicateHit };
 export { findDuplicates, findOrCreateAccount, findOrCreateContact };
@@ -106,7 +108,7 @@ export function calculateLeadRating(lead: {
   const threshold = settingNumber("bant_threshold");
   const warmMin = settingNumber("lead_rating_warm_min");
 
-  if (score >= threshold && authority > 0 && timeline >= 18) {
+  if (bantQualified(score,authority,threshold) && timeline===25) {
     return "HOT";
   }
 
@@ -200,6 +202,7 @@ export function getLead(id: number, user?: UserScope): Lead | undefined {
  * FR-01 & FR-11: Tạo Lead thủ công, tự động điền khi chọn Account hoặc Contact có sẵn.
  */
 export function createLead(actor: Actor, input: LeadInput): number {
+  requireVietnamAddress(input.address);
   let companyName = input.company_name?.trim();
   let contactName = input.contact_name?.trim();
   let email = normalizeEmail(input.email);
@@ -307,6 +310,7 @@ const EDITABLE = [
 ] as const;
 
 export function updateLead(actor: Actor, id: number, input: Partial<LeadInput>) {
+  if('address' in input) requireVietnamAddress(input.address);
   assertActorAccess(actor, "lead", id);
   const lead = getLead(id);
   assert(lead, "Không tìm thấy Lead");

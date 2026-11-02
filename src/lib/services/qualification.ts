@@ -5,6 +5,7 @@ import { actorUserId, audit, settingBool, settingNumber, type Actor } from "./co
 import { findOrCreateAccount } from "./accounts";
 import { findOrCreateContact } from "./contacts";
 import { emitEvent } from "../events";
+import {bantQualified,requireBantLevel} from '../bant-policy';
 
 export type TimelineFrame = "IN_MONTH" | "END_OF_QUARTER" | "NEXT_YEAR" | "UNKNOWN";
 export type LeadRating = "HOT" | "WARM" | "COLD";
@@ -61,7 +62,7 @@ export function calculateLeadRating(
   threshold = 60,
   warmMin = 40,
 ): LeadRating {
-  const isQualified = totalScore >= threshold && authorityScore > 0;
+  const isQualified = bantQualified(totalScore,authorityScore,threshold);
 
   if (isQualified && (timelineFrame === "IN_MONTH" || timelineFrame === "END_OF_QUARTER")) {
     return "HOT";
@@ -129,7 +130,7 @@ export function scoreBant(actor: Actor, leadId: number, input: BantScoresInput):
   assert(lead, "Không tìm thấy khách hàng tiềm năng");
   assert(lead.status !== "CONVERTED" && lead.status !== "DISQUALIFIED", "Lead đã đóng");
 
-  const clamp = (val: number) => Math.max(0, Math.min(25, Math.round(val)));
+  const clamp = requireBantLevel;
   const b = clamp(input.budget);
   const a = clamp(input.authority);
   const n = clamp(input.need);
@@ -265,7 +266,7 @@ export function convertLeadToOpportunity(
 
   assert(lead, "Không tìm thấy khách hàng tiềm năng");
   assert(lead.status === "OPEN" || lead.status === "WORKING", "Lead không ở trạng thái mở");
-  assert(lead.bant_authority > 0, "Chưa xác định người quyết định: Authority phải lớn hơn 0 để chuyển đổi");
+  assert(lead.bant_authority===25, "Chưa xác định người quyết định: Authority phải đạt mức 25 để chuyển đổi");
 
   // Kiểm tra ngưỡng BANT
   const threshold = settingNumber("bant_threshold");

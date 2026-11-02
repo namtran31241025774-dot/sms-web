@@ -4,7 +4,8 @@
 import { z } from "zod";
 import { all, get, run, tx } from "../db";
 import { opportunityResearchContext, type ResearchPhase } from './research-context';
-import { bantScore, clampBant } from "../domain";
+import { bantScore } from "../domain";
+import {bantQualified,requireBantLevel} from '../bant-policy';
 import { maps, webResearch } from "../integrations";
 import { createSuggestion } from "../services/ai-review";
 import { audit, notify, notifyRole, setting, settingNumber } from "../services/core";
@@ -208,15 +209,15 @@ export const TOOLS = {
       const tScore = typeof input.timeline === "number" ? input.timeline : input.timeline.score;
 
       const scores = {
-        budget: clampBant(bScore),
-        authority: clampBant(aScore),
-        need: clampBant(nScore),
-        timeline: clampBant(tScore),
+        budget: requireBantLevel(bScore),
+        authority: requireBantLevel(aScore),
+        need: requireBantLevel(nScore),
+        timeline: requireBantLevel(tScore),
       };
       const total = bantScore(scores);
 
       // BUG-010: Nếu confidence < 0.6 hoặc dữ liệu mâu thuẫn -> chuyển người (outcome = NEED_INFO)
-      let outcome = input.outcome ?? (total >= settingNumber("bant_threshold") ? "QUALIFIED" : total < 35 ? "DISQUALIFY_PROPOSED" : "NEED_INFO");
+      let outcome = bantQualified(total,scores.authority,settingNumber('bant_threshold')) ? 'QUALIFIED' : total<35 ? 'DISQUALIFY_PROPOSED' : 'NEED_INFO';
       const confidence = input.confidence ?? 0.8;
       if (confidence < 0.6) {
         outcome = "NEED_INFO";
@@ -230,6 +231,12 @@ export const TOOLS = {
         outcome,
         missing_info: input.missing_info ?? [],
         rationale: input.rationale,
+        breakdown:Object.fromEntries(['budget','authority','need','timeline'].map(key=>{
+          const value=input[key as 'budget'];
+          const refs=typeof value==='number' ? [] : normalizeRefs(value.evidence);
+          const evidence=refs.length ? validateEvidence(ctx,refs,{required:true,min:1}) : [];
+          return [key,{score:scores[key as 'budget'],reason:typeof value==='number' ? input.rationale : value.reason ?? input.rationale,evidence}];
+        })),
       };
 
       const id = createSuggestion({

@@ -22,19 +22,19 @@ export type InsightItem = z.infer<typeof InsightItemSchema>;
 export const BantProposalSchema = z.object({
   budget: z.union([
     z.number().int().min(0).max(25),
-    z.object({ score: z.number().int().min(0).max(25), evidence: z.array(RefSchema).optional() }),
+    z.object({ score: z.number().int().min(0).max(25), reason: z.string().min(1).max(500).optional(), evidence: z.array(RefSchema).optional() }),
   ]),
   authority: z.union([
     z.number().int().min(0).max(25),
-    z.object({ score: z.number().int().min(0).max(25), evidence: z.array(RefSchema).optional() }),
+    z.object({ score: z.number().int().min(0).max(25), reason: z.string().min(1).max(500).optional(), evidence: z.array(RefSchema).optional() }),
   ]),
   need: z.union([
     z.number().int().min(0).max(25),
-    z.object({ score: z.number().int().min(0).max(25), evidence: z.array(RefSchema).optional() }),
+    z.object({ score: z.number().int().min(0).max(25), reason: z.string().min(1).max(500).optional(), evidence: z.array(RefSchema).optional() }),
   ]),
   timeline: z.union([
     z.number().int().min(0).max(25),
-    z.object({ score: z.number().int().min(0).max(25), evidence: z.array(RefSchema).optional() }),
+    z.object({ score: z.number().int().min(0).max(25), reason: z.string().min(1).max(500).optional(), evidence: z.array(RefSchema).optional() }),
   ]),
   timeline_bucket: z.enum(["THIS_MONTH", "END_OF_QUARTER", "NEXT_YEAR", "UNKNOWN"]).optional(),
   total: z.number().int().min(0).max(100).optional(),

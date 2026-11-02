@@ -51,7 +51,7 @@ export function mockQualificationAgent(ctx: ToolContext, log: ToolCallLog[]): st
     company_name: string; contact_title: string | null; email: string | null; industry: string | null;
     address: string | null; notes: Wrapped<string | null>;
   };
-  const criteria = call("get_admin_criteria") as { bant_threshold: number };
+  const criteria=call("get_admin_criteria") as {bant_threshold:number};
   const activities = call("list_lead_activities") as Wrapped<{ subject: string; body: string | null; ref: string }[]>;
   const dups = call("find_duplicates") as { kind: string; label: string; reason: string }[];
   const addr = call("normalize_address") as { normalized: string | null; confidence: number };
@@ -61,49 +61,18 @@ export function mockQualificationAgent(ctx: ToolContext, log: ToolCallLog[]): st
   const acts = stripAccents(activities.data.map((a) => `${a.subject} ${a.body ?? ""}`).join(" ").toLowerCase());
   const webText = stripAccents(web.map((w) => w.snippet).join(" ").toLowerCase());
   const title = stripAccents((lead.contact_title ?? "").toLowerCase());
-  const all = `${notes} ${acts} ${webText}`;
   const evidence: { ref: string; detail: string; quote: string }[] = [];
   const negative = has(webText, "cat giam", "tam dung");
 
-  // --- Need
-  let need = 8;
-  if (has(all, "crm", "pipeline", "quan ly ban hang", "doi sales", "doi kinh doanh", "nhan vien kinh doanh", "trinh duoc vien", "bang tinh")) {
-    need = 20;
-    const ref = lead.notes.data ? "lead.notes" : web[0]?.source ?? "web_research";
-    evidence.push({ ref, detail: "Có nhu cầu quản lý bán hàng / đội sales", quote: "Nhu cầu quản lý bán hàng" });
-  }
-  // --- Budget
-  let budget = 8;
-  if (has(all, "ngan sach", "budget", "trieu", "ty dong", "goi von", "mo rong")) {
-    budget = 18;
-    const ref = web[0]?.source ?? (lead.notes.data ? "lead.notes" : "web_research");
-    evidence.push({ ref, detail: "Tín hiệu có ngân sách / đang mở rộng", quote: "Có ngân sách mở rộng" });
-  }
-  if (negative) {
-    budget = 3;
-    evidence.push({ ref: web[0]?.source ?? "web_research", detail: "Đang cắt giảm chi phí / tạm dừng dự án CNTT", quote: "Cắt giảm chi phí" });
-  }
-  // --- Authority
-  let authority = 6;
-  if (has(title, "giam doc", "ceo", "cio", "cto", "director", "founder", "chu tich", "pho tong")) authority = 22;
-  else if (has(title, "truong", "head", "manager", "quan ly")) authority = 14;
-  if (lead.contact_title) {
-    evidence.push({ ref: "lead.contact_title", detail: `Chức danh: ${lead.contact_title}`, quote: lead.contact_title });
-  }
-  // --- Timeline
-  let timeline = 8;
-  if (has(all, "q1", "q2", "quy 1", "quy 2", "2027", "trong thang", "ngay")) {
-    timeline = 17;
-    evidence.push({ ref: web[0]?.source ?? (lead.notes.data ? "lead.notes" : "web_research"), detail: "Có mốc thời gian triển khai", quote: "Kế hoạch triển khai" });
-  }
-  if (negative) timeline = 3;
-
-  // Đảm bảo luôn có ít nhất 1 evidence từ lead
-  if (evidence.length === 0) {
-    if (lead.notes.data) evidence.push({ ref: "lead.notes", detail: "Ghi chú từ Lead", quote: "Ghi chú" });
-    else if (lead.company_name) evidence.push({ ref: "lead.company_name", detail: "Tên công ty", quote: lead.company_name });
-    else evidence.push({ ref: "web_research", detail: "Nghiên cứu web", quote: "Thông tin doanh nghiệp" });
-  }
+  // Scores reflect customer statements, not speculative public financing news.
+  const customerText=`${notes} ${acts}`;
+  const need=has(customerText,'pham vi','so nguoi dung','users') && has(customerText,'crm','phan mem') ? 25 : has(customerText,'crm','pipeline','quan ly ban hang','excel','bang tinh') ? 15 : has(customerText,'nhu cau','phan mem') ? 8 : 0;
+  const budget=has(customerText,'ngan sach da duyet','da phe duyet ngan sach') ? 25 : /(?:ngan sach|budget)[^.!?]{0,80}\d/.test(customerText) ? 15 : has(customerText,'ngan sach','budget') ? 8 : 0;
+  const authority=!has(customerText,'chua gap','chua xac dinh','can xac dinh','thieu nguoi quyet dinh') && has(customerText,'nguoi quyet dinh','quyet dinh cuoi cung','nguoi ky quyet dinh') ? 25 : has(title,'giam doc','ceo','truong','head','manager','quan ly') ? 15 : title ? 8 : 0;
+  const timeline=has(customerText,'trong thang','cuoi quy') ? 25 : has(customerText,'nam sau') ? 8 : has(customerText,'trong nam','nam nay') ? 15 : 0;
+  const source=lead.notes.data ? {ref:'lead.notes',quote:lead.notes.data.slice(0,180),detail:'Thông tin khách cung cấp'} : activities.data[0] ? {ref:activities.data[0].ref,quote:(activities.data[0].body ?? activities.data[0].subject).slice(0,180),detail:'Trao đổi với khách'} : {ref:'lead.company_name',quote:lead.company_name,detail:'Hồ sơ mới, chưa đủ dữ liệu chấm điểm'};
+  evidence.push(source);
+  if(lead.contact_title) evidence.push({ref:'lead.contact_title',quote:lead.contact_title,detail:'Chức danh chưa tự chứng minh thẩm quyền quyết định'});
 
   // --- Làm giàu dữ liệu (chỉ đề xuất trường trống)
   const fields: Record<string, string> = {};
@@ -123,14 +92,14 @@ export function mockQualificationAgent(ctx: ToolContext, log: ToolCallLog[]): st
     (web.length ? `Nguồn web: ${web[0].title}. ` : "Không tìm thấy thông tin công khai. ") +
     (dups.length ? `Cảnh báo trùng: ${dups.map((d) => `${d.label} (${d.reason})`).join("; ")}.` : "");
 
-  const timelineBucket = timeline >= 15 ? "END_OF_QUARTER" : "UNKNOWN";
+  const timelineBucket = timeline===25 ? "END_OF_QUARTER" : timeline===8 ? "NEXT_YEAR" : "UNKNOWN";
   const confidence = authority >= 14 && need >= 15 ? 0.85 : 0.65;
 
   const scored = call("propose_bant_score", {
-    budget: { score: budget, evidence },
-    authority: { score: authority, evidence },
-    need: { score: need, evidence },
-    timeline: { score: timeline, evidence },
+    budget: { score: budget, reason: budget ? "Mức ngân sách từ ghi chú/trao đổi của khách" : "Chưa có thông tin ngân sách", evidence: budget ? [source] : [] },
+    authority: { score: authority, reason: authority===25 ? "Khách xác định người quyết định" : authority ? "Mới có chức danh, chưa xác nhận người quyết định" : "Chưa có thông tin thẩm quyền", evidence: authority ? evidence : [] },
+    need: { score: need, reason: need ? "Độ rõ nhu cầu theo thông tin khách cung cấp" : "Chưa rõ nhu cầu", evidence: need ? [source] : [] },
+    timeline: { score: timeline, reason: timeline ? "Mốc mua hàng khách đã nêu" : "Chưa có mốc mua hàng", evidence: timeline ? [source] : [] },
     timeline_bucket: timelineBucket,
     confidence,
     rationale,
@@ -139,7 +108,7 @@ export function mockQualificationAgent(ctx: ToolContext, log: ToolCallLog[]): st
   const total = scored.total;
 
   let next: string;
-  if (total >= criteria.bant_threshold) {
+  if (scored.outcome === "QUALIFIED") {
     call("propose_conversion", {
       handoff_summary: `${lead.company_name}: ${rationale}`,
       evidence,

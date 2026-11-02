@@ -223,10 +223,10 @@ describe("WP-08: AI Agent (FR-06, FR-19, FR-20, FR-32, FR-36, FR-44, FR-88, FR-8
       // Chạy công cụ propose_bant_score với mảng rỗng -> Ném lỗi bắt buộc căn cứ
       expect(() => {
         invokeTool(ctx, "propose_bant_score", {
-          budget: 20,
-          authority: 20,
-          need: 20,
-          timeline: 20,
+          budget: 25,
+          authority: 25,
+          need: 25,
+          timeline: 25,
           rationale: "Chấm điểm không căn cứ",
           evidence: [],
         }, []);
@@ -320,10 +320,10 @@ describe("WP-08: AI Agent (FR-06, FR-19, FR-20, FR-32, FR-36, FR-44, FR-88, FR-8
       const ctx: ToolContext = { agent: "QUALIFICATION", runId: 22, entityType: "lead", entityId: leadId };
 
       const res = invokeTool(ctx, "propose_bant_score", {
-        budget: 20,
-        authority: 20,
-        need: 20,
-        timeline: 20,
+        budget: 25,
+        authority: 25,
+        need: 25,
+        timeline: 25,
         confidence: 0.45, // < 0.6
         outcome: "QUALIFIED", // Model đề xuất đạt chuẩn
         rationale: "Điểm cao nhưng dữ liệu mơ hồ",

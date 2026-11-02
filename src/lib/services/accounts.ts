@@ -3,6 +3,7 @@ import { all, get, run, tx } from "../db";
 import { assert, emailDomain, normalizeCompany } from "../domain";
 import { actorUserId, audit, type Actor } from "./core";
 import { maps } from "../integrations";
+import {requireVietnamAddress} from './address-validation';
 
 export type Account = {
   id: number;
@@ -76,6 +77,7 @@ export function getAccount(id: number) {
 }
 
 export function createAccount(actor: Actor, input: AccountInput): number {
+  requireVietnamAddress(input.address);
   assert(input.name?.trim(), "Tên doanh nghiệp không được để trống");
   const norm = normalizeCompany(input.name);
   const tax = input.tax_code?.trim() || null;
@@ -122,6 +124,7 @@ export function updateAccount(actor: Actor, id: number, input: Partial<AccountIn
   if ("website" in input) updates.website = input.website?.trim() || null;
   if ("tax_code" in input) updates.tax_code = input.tax_code?.trim() || null;
   if ("address" in input) {
+    requireVietnamAddress(input.address);
     updates.address = input.address?.trim() ? maps.normalizeAddress(input.address).normalized : null;
   }
   if ("employee_size" in input) updates.employee_size = input.employee_size?.trim() || null;

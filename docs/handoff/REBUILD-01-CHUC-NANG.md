@@ -115,11 +115,15 @@ Ghi tên hàm, tệp và kiểu trả về vào đây khi làm xong, để AI gi
 | Bản nghiên cứu theo tên mục trong bài, loại lần chạy | `researchView(researchId, user)` — `src/lib/services/sales-flow.ts`, trả `ResearchView` | có; 10 mục, INITIAL/POST_SURVEY/LEGACY, sources, missingInfo, recommendations, evaluations |
 | Kết quả quy tắc kèm thao tác đã chọn | `ruleEvaluationsOf(researchId)` — `src/lib/services/opportunities.ts`; `actOnRuleEvaluation(actor,id,input)` — `research-actions.ts` | có; human_action/by/time/note, linked risk/task; xử lý chỉ người có quyền |
 | Điểm BANT từng tiêu chí, lý do, căn cứ | `bantBreakdown(leadId,user)` — `src/lib/services/sales-flow.ts`, trả `BantBreakdown` | có; phân biệt đề xuất và hồ sơ đã áp dụng, đánh dấu điểm lịch sử ngoài thang |
-| Lộ trình một lần chạy Agent | mở rộng `runForWorkflow` | đã có một phần |
+| Lộ trình một lần chạy Agent | `runForWorkflow(runId,user?)` trong `src/lib/services/ai-review.ts`, trả `AgentWorkflow` | có; trace công cụ theo thứ tự, kết quả/nguồn quy tắc, model, phase; truyền user hoặc dùng ID đã kiểm quyền |
 | Dòng tiền dự tính | `cashflowForecast(user)` | chưa có |
 | Trạng thái cổng QLKD rà soát | `stageGateStatus(o)` trong `approvals.ts` | đã có |
 | Khảo sát và lịch hẹn | `discoverySurvey(id)`, `updateDiscoverySurvey(actor,id,input)`, `updateTechnicalSurvey(actor,id,input)`, `createDiscoveryAppointment(actor,id,input)` trong `src/lib/services/discovery.ts` | có; kiểu `SurveyUpdate`, `TechnicalUpdate`, `DiscoveryAppointmentInput`; actions tương ứng `saveDiscoverySurveyAction`, `createDiscoveryAppointmentAction` |
 | Tài liệu theo hồ sơ kỹ thuật | `saveOpportunityDocument(actor,oppId,file,{kind,solutionId})`, `listOpportunityDocuments(oppId)` trong `src/lib/services/documents.ts` | có; `DocumentKind`, trả `number` / `OpportunityDocument[]` thêm document_kind, solution_id |
+| Email nháp tại Lead | `leadEmailDrafts(leadId,user)` trong `src/lib/services/ai-review.ts` | có; id/status/payload_json/reviewed_at/review_note/delivery_status/sent_at; duyệt vẫn qua approveSuggestion (HG1) |
+| Kiểm tra địa chỉ offline | `validateVietnamAddress(raw)` trong `src/lib/services/address-validation.ts` | có; valid/normalized/province/reason; danh mục 34 tỉnh hiện hành; không xác minh vị trí thực tế |
+
+Lưu ý Q1: đề bài này yêu cầu xác định người quyết định (Authority=25), chặt hơn câu Authority>0 còn trong DEC-31. Backend mới theo Q1; không tự sửa tài liệu yêu cầu. Điểm lịch sử giữ nguyên, muốn chuyển đổi phải đánh giá lại đúng thang.
 
 ## 10. Nghiệm thu
 
