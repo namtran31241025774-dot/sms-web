@@ -10,7 +10,7 @@ import { email, esign } from "../integrations";
 import { generateQuotePdf } from "../pdf";
 import { requestApproval } from "./approvals";
 import { actorUserId, addActivity, audit, settingNumber, type Actor } from "./core";
-import { getOpportunity, moveStage } from "./opportunities";
+import { getOpportunity, listOpportunityItems, moveStage } from "./opportunities";
 import { checkDiscount, priceFor } from "./pricing";
 import {can} from '../rbac';
 
@@ -408,6 +408,24 @@ export function addLine(
     audit(actor, "quote_version", versionId, "LINE_ADD", {
       details: { productId, quantity, discountPct, taxPct },
     });
+  });
+}
+
+/** Snapshot Develop quantities into a draft, repricing against the selected approved price list. */
+export function createQuoteFromConfiguration(actor:Actor,oppId:number,options:{notes?:string;validDays?:number;priceListId?:number}={}) {
+  assert(actor.type==='USER' && can(actor.role,'quote.write'),'Chỉ kinh doanh được lập báo giá');
+  assertActorAccess(actor,'opportunity',oppId);
+  const o=getOpportunity(oppId);assert(o?.solution_confirmed,'Cần xác nhận cấu hình và giải pháp từ Develop');
+  const items=listOpportunityItems(oppId);assert(items.length,'Cơ hội chưa có cấu hình dự kiến');
+  return tx(()=>{
+    const q=createQuote(actor,oppId,options);
+    for(const i of items){
+      const p=get<{type:string}>('SELECT type FROM products WHERE id=?',i.product_id)!;
+      const term=get<{duration_months:number}>('SELECT duration_months FROM opportunity_items WHERE id=?',i.id)?.duration_months ?? 12;
+      addLine(actor,q.versionId,i.product_id,i.quantity,0,{licenseCount:['SUBSCRIPTION','MODULE'].includes(p.type)?i.quantity:undefined,termMonths:['SUBSCRIPTION','MODULE'].includes(p.type)?term:undefined});
+    }
+    audit(actor,'quote',q.quoteId,'INHERIT_CONFIGURATION',{details:{opportunityId:oppId,itemIds:items.map(i=>i.id),pricing:'CURRENT_PRICE_LIST'}});
+    return q;
   });
 }
 

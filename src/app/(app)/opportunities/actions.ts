@@ -1,7 +1,7 @@
 "use server";
 
 import { DOC_FIELDS } from "@/lib/services/document-extract";
-import { applyExtraction, applySolutionExtraction, extractDocument, rejectExtraction, removeOpportunityDocument, saveOpportunityDocument } from "@/lib/services/documents";
+import { applyExtraction, applySolutionExtraction, extractDocument, rejectExtraction, removeOpportunityDocument, saveOpportunityDocument,type DocumentKind } from "@/lib/services/documents";
 import { agentMode } from "@/lib/agents/runtime";
 import { act, id, num, optStr, str } from "@/lib/action";
 import { requirePermission } from "@/lib/auth";
@@ -33,7 +33,7 @@ import {
   updateSolution,
   verifyResearch,
 } from "@/lib/services/opportunities";
-import { createQuote } from "@/lib/services/quotes";
+import { createQuoteFromConfiguration } from "@/lib/services/quotes";
 import {createDiscoveryAppointment,updateDiscoverySurvey,updateTechnicalSurvey,SURVEY_FIELDS,TECHNICAL_FIELDS} from '@/lib/services/discovery';
 import {actOnRuleEvaluation,type RuleAction} from '@/lib/services/research-actions';
 
@@ -397,7 +397,8 @@ export async function createQuoteAction(fd: FormData) {
     back(oppId, "quotes"),
     async () => {
       const u = await requirePermission("quote.write");
-      return { redirectTo: `/quotes/${createQuote(userActor(u), oppId)}` };
+      const quote=createQuoteFromConfiguration(userActor(u),oppId);
+      return { redirectTo: `/quotes/${quote.quoteId}?v=${quote.versionId}` };
     },
     "Đã tạo báo giá nháp",
   );
@@ -411,7 +412,7 @@ export async function uploadDocumentAction(fd: FormData) {
       const u = await requirePermission("document.write");
       const file = fd.get("file");
       if (!(file instanceof File) || !file.size) throw new DomainError("Vui lòng chọn tệp");
-      saveOpportunityDocument(userActor(u), oppId, { name: file.name, bytes: Buffer.from(await file.arrayBuffer()) });
+      saveOpportunityDocument(userActor(u), oppId, { name: file.name, bytes: Buffer.from(await file.arrayBuffer()) },{kind:(optStr(fd,'document_kind') ?? 'OTHER') as DocumentKind,solutionId:fd.get('solution_id')?id(fd,'solution_id'):undefined});
     },
     "Đã tải tài liệu lên",
   );
@@ -478,7 +479,9 @@ export async function applySolutionExtractionAction(fd: FormData) {
     back(oppId, "solution"),
     async () => {
       const u = await requirePermission("opp.solution");
-      applySolutionExtraction(userActor(u), Number(fd.get("extraction_id")), documentValues(fd));
+      const choice=optStr(fd,'solution_choice');
+      if(choice && !['SKIP','REPLACE'].includes(choice)) throw new DomainError('Lựa chọn hồ sơ không hợp lệ');
+      applySolutionExtraction(userActor(u), Number(fd.get("extraction_id")), documentValues(fd),choice?{action:choice as 'SKIP'|'REPLACE',solutionId:fd.get('solution_id')?id(fd,'solution_id'):undefined}:undefined);
     },
     "Đã tạo hồ sơ kỹ thuật từ tài liệu",
   );

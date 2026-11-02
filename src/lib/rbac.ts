@@ -91,6 +91,7 @@ const MATRIX = {
 export type Permission = keyof typeof MATRIX;
 
 export function can(role: Role, permission: Permission): boolean {
+  if(permission==='opp.expert_review') return role===rebuildPolicy().expertReviewerRole;
   if(permission==='report.cashflow') return rebuildPolicy().cashflowRoles.includes(role);
   const allowed = MATRIX[permission] as readonly Role[] | undefined;
   if (!allowed) return false;

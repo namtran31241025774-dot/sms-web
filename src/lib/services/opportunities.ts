@@ -7,6 +7,7 @@ import { recordVisible } from "./access";
 import { notifyDeciders, requestApproval } from "./approvals";
 import { actorUserId, audit, notify, setting, type Actor } from "./core";
 import { listRisks, findMatchingRisk, type OpportunityRisk } from "./risks";
+import {rebuildPolicy} from '../rebuild-policy';
 
 export * from "./risks";
 
@@ -336,7 +337,7 @@ export function updateOpportunityItem(
 
   const quantity = input.quantity !== undefined ? input.quantity : item.quantity;
   const unitPrice = input.unit_price !== undefined ? input.unit_price : item.unit_price;
-  const discountPct = input.discount_pct !== undefined ? input.discount_pct : item.discount_pct;
+  const discountPct = itemOpp.stage==='DEVELOP'?0:input.discount_pct !== undefined ? input.discount_pct : item.discount_pct;
   assert(quantity > 0, "Số lượng sản phẩm phải lớn hơn 0");
   assert(unitPrice >= 0, "Đơn giá không hợp lệ");
   assert(discountPct >= 0 && discountPct <= 100, "Tỷ lệ chiết khấu phải từ 0 đến 100%");
@@ -555,7 +556,7 @@ export function submitExpertReview(actor: Actor, opportunityId: number) {
   tx(() => {
     run("UPDATE opportunities SET expert_review_status = 'PENDING', updated_at = datetime('now') WHERE id = ?", opportunityId);
     audit(actor, "opportunity", opportunityId, "EXPERT_REVIEW_SUBMIT", { details: { reason: check.reason } });
-    notifyDeciders("SALES_MANAGER", "opportunity", opportunityId, `Cơ hội ${o.code} yêu cầu Quản lý kinh doanh duyệt chuyên môn (${check.reason})`, `/opportunities/${opportunityId}?tab=solution`);
+    notifyDeciders(rebuildPolicy().expertReviewerRole, "opportunity", opportunityId, `Cơ hội ${o.code} yêu cầu duyệt chuyên môn (${check.reason})`, `/opportunities/${opportunityId}?tab=solution`);
   });
 }
 
@@ -568,7 +569,7 @@ export function reviewExpertSolution(
   assertActorAccess(actor, "opportunity", opportunityId);
   assert(actor.type === "USER", "Chỉ nhân viên được thực hiện duyệt chuyên môn");
   assert(
-    actor.role === "SALES_MANAGER",
+    actor.role === rebuildPolicy().expertReviewerRole,
     "Cổng kiểm soát FR-42: Chỉ Quản lý kinh doanh mới có quyền duyệt chuyên môn",
   );
   const o = mustOpen(opportunityId);
@@ -604,6 +605,7 @@ export function addStakeholder(
   id: number,
   input: { name: string; role: string; notes?: string | null; contact_id?: number | null },
 ) {
+  assert(actor.type==='USER','Agent không được tự thêm bên liên quan');
   assertActorAccess(actor, "opportunity", id);
   mustOpen(id);
   assert(input.name?.trim(), "Thiếu tên bên liên quan");
@@ -646,6 +648,7 @@ export function competitorsOf(id: number) {
 }
 
 export function addCompetitor(actor: Actor, id: number, competitorId: number, notes: string | null) {
+  assert(actor.type==='USER','Agent không được tự thêm đối thủ');
   assertActorAccess(actor, "opportunity", id);
   mustOpen(id);
   assert(get("SELECT id FROM competitors WHERE id = ?", competitorId), "Đối thủ không tồn tại");
@@ -864,7 +867,7 @@ export function markLost(actor: Actor, id: number, reasonCode: string, note?: st
 
   tx(() => {
     run(
-      "UPDATE opportunities SET stage = 'LOST', lost_reason = ?, lost_reason_code = ?, closed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
+      "UPDATE opportunities SET stage = 'LOST', expert_review_status=CASE WHEN expert_review_status='PENDING' THEN 'NONE' ELSE expert_review_status END, lost_reason = ?, lost_reason_code = ?, closed_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
       finalReason,
       reasonCode.trim(),
       id,

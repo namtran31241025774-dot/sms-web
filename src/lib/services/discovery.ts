@@ -12,12 +12,16 @@ export type TechnicalUpdate=Partial<Record<typeof TECHNICAL_FIELDS[number],strin
 function update(actor:Actor,id:number,input:SurveyUpdate|TechnicalUpdate,technical:boolean){
   assert(actor.type==='USER' && can(actor.role,technical?'opp.solution':'opp.write'),'Không có quyền cập nhật khảo sát này');
   assertActorAccess(actor,'opportunity',id);
-  const o=get<{stage:string}>('SELECT stage FROM opportunities WHERE id=?',id);
+  const o=get<Record<string,unknown> & {stage:string}>('SELECT * FROM opportunities WHERE id=?',id);
   assert(o?.stage==='DEVELOP','Chỉ khảo sát khi đang Phát triển cơ hội');
   const allowed:readonly string[]=technical?TECHNICAL_FIELDS:SURVEY_FIELDS;
   const entries=Object.entries(input);
   assert(entries.length>0 && entries.every(([k,v])=>allowed.includes(k) && typeof v==='string' && v.length<=10000),'Trường khảo sát không hợp lệ');
+  const changed=entries.some(([k,v])=>(v.trim()||null)!==(o[k] ?? null));
+  if(!changed) return discoverySurvey(id);
   tx(()=>{run(`UPDATE opportunities SET ${entries.map(([k])=>`${k}=?`).join(',')},updated_at=datetime('now') WHERE id=?`,...entries.map(([,v])=>v.trim()||null),id);
+    run("UPDATE opportunities SET need_confirmed=0,solution_confirmed=0,expert_review_status=CASE WHEN expert_review_status IN ('APPROVED','PENDING') THEN 'NONE' ELSE expert_review_status END WHERE id=?",id);
+    run("UPDATE scope_documents SET status='DRAFT',confirmed_at=NULL,confirmed_by=NULL WHERE opportunity_id=? AND status!='DRAFT'",id);
     audit(actor,'opportunity',id,'UPDATE',{details:{section:technical?'technical_survey':'discovery_survey',fields:entries.map(([k])=>k)}});
   });
   return discoverySurvey(id);

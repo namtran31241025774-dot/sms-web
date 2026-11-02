@@ -54,7 +54,7 @@ export function proposeFlow(o:Opportunity,user?:UserScope):ProcessFlow {
   const href=`/opportunities/${o.id}?tab=quotes`;
   return flow('PROPOSE',[
     {id:'configuration',title:'Chốt cấu hình từ Phát triển cơ hội',actor:'Nhân viên kinh doanh và Chuyên viên tư vấn giải pháp',done:!!o.solution_confirmed && listOpportunityItems(o.id).length>0,href,reason:null},
-    {id:'draft',title:'Lập bản đề xuất và báo giá nháp',actor:'Nhân viên kinh doanh',done:!!v && !!get('SELECT id FROM proposals WHERE opportunity_id=?',o.id),href,reason:null},
+    {id:'draft',title:'Lập bản đề xuất và báo giá nháp',actor:'Nhân viên kinh doanh',done:!!v && !!get("SELECT id FROM proposals WHERE opportunity_id=? AND quote_version_id=? AND status!='SUPERSEDED'",o.id,v.id),href,reason:null},
     {id:'discount',title:'Duyệt giá khi vượt hạn mức',actor:'Quản lý kinh doanh',done:!!v && ['APPROVED','SENT','ACCEPTED'].includes(v.status),applicable:needsApproval,href,reason:needsApproval ? 'Chiết khấu vượt hạn mức nhân viên' : null},
     {id:'negotiation',title:'Gửi và thương lượng đúng phiên bản',actor:'Nhân viên kinh doanh',done:sent,href,reason:null},
     {id:'response',title:'Ghi nhận quyết định của khách hàng',actor:'Nhân viên kinh doanh',done:!!response,href,reason:response?.response_type ?? null},

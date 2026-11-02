@@ -1,7 +1,7 @@
 import {it,expect} from 'vitest';
 import {get,run} from '@/lib/db';
 import {createDiscoveryAppointment,updateDiscoverySurvey,updateTechnicalSurvey} from '@/lib/services/discovery';
-import {createSolution} from '@/lib/services/opportunities';
+import {createSolution,createScopeDocument,confirmScopeDocument,getScopeDocument,getOpportunity} from '@/lib/services/opportunities';
 import {saveOpportunityDocument,listOpportunityDocuments} from '@/lib/services/documents';
 import type {Actor} from '@/lib/services/core';
 const sales:Actor={type:'USER',id:1,role:'SALES',name:'Sales'};
@@ -25,6 +25,10 @@ it('FR-37 FR-41 F3: separate five survey fields and technical responsibilities w
  expect(s?.customer_need).toBe('Giữ nhu cầu cũ');expect(s?.software_needs).toBe('CRM');
  expect(()=>updateTechnicalSurvey(sales,opp,{technical_security:'SSO'})).toThrow();
  expect(updateTechnicalSurvey({type:'USER',id:pre,role:'PRESALES',name:'Tư vấn'},opp,{technical_integration:'ERP',technical_infrastructure:'Cloud',technical_security:'SSO',technical_access:'RBAC'})?.technical_security).toBe('SSO');
+ const scope=createScopeDocument(sales,opp,{title:'Phạm vi',content:'CRM'});confirmScopeDocument(sales,scope.id);
+ run("UPDATE opportunities SET expert_review_status='APPROVED',solution_confirmed=1 WHERE id=?",opp);
+ updateTechnicalSurvey({type:'USER',id:pre,role:'PRESALES',name:'Tư vấn'},opp,{technical_security:'MFA bổ sung'});
+ expect(getOpportunity(opp)?.expert_review_status).toBe('NONE');expect(getOpportunity(opp)?.solution_confirmed).toBe(0);expect(getScopeDocument(opp)?.status).toBe('DRAFT');
 });
 it('FR-41 F8: technical document belongs to the exact solution and rejects cross-opportunity links',()=>{
  const {opp,pre}=setup();const actor:Actor={type:'USER',id:pre,role:'PRESALES',name:'Tư vấn'};
