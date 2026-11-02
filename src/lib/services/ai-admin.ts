@@ -1,5 +1,5 @@
 // Dịch vụ quản trị và giám sát tác nhân AI (WP-08, FR-88 -> FR-95, BR-16, BR-23 -> BR-27).
-// Dành cho AI_MANAGER và SALES_MANAGER.
+// Dành cho ADMIN và SALES_MANAGER.
 import { all, get, run, tx } from "../db";
 import { assert, DomainError } from "../domain";
 import { can } from "../rbac";
@@ -76,7 +76,7 @@ export type AiFeedbackRecord = {
 // ======================== 1. GIÁM SÁT & VẬN HÀNH (FR-90, BR-23) ========================
 
 /**
- * Thống kê tổng quan giám sát cho AI_MANAGER:
+ * Thống kê tổng quan giám sát cho ADMIN:
  * - Token tiêu thụ hôm nay vs ngân sách ngày (BR-16)
  * - Tỷ lệ lỗi 24h & cảnh báo nếu >= 20% (BR-23)
  * - Số tool call bị DENIED (BR-23)
@@ -237,7 +237,7 @@ export function cleanTimedOutRuns() {
       WHERE id = ?
     `, r.id);
 
-    notifyRole("AI_MANAGER", `[Cảnh báo AI] Lần chạy ${r.agent} #${r.id} bị quá thời gian (${timeoutSec}s) và đã được huỷ`);
+    notifyRole("ADMIN", `[Cảnh báo AI] Lần chạy ${r.agent} #${r.id} bị quá thời gian (${timeoutSec}s) và đã được huỷ`);
   }
 
   return { cleanedCount: timedOut.length };
@@ -303,7 +303,7 @@ export function createConfigDraft(
   },
 ) {
   assert(actor.type === "USER", "Chỉ nhân viên được tạo cấu hình");
-  assert(can(actor.role, "ai.config.write"), "Chỉ AI_MANAGER được tạo cấu hình kỹ thuật Agent");
+  assert(can(actor.role, "ai.config.write"), "Chỉ Người quản trị hệ thống được tạo cấu hình kỹ thuật Agent");
 
   // Kiểm tra model có trong danh sách được phép không (BR-25)
   const allowedModels = setting("llm_allowed_models")
@@ -395,13 +395,13 @@ export function rollbackConfig(actor: Actor, agentId: "QUALIFICATION" | "OPPORTU
  */
 export function setAiEmergencyStatus(actor: Actor, status: "ACTIVE" | "PAUSED") {
   assert(actor.type === "USER", "Chỉ nhân viên được đổi trạng thái AI");
-  assert(can(actor.role, "ai.admin.security") || can(actor.role, "ai.config.manage"), "Chỉ ADMIN hoặc AI_MANAGER được chuyển công tắc khẩn cấp");
+  assert(can(actor.role, "ai.admin.security") || can(actor.role, "ai.config.manage"), "Chỉ Người quản trị hệ thống được chuyển công tắc khẩn cấp");
 
   run("INSERT INTO settings (key, value) VALUES ('ai_status', ?) ON CONFLICT(key) DO UPDATE SET value = ?", status, status);
   audit(actor, "system_setting", 0, "AI_STATUS_CHANGE", { to: status });
 
   if (status === "PAUSED") {
-    notifyRole("AI_MANAGER", "Công tắc khẩn cấp: TẤT CẢ TÁC NHÂN AI ĐÃ BỊ TẠM DỪNG!");
+    notifyRole("ADMIN", "Công tắc khẩn cấp: TẤT CẢ TÁC NHÂN AI ĐÃ BỊ TẠM DỪNG!");
     notifyRole("SALES_MANAGER", "Tất cả tác nhân AI đã bị tạm dừng hoạt động khẩn cấp.");
   }
 
@@ -417,7 +417,7 @@ export function setAiEmergencyStatus(actor: Actor, status: "ACTIVE" | "PAUSED") 
 export function checkPreRunConstraints(agent: "QUALIFICATION" | "OPPORTUNITY"): { ok: boolean; reason?: string } {
   const warnOnce = (threshold: string) => {
     const message = `[Cảnh báo AI] ${agent} chạm ${threshold}% ngân sách ngày`;
-    if (!get("SELECT id FROM notifications WHERE message=? AND date(created_at)=date('now')",message)) notifyRole("AI_MANAGER",message);
+    if (!get("SELECT id FROM notifications WHERE message=? AND date(created_at)=date('now')",message)) notifyRole("ADMIN",message);
   };
   // 1. Kiểm tra Kill switch
   const aiStatus = setting("ai_status");

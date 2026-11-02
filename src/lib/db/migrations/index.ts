@@ -14,6 +14,10 @@ import { wp06_002_payment_invoice_safety } from "./wp06_002_payment_invoice_safe
 import { wp08_002_edit_and_refresh } from "./wp08_002_edit_and_refresh";
 import {wp10_001_integration_requests} from './wp10_001_integration_requests';
 import { wp08_003_rule_evaluations } from "./wp08_003_rule_evaluations";
+import { wp11_001_six_roles } from "./wp11_001_six_roles";
+import { wp11_002_document_extractions } from "./wp11_002_document_extractions";
+import { wp11_003_document_items } from "./wp11_003_document_items";
+import { wp12_001_backfill_quote_versions, wp12_002_backfill_quote_accounts } from "./wp12_001_backfill_quote_versions";
 
 export const MIGRATIONS: readonly Migration[] = [
   wp00_001_shared_schema,
@@ -30,6 +34,11 @@ export const MIGRATIONS: readonly Migration[] = [
   wp08_002_edit_and_refresh,
   wp10_001_integration_requests,
   wp08_003_rule_evaluations,
+  wp11_001_six_roles,
+  wp11_002_document_extractions,
+  wp11_003_document_items,
+  wp12_001_backfill_quote_versions,
+  wp12_002_backfill_quote_accounts,
 ] as const;
 
 /**

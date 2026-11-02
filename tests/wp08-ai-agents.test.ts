@@ -32,7 +32,7 @@ describe("WP-08: AI Agent (FR-06, FR-19, FR-20, FR-32, FR-36, FR-44, FR-88, FR-8
   const salesUserA = { id: 101, name: "Sales User A", role: "SALES" as const };
   const salesUserB = { id: 102, name: "Sales User B", role: "SALES" as const };
   const salesManager = { id: 103, name: "Sales Manager", role: "SALES_MANAGER" as const };
-  const aiManager = { id: 104, name: "AI Manager", role: "AI_MANAGER" as const };
+  const aiManager = { id: 104, name: "AI Manager", role: "ADMIN" as const };
   const deliveryUser = { id: 105, name: "Delivery User", role: "DELIVERY" as const };
 
   beforeEach(() => {

@@ -43,7 +43,7 @@ describe('Agent regression safeguards',()=>{
     expect(get<{input_tokens:number,output_tokens:number}>('SELECT input_tokens,output_tokens FROM ai_runs WHERE id=?',res.runId)).toEqual({input_tokens:0,output_tokens:0});
   });
   it('FR-90: BUG-032 budget warning is emitted once per threshold per day',()=>{
-    run("INSERT OR IGNORE INTO users(id,name,email,role) VALUES (903,'AI Review','ai-review@sms.local','AI_MANAGER')");
+    run("INSERT OR IGNORE INTO users(id,name,email,role) VALUES (903,'AI Review','ai-review@sms.local','ADMIN')");
     run("INSERT INTO ai_runs(agent,trigger,entity_type,entity_id,model,status,input_tokens,output_tokens) VALUES ('QUALIFICATION','budget','lead',?,'unit-model','SUCCEEDED',170000,0)",entityId);
     const before=get<{n:number}>("SELECT count(*) n FROM notifications WHERE user_id=903")!.n;
     checkPreRunConstraints('QUALIFICATION'); checkPreRunConstraints('QUALIFICATION');

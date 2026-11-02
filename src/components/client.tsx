@@ -55,3 +55,17 @@ export function SubmitButton({
     </button>
   );
 }
+
+export function ConfirmSubmitButton({ children, message }: { children: ReactNode; message: string }) {
+  return (
+    <button
+      type="submit"
+      className="btn btn-sm"
+      onClick={(e) => {
+        if (!window.confirm(message)) e.preventDefault();
+      }}
+    >
+      {children}
+    </button>
+  );
+}

@@ -118,12 +118,9 @@ export default async function AdminPage({
                     <option value="ADMIN">Người quản trị hệ thống (ADMIN)</option>
                     <option value="SALES_MANAGER">Quản lý kinh doanh (SALES_MANAGER)</option>
                     <option value="SALES">Nhân viên kinh doanh (SALES)</option>
-                    <option value="PRESALES_MANAGER">Quản lý tư vấn giải pháp (PRESALES_MANAGER)</option>
-                    <option value="PRESALES">Chuyên viên tư vấn kỹ thuật (PRESALES)</option>
+                    <option value="PRESALES">Chuyên viên tư vấn giải pháp (PRESALES)</option>
                     <option value="FINANCE">Nhân viên Tài chính – Kế toán (FINANCE)</option>
-                    <option value="AI_MANAGER">Người quản lý tác nhân AI (AI_MANAGER)</option>
-                    <option value="LEGAL">Nhân viên Pháp chế (LEGAL)</option>
-                    <option value="DELIVERY">Nhân viên triển khai (DELIVERY)</option>
+                    <option value="DELIVERY">Nhân viên triển khai kỹ thuật (DELIVERY)</option>
                   </select>
                 </div>
 

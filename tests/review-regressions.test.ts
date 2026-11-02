@@ -106,9 +106,10 @@ describe("Regression review 27/10", () => {
     const admin:Actor={type:'USER',id:901,name:'Admin',role:'ADMIN'}, f=fixture();
     expect(()=>reviewExpertSolution(admin,f.opp,'APPROVED')).toThrow();
     expect(()=>reopenOpportunity(admin,f.opp,'Review')).toThrow(/Quản lý kinh doanh/);
-    expect(()=>setChecklist(admin,f.opp,'solution_confirmed',true)).toThrow(/quyền|Presales/);
+    expect(()=>setChecklist(admin,f.opp,'solution_confirmed',true)).toThrow(/quyền|tư vấn giải pháp/);
     expect(can('SALES','invoice.create')).toBe(false);
-    expect(can('DELIVERY','fulfillment.update')).toBe(false);
+    expect(can('DELIVERY','fulfillment.update')).toBe(true);
+    expect(can('DELIVERY','order.write')).toBe(false);
     expect(checkDiscount(20,'ADMIN').requiresApproval).toBe(true);
   });
   it("FR-42: BUG-019 effort alone does not trigger expert review",()=>{

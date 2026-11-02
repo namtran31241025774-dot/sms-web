@@ -1,11 +1,11 @@
 import { assertActorAccess } from "./access";
 // Giai đoạn DEVELOP (và chuyển stage đến PROPOSE/CLOSE, WON, LOST).
-import { all, get, run, tx } from "../db";
+import { all, db, get, run, tx } from "../db";
 import { assert, DEVELOP_CHECKLIST, type ChecklistKey } from "../domain";
 import type { UserScope } from "../scope";
 import { recordVisible } from "./access";
-import { requestApproval } from "./approvals";
-import { actorUserId, audit, notify, notifyRole, setting, type Actor } from "./core";
+import { notifyDeciders, requestApproval } from "./approvals";
+import { actorUserId, audit, notify, setting, type Actor } from "./core";
 import { listRisks, type OpportunityRisk } from "./risks";
 
 export * from "./risks";
@@ -389,6 +389,12 @@ export function getSolution(id: number): SolutionRecord | undefined {
   );
 }
 
+/** Hồ sơ đổi sau khi đã duyệt thì kết quả cũ không còn giá trị, phải gửi duyệt lại (BR-07). */
+function resetExpertApproval(actor: Actor, opportunityId: number) {
+  const { changes } = db().prepare("UPDATE opportunities SET expert_review_status = 'NONE' WHERE id = ? AND expert_review_status = 'APPROVED'").run(opportunityId);
+  if (changes) audit(actor, "opportunity", opportunityId, "EXPERT_REVIEW_RESET");
+}
+
 export function createSolution(
   actor: Actor,
   opportunityId: number,
@@ -402,7 +408,7 @@ export function createSolution(
   },
 ): { id: number } {
   assertActorAccess(actor, "opportunity", opportunityId);
-  assert(actor.type === "USER" && (actor.role === "PRESALES" || actor.role === "PRESALES_MANAGER" || actor.role === "SALES_MANAGER" || actor.role === "ADMIN"), "Chỉ Presales có quyền lập phương án kỹ thuật");
+  assert(actor.type === "USER" && (actor.role === "PRESALES" || actor.role === "SALES_MANAGER" || actor.role === "ADMIN"), "Chỉ Chuyên viên tư vấn giải pháp có quyền lập phương án kỹ thuật");
   mustOpen(opportunityId);
   assert(input.title?.trim(), "Tiêu đề phương án kỹ thuật không được để trống");
 
@@ -436,6 +442,7 @@ export function createSolution(
     );
 
     audit(actor, "opportunity", opportunityId, "SOLUTION_CREATE", { details: { solutionId: insertId, ...input } });
+    resetExpertApproval(actor, opportunityId);
   });
 
   return { id: insertId };
@@ -454,7 +461,7 @@ export function updateSolution(
   },
 ) {
   assertActorAccess(actor, "solution", solutionId);
-  assert(actor.type === "USER" && (actor.role === "PRESALES" || actor.role === "PRESALES_MANAGER" || actor.role === "SALES_MANAGER" || actor.role === "ADMIN"), "Chỉ Presales có quyền cập nhật phương án kỹ thuật");
+  assert(actor.type === "USER" && (actor.role === "PRESALES" || actor.role === "SALES_MANAGER" || actor.role === "ADMIN"), "Chỉ Chuyên viên tư vấn giải pháp có quyền cập nhật phương án kỹ thuật");
   const sol = getSolution(solutionId);
   assert(sol, "Không tìm thấy hồ sơ giải pháp");
   mustOpen(sol.opportunity_id);
@@ -483,7 +490,30 @@ export function updateSolution(
     run("UPDATE opportunities SET solution_confirmed = 0 WHERE id = ?", sol.opportunity_id);
 
     audit(actor, "opportunity", sol.opportunity_id, "SOLUTION_UPDATE", { details: { solutionId, ...input } });
+    resetExpertApproval(actor, sol.opportunity_id);
   });
+}
+
+export function expertReviewMinAmount() {
+  return Number(setting("expert_review_min_amount") || "500000000");
+}
+
+/** Lần gửi và lần quyết định gần nhất của cổng duyệt chuyên môn, lấy từ nhật ký. */
+export function expertReviewInfo(opportunityId: number) {
+  const rows = all<{ action: string; actor_label: string; details_json: string | null; created_at: string }>(
+    `SELECT action, actor_label, details_json, created_at FROM audit_log
+     WHERE entity_type = 'opportunity' AND entity_id = ?
+       AND action IN ('EXPERT_REVIEW_SUBMIT', 'EXPERT_REVIEW_DECISION', 'EXPERT_REVIEW_RESET')
+     ORDER BY id DESC`,
+    opportunityId,
+  );
+  const decision = rows.find((r) => r.action === "EXPERT_REVIEW_DECISION");
+  return {
+    submitted: rows.find((r) => r.action === "EXPERT_REVIEW_SUBMIT"),
+    decision,
+    note: decision?.details_json ? (JSON.parse(decision.details_json) as { note?: string }).note ?? null : null,
+    reset: rows[0]?.action === "EXPERT_REVIEW_RESET",
+  };
 }
 
 /** Kiểm tra cơ hội có thuộc diện duyệt chuyên môn theo BR-07 không */
@@ -491,7 +521,7 @@ export function isExpertReviewRequired(opp: Opportunity): { required: boolean; r
   const enabled = setting("expert_review_enabled") !== "false";
   if (!enabled) return { required: false, reason: "Tính năng duyệt chuyên môn đang tắt" };
 
-  const minAmount = Number(setting("expert_review_min_amount") || "500000000");
+  const minAmount = expertReviewMinAmount();
   if (opp.amount >= minAmount) {
     return { required: true, reason: `Doanh thu cơ hội (${opp.amount.toLocaleString("vi-VN")} VND) >= ngưỡng ${minAmount.toLocaleString("vi-VN")} VND` };
   }
@@ -512,11 +542,13 @@ export function submitExpertReview(actor: Actor, opportunityId: number) {
   const o = mustOpen(opportunityId);
   const check = isExpertReviewRequired(o);
   assert(check.required, "Cơ hội không thuộc diện cần gửi duyệt chuyên môn: " + check.reason);
+  assert(listSolutions(opportunityId).length, "Cần lập hồ sơ giải pháp trước khi gửi duyệt chuyên môn");
+  assert(o.expert_review_status === "NONE" || o.expert_review_status === "REJECTED", "Yêu cầu duyệt chuyên môn đã được gửi hoặc đã được duyệt");
 
   tx(() => {
     run("UPDATE opportunities SET expert_review_status = 'PENDING', updated_at = datetime('now') WHERE id = ?", opportunityId);
     audit(actor, "opportunity", opportunityId, "EXPERT_REVIEW_SUBMIT", { details: { reason: check.reason } });
-    notifyRole("PRESALES_MANAGER", `Cơ hội ${o.code} yêu cầu Quản lý tư vấn giải pháp duyệt chuyên môn (${check.reason})`, `/opportunities/${opportunityId}`);
+    notifyDeciders("SALES_MANAGER", "opportunity", opportunityId, `Cơ hội ${o.code} yêu cầu Quản lý kinh doanh duyệt chuyên môn (${check.reason})`, `/opportunities/${opportunityId}?tab=solution`);
   });
 }
 
@@ -529,10 +561,14 @@ export function reviewExpertSolution(
   assertActorAccess(actor, "opportunity", opportunityId);
   assert(actor.type === "USER", "Chỉ nhân viên được thực hiện duyệt chuyên môn");
   assert(
-    actor.role === "PRESALES_MANAGER",
-    "Cổng kiểm soát FR-42: Chỉ Quản lý tư vấn giải pháp (PRESALES_MANAGER) mới có quyền duyệt chuyên môn",
+    actor.role === "SALES_MANAGER",
+    "Cổng kiểm soát FR-42: Chỉ Quản lý kinh doanh mới có quyền duyệt chuyên môn",
   );
   const o = mustOpen(opportunityId);
+  assert(o.expert_review_status === "PENDING", "Không có yêu cầu duyệt chuyên môn đang chờ");
+  const comment = note?.trim() || undefined;
+  if (decision === "APPROVED") assert(listSolutions(opportunityId).length, "Chưa có hồ sơ giải pháp để phê duyệt");
+  else assert(comment, "Từ chối phải ghi lý do");
 
   tx(() => {
     run(
@@ -540,8 +576,11 @@ export function reviewExpertSolution(
       decision,
       opportunityId,
     );
-    audit(actor, "opportunity", opportunityId, "EXPERT_REVIEW_DECISION", { details: { decision, note } });
-    notify(o.owner_id, `Quản lý tư vấn giải pháp đã ${decision === "APPROVED" ? "phê duyệt" : "từ chối"} chuyên môn giải pháp cơ hội ${o.code}`, `/opportunities/${opportunityId}`);
+    audit(actor, "opportunity", opportunityId, "EXPERT_REVIEW_DECISION", { details: { decision, note: comment } });
+    const message = `Quản lý kinh doanh đã ${decision === "APPROVED" ? "phê duyệt" : "từ chối"} chuyên môn giải pháp cơ hội ${o.code}${comment ? `: ${comment}` : ""}`;
+    for (const userId of new Set([o.owner_id, o.presales_id])) {
+      if (userId) notify(userId, message, `/opportunities/${opportunityId}?tab=solution`);
+    }
   });
 }
 
@@ -638,8 +677,8 @@ export function setChecklist(actor: Actor, id: number, key: ChecklistKey, value:
     }
     if (key === "solution_confirmed") {
       assert(
-        actor.role === "SALES" || actor.role === "PRESALES" || actor.role === "PRESALES_MANAGER" || actor.role === "SALES_MANAGER",
-        "Chỉ Presales hoặc Quản lý được xác nhận giải pháp",
+        actor.role === "SALES" || actor.role === "PRESALES" || actor.role === "SALES_MANAGER",
+        "Chỉ Chuyên viên tư vấn giải pháp hoặc Quản lý được xác nhận giải pháp",
       );
       assert(o.proposed_solution?.trim() || listSolutions(id).length > 0, "Chưa có đề xuất phương án giải pháp");
     }
@@ -744,11 +783,11 @@ export function advanceStage(actor: Actor, id: number): { moved: boolean; messag
     const expCheck = isExpertReviewRequired(o);
     if (expCheck.required && o.expert_review_status !== "APPROVED") {
       if (o.expert_review_status === "PENDING") {
-        return { moved: false, message: "Đang chờ Quản lý tư vấn giải pháp duyệt chuyên môn (FR-42)" };
+        return { moved: false, message: "Đang chờ Quản lý kinh doanh duyệt chuyên môn (FR-42)" };
       }
       return {
         moved: false,
-        message: `Cần Quản lý tư vấn giải pháp duyệt chuyên môn (${expCheck.reason}). Vui lòng gửi yêu cầu duyệt chuyên môn trước.`,
+        message: `Cần Quản lý kinh doanh duyệt chuyên môn (${expCheck.reason}). Vui lòng gửi yêu cầu duyệt chuyên môn trước.`,
       };
     }
 

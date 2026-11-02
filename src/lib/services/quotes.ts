@@ -676,6 +676,15 @@ export function applyDiscountDecision(
       v.quote_id,
     );
 
+    // Duyệt ở trang báo giá cũng phải đóng yêu cầu trong danh sách phê duyệt.
+    run(
+      "UPDATE approvals SET status=?, decided_by=?, decision_comment=?, decided_at=datetime('now') WHERE kind='QUOTE_DISCOUNT' AND status='PENDING' AND entity_id=?",
+      to,
+      actorUserId(actor),
+      comment,
+      versionId,
+    );
+
     audit(actor, "quote_version", versionId, approved ? "APPROVE" : "REJECT_APPROVAL", {
       from: "PENDING_APPROVAL",
       to,

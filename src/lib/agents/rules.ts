@@ -65,7 +65,7 @@ export const OPPORTUNITY_RULES = [
   { id: "OPP-R07", br: "FR-35", title: "Doanh thu dự kiến so với ngân sách khách", settings: [],
     logic: { input: "Doanh thu dự kiến, ngân sách khách", missing: "Chưa có ngân sách", hit: "Doanh thu > ngân sách → rủi ro TRUNG BÌNH", pass: "Doanh thu ≤ ngân sách" } },
   { id: "OPP-R08", br: "FR-41", title: "Giải pháp đã được xác nhận", settings: [],
-    logic: { input: "Mục kiểm soát Giải pháp", warn: "Chưa xác nhận → việc cho Presales", pass: "Presales đã xác nhận" } },
+    logic: { input: "Mục kiểm soát Giải pháp", warn: "Chưa xác nhận → việc cho Chuyên viên tư vấn giải pháp", pass: "Chuyên viên tư vấn giải pháp đã xác nhận" } },
   { id: "OPP-R09", br: "BR-06", title: "Cổng rà soát của QLKD", settings: ["manager_gate_mode"],
     logic: { input: "Mức quan trọng, rủi ro mở và rủi ro vừa phát hiện", warn: "Mức CAO hoặc còn ≥ 1 rủi ro → bật cổng QLKD (HG6)", pass: "Không thuộc diện rà soát" } },
   { id: "OPP-R10", br: "BR-07", title: "Cổng rà soát chuyên môn", settings: ["expert_review_enabled", "expert_review_min_amount"],
@@ -221,7 +221,7 @@ export function evaluateOpportunityRules(opportunityId: number): RuleOutcome {
   ev.push(o.solution_confirmed
     ? { ...base("OPP-R08"), ...empty, status: "PASSED", raw_value: "Đã xác nhận", threshold: "Đã xác nhận", rationale: "Giải pháp đã được xác nhận", evidence_refs: ["opportunity.solution_confirmed"] }
     : { ...base("OPP-R08"), ...empty, status: "WARNING", severity: "MEDIUM", raw_value: "Chưa xác nhận", threshold: "Đã xác nhận", rationale: "Mục kiểm soát Giải pháp chưa được xác nhận",
-        evidence_refs: ["opportunity.solution_confirmed"], required_action: { action: "Phối hợp Presales hoàn thiện và xác nhận giải pháp", owner_role: "PRESALES" } });
+        evidence_refs: ["opportunity.solution_confirmed"], required_action: { action: "Phối hợp Chuyên viên tư vấn giải pháp hoàn thiện và xác nhận giải pháp", owner_role: "PRESALES" } });
 
   // OPP-R09 — BR-06: Cao hoặc còn rủi ro mở (rủi ro mở gồm rủi ro đã ghi + rủi ro rule vừa phát hiện)
   const ruleRiskCount = ev.filter((e) => e.status === "HIT").length;

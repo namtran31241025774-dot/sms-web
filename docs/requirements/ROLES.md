@@ -1,5 +1,7 @@
 # Vai trò và quyền
 
+> **Cập nhật 31/10/2026 (DEC-30):** hệ thống chỉ còn 6 vai trò `SALES`, `SALES_MANAGER`, `PRESALES`, `FINANCE`, `DELIVERY`, `ADMIN`. Quyền thực tế xem `src/lib/rbac.ts`, người phụ trách FR xem `FR-OWNERS.md`. Phần dưới nhắc `PRESALES_MANAGER`, `AI_MANAGER`, `LEGAL` là bản cũ.
+
 Mã FR theo bản đọc ngày 22/10/2026.
 
 ## Ánh xạ vai trò trong bài → mã trong code

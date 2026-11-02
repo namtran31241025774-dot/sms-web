@@ -141,11 +141,9 @@ export default async function TeamPage({
                 <select name="role" defaultValue={sp.role ?? ""} className="select !h-8 !py-0 !text-xs">
                   <option value="">Tất cả vai trò</option>
                   <option value="SALES">Nhân viên kinh doanh (SDR/AE)</option>
-                  <option value="PRESALES">Tư vấn kỹ thuật (SE)</option>
-                  <option value="PRESALES_MANAGER">Quản lý tư vấn giải pháp</option>
+                  <option value="PRESALES">Tư vấn giải pháp (SE)</option>
                   <option value="SALES_MANAGER">Quản lý kinh doanh</option>
                   <option value="FINANCE">Tài chính – Kế toán</option>
-                  <option value="AI_MANAGER">Quản lý tác nhân AI</option>
                   <option value="ADMIN">Quản trị hệ thống</option>
                 </select>
                 <button type="submit" className="btn !py-1 !text-xs">
@@ -413,11 +411,11 @@ export default async function TeamPage({
                       <input type="date" name="due_date" className="input" />
                     </div>
                     <div>
-                      <label className="label">Mời tư vấn (SE/Presales)</label>
+                      <label className="label">Mời tư vấn giải pháp</label>
                       <select name="presales_user_id" className="select">
                         <option value="">-- Không mời --</option>
                         {allUsers
-                          .filter((u) => u.role === "PRESALES" || u.role === "PRESALES_MANAGER")
+                          .filter((u) => u.role === "PRESALES")
                           .map((u) => (
                             <option key={u.id} value={u.id}>
                               {u.name} ({u.title || "SE"})

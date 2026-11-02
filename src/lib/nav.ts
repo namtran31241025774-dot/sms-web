@@ -43,7 +43,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/approvals",
         label: "Phê duyệt",
         icon: "approval",
-        roles: ["SALES_MANAGER", "PRESALES_MANAGER", "LEGAL"],
+        roles: ["SALES_MANAGER"],
         badgeKey: "approvals",
       },
     ],
@@ -61,13 +61,13 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/opportunities",
         label: "Opportunities",
         icon: "opportunity",
-        roles: ["SALES", "SALES_MANAGER", "PRESALES", "PRESALES_MANAGER"],
+        roles: ["SALES", "SALES_MANAGER", "PRESALES"],
       },
       {
         href: "/quotes",
         label: "Báo giá",
         icon: "quote",
-        roles: ["SALES", "SALES_MANAGER", "PRESALES", "PRESALES_MANAGER", "FINANCE"],
+        roles: ["SALES", "SALES_MANAGER", "PRESALES", "FINANCE"],
       },
       {
         href: "/accounts",
@@ -113,7 +113,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/catalog",
         label: "Sản phẩm & bảng giá",
         icon: "product",
-        roles: ["SALES", "PRESALES", "PRESALES_MANAGER", "SALES_MANAGER", "FINANCE"],
+        roles: ["SALES", "PRESALES", "SALES_MANAGER", "FINANCE"],
       },
       {
         href: "/team",
@@ -130,7 +130,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         href: "/admin/ai",
         label: "Quản trị AI Agent",
         icon: "bot",
-        roles: ["AI_MANAGER", "ADMIN", "SALES_MANAGER"],
+        roles: ["ADMIN", "SALES_MANAGER"],
       },
       {
         href: "/admin",

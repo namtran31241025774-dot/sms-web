@@ -1,5 +1,8 @@
 "use server";
 
+import { DOC_FIELDS } from "@/lib/services/document-extract";
+import { applyExtraction, applySolutionExtraction, extractDocument, rejectExtraction, removeOpportunityDocument, saveOpportunityDocument } from "@/lib/services/documents";
+import { agentMode } from "@/lib/agents/runtime";
 import { act, id, num, optStr, str } from "@/lib/action";
 import { requirePermission } from "@/lib/auth";
 import { runAgent } from "@/lib/agents/runtime";
@@ -172,7 +175,7 @@ export async function submitExpertReviewAction(fd: FormData) {
       const u = await requirePermission("opp.solution");
       submitExpertReview(userActor(u), oppId);
     },
-    "Đã gửi yêu cầu Quản lý tư vấn giải pháp duyệt chuyên môn (FR-42)",
+    "Đã gửi yêu cầu Quản lý kinh doanh duyệt chuyên môn (FR-42)",
   );
 }
 
@@ -371,5 +374,86 @@ export async function createQuoteAction(fd: FormData) {
       return { redirectTo: `/quotes/${createQuote(userActor(u), oppId)}` };
     },
     "Đã tạo báo giá nháp",
+  );
+}
+
+export async function uploadDocumentAction(fd: FormData) {
+  const oppId = id(fd);
+  await act(
+    back(oppId, "documents"),
+    async () => {
+      const u = await requirePermission("document.write");
+      const file = fd.get("file");
+      if (!(file instanceof File) || !file.size) throw new DomainError("Vui lòng chọn tệp");
+      saveOpportunityDocument(userActor(u), oppId, { name: file.name, bytes: Buffer.from(await file.arrayBuffer()) });
+    },
+    "Đã tải tài liệu lên",
+  );
+}
+
+export async function extractDocumentAction(fd: FormData) {
+  const oppId = id(fd);
+  await act(
+    back(oppId, "documents"),
+    async () => {
+      const u = await requirePermission("document.write");
+      const r = await extractDocument(userActor(u), Number(fd.get("document_id")), { useAi: agentMode() === "llm" });
+      return r.fields.filter((f) => !f.value).length;
+    },
+    (missing) => (missing ? `Đã đọc tệp, còn thiếu ${missing} thông tin. Vui lòng kiểm tra.` : "Đã đọc đủ thông tin. Vui lòng kiểm tra."),
+  );
+}
+
+export async function removeDocumentAction(fd: FormData) {
+  const oppId = id(fd);
+  await act(
+    back(oppId, "documents"),
+    async () => {
+      const u = await requirePermission("document.write");
+      removeOpportunityDocument(userActor(u), Number(fd.get("document_id")));
+    },
+    "Đã xóa tài liệu khỏi cơ hội",
+  );
+}
+
+const documentValues = (fd: FormData) =>
+  Object.fromEntries(DOC_FIELDS.filter((f) => fd.has(`field_${f.key}`)).map((f) => [f.key, String(fd.get(`field_${f.key}`))]));
+
+export async function applyExtractionAction(fd: FormData) {
+  const oppId = id(fd);
+  const reject = fd.get("op") === "reject";
+  await act(
+    back(oppId, "documents"),
+    async () => {
+      const u = await requirePermission("document.write");
+      const extractionId = Number(fd.get("extraction_id"));
+      if (reject) {
+        rejectExtraction(userActor(u), extractionId);
+        return "Đã bỏ qua kết quả đọc tệp";
+      }
+      const items = [...fd.keys()]
+        .filter((k) => k.startsWith("item_on_"))
+        .map((k) => {
+          const productId = Number(k.slice("item_on_".length));
+          return { product_id: productId, quantity: Number(fd.get(`item_qty_${productId}`)) };
+        });
+      const { solution } = applyExtraction(userActor(u), extractionId, documentValues(fd), items);
+      return solution === "PENDING"
+        ? `Đã cập nhật hồ sơ và thêm ${items.length} sản phẩm. Hồ sơ kỹ thuật đang chờ Chuyên viên tư vấn giải pháp xác nhận.`
+        : `Đã cập nhật hồ sơ và thêm ${items.length} sản phẩm.`;
+    },
+    (message) => message,
+  );
+}
+
+export async function applySolutionExtractionAction(fd: FormData) {
+  const oppId = id(fd);
+  await act(
+    back(oppId, "solution"),
+    async () => {
+      const u = await requirePermission("opp.solution");
+      applySolutionExtraction(userActor(u), Number(fd.get("extraction_id")), documentValues(fd));
+    },
+    "Đã tạo hồ sơ kỹ thuật từ tài liệu",
   );
 }

@@ -42,21 +42,20 @@ describe("WP-00: Nền móng và Hợp đồng chung", () => {
 
   describe("Phân quyền RBAC & Phạm vi Scope (ROLES.md)", () => {
     it("hỗ trợ đầy đủ các vai trò mới và nhãn tiếng Việt", () => {
-      expect(ROLE_LABEL.PRESALES_MANAGER).toBe("Quản lý tư vấn giải pháp");
-      expect(ROLE_LABEL.AI_MANAGER).toBe("Người quản lý tác nhân AI");
+      expect(ROLE_LABEL.PRESALES).toBe("Chuyên viên tư vấn giải pháp");
+      expect(ROLE_LABEL.DELIVERY).toBe("Nhân viên triển khai kỹ thuật");
     });
 
-    it("PRESALES_MANAGER có quyền rà soát chuyên môn FR-42", () => {
-      expect(can("PRESALES_MANAGER", "opp.expert_review")).toBe(true);
+    it("SALES_MANAGER có quyền rà soát chuyên môn FR-42", () => {
+      expect(can("SALES_MANAGER", "opp.expert_review")).toBe(true);
       expect(can("SALES", "opp.expert_review")).toBe(false);
     });
 
-    it("AI_MANAGER có quyền cấu hình Agent nhưng không có quyền admin user hay bán hàng", () => {
-      expect(can("AI_MANAGER", "ai.config.write")).toBe(true);
-      expect(can("AI_MANAGER", "ai.config.manage")).toBe(true);
-      expect(can("AI_MANAGER", "admin.users")).toBe(false);
-      expect(can("AI_MANAGER", "lead.write")).toBe(false);
-      expect(can("AI_MANAGER", "quote.approve")).toBe(false);
+    it("ADMIN có quyền cấu hình Agent nhưng không có quyền bán hàng", () => {
+      expect(can("ADMIN", "ai.config.write")).toBe(true);
+      expect(can("ADMIN", "ai.config.manage")).toBe(true);
+            expect(can("ADMIN", "lead.write")).toBe(false);
+      expect(can("ADMIN", "quote.approve")).toBe(false);
     });
 
     it("SALES_MANAGER có quyền duyệt chiết khấu và duyệt tiêu chí AI", () => {

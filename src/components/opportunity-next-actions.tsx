@@ -1,4 +1,5 @@
 import { createElement } from "react";
+import { ROLE_LABEL, type Role } from "@/lib/domain";
 
 type NextAction = { action: string; owner_role?: string; why?: string };
 
@@ -26,7 +27,7 @@ export function OpportunityNextActions({ serialized }: { serialized: string }) {
   return createElement("ol", { className: "list-decimal space-y-2 pl-5" },
     ...actions.map((item, index) => createElement("li", { key: index },
       createElement("div", null, item.action),
-      item.owner_role ? createElement("div", { className: "text-xs text-ink-3" }, "Vai trò đề xuất: ", item.owner_role) : null,
+      item.owner_role ? createElement("div", { className: "text-xs text-ink-3" }, "Vai trò đề xuất: ", ROLE_LABEL[item.owner_role as Role] ?? item.owner_role) : null,
       item.why ? createElement("div", { className: "text-xs text-ink-2" }, "Lý do: ", item.why) : null,
     )),
   );

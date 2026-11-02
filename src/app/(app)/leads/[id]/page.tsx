@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
-import { BANT_KEYS, BANT_LABEL, DISQUALIFY_REASONS, formatDate, LEAD_SOURCE, LEAD_STATUS } from "@/lib/domain";
+import { BANT_KEYS, BANT_LABEL, BANT_SCALE, DISQUALIFY_REASONS, formatDate, LEAD_SOURCE, LEAD_STATUS } from "@/lib/domain";
 import { can } from "@/lib/rbac";
 import { listRuns, listSuggestions } from "@/lib/services/ai-review";
 import { activitiesFor, auditTrail, settingNumber, users } from "@/lib/services/core";
@@ -297,6 +297,7 @@ export default async function LeadPage({ params, searchParams }: PageProps<"/lea
                             <span className="block h-2 rounded-full bg-brand" style={{ width: `${(v / 25) * 100}%` }} />
                           </span>
                           <input name={k} type="number" min={0} max={25} defaultValue={v} className="input !min-h-7 !py-0.5 text-right" aria-label={BANT_LABEL[k]} />
+                          <span className="col-span-3 text-[11px] text-ink-3">{BANT_SCALE[k]}</span>
                         </div>
                       );
                     })}

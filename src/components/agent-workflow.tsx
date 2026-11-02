@@ -1,10 +1,11 @@
 // Hiển thị workflow của Agent theo từng bước, có nhãn "ai làm bước này" (Hệ thống / LLM / Quy tắc / Con người).
+import Link from "next/link";
 import { Icon, type IconName } from "./icons";
 import { cx } from "./ui";
 
 export type FlowOwner = "SYSTEM" | "LLM" | "RULES" | "HUMAN";
 export type FlowState = "done" | "active" | "todo" | "skipped" | "failed";
-export type FlowStep = { key: string; title: string; owner: FlowOwner; detail: string; state?: FlowState; note?: string };
+export type FlowStep = { key: string; title: string; owner: FlowOwner; detail: string; state?: FlowState; note?: string; href?: string; hrefLabel?: string };
 
 export const OWNER: Record<FlowOwner, { label: string; icon: IconName; cls: string }> = {
   SYSTEM: { label: "Hệ thống", icon: "shield", cls: "bg-[#ebf3fc] text-[#0f6cbd]" },
@@ -52,6 +53,7 @@ export function WorkflowSteps({ steps, compact }: { steps: FlowStep[]; compact?:
             <div className="mt-1.5"><OwnerBadge owner={s.owner} /></div>
             {!compact && <p className="mt-1.5 text-xs text-ink-2">{s.detail}</p>}
             {s.note && <p className={cx("mt-1 text-xs", st === "failed" ? "text-[#b10e1c]" : "text-ink-3")}>{s.note}</p>}
+            {s.href && <Link className="link mt-1 inline-block text-xs" href={s.href}>{s.hrefLabel ?? "Xem"}</Link>}
           </li>
         );
       })}

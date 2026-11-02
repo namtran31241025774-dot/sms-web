@@ -9,24 +9,18 @@ export function assert(cond: unknown, message: string): asserts cond {
 export type Role =
   | "SALES"
   | "PRESALES"
-  | "PRESALES_MANAGER"
   | "SALES_MANAGER"
   | "FINANCE"
-  | "LEGAL"
   | "DELIVERY"
-  | "ADMIN"
-  | "AI_MANAGER";
+  | "ADMIN";
 
 export const ROLE_LABEL: Record<Role, string> = {
   SALES: "Nhân viên kinh doanh",
-  PRESALES: "Chuyên viên tư vấn kỹ thuật",
-  PRESALES_MANAGER: "Quản lý tư vấn giải pháp",
+  PRESALES: "Chuyên viên tư vấn giải pháp",
   SALES_MANAGER: "Quản lý kinh doanh",
   FINANCE: "Nhân viên Tài chính – Kế toán",
-  LEGAL: "Nhân viên Pháp chế",
   DELIVERY: "Nhân viên triển khai kỹ thuật",
   ADMIN: "Người quản trị hệ thống",
-  AI_MANAGER: "Người quản lý tác nhân AI",
 };
 
 export const LEAD_STATUS: Record<string, string> = {
@@ -243,6 +237,14 @@ export function emailDomain(email?: string | null): string | null {
 // Mỗi tiêu chí 0–25 điểm, tổng 0–100. Ngưỡng đạt chuẩn cấu hình trong settings (bant_threshold).
 export const BANT_KEYS = ["budget", "authority", "need", "timeline"] as const;
 export type BantKey = (typeof BANT_KEYS)[number];
+
+// Thang chấm BANT đã chốt (DEC-31, BR-01). Chọn mức gần nhất với thông tin đang có.
+export const BANT_SCALE: Record<BantKey, string> = {
+  budget: "0: không có thông tin · 8: có nói đến, chưa rõ số · 15: có khoảng ngân sách · 25: đã được duyệt",
+  authority: "0: chưa rõ người quyết định · 8: mới gặp người dùng cuối · 15: gặp người ảnh hưởng · 25: gặp đúng người quyết định",
+  need: "0: chưa rõ nhu cầu · 8: chung chung · 15: nêu được vấn đề cụ thể · 25: rõ vấn đề và phạm vi",
+  timeline: "0: chưa rõ · 8: năm sau · 15: trong năm nay · 25: trong tháng hoặc cuối quý",
+};
 export const BANT_LABEL: Record<BantKey, string> = {
   budget: "Budget – Ngân sách",
   authority: "Authority – Thẩm quyền",
@@ -268,7 +270,7 @@ export function lineTotal(quantity: number, unitPrice: number, discountPct: numb
 // theo các bước được mô tả: Nhu cầu, Giải pháp đề xuất, Stakeholders, Đối thủ.
 export const DEVELOP_CHECKLIST = [
   { key: "need_confirmed", label: "Customer Need đã khảo sát & xác nhận" },
-  { key: "solution_confirmed", label: "Proposed Solution đã được Presales xác nhận" },
+  { key: "solution_confirmed", label: "Proposed Solution đã được Chuyên viên tư vấn giải pháp xác nhận" },
   { key: "stakeholders_confirmed", label: "Đã xác định stakeholders (có người quyết định)" },
   { key: "competitors_confirmed", label: "Đã xác định đối thủ cạnh tranh" },
 ] as const;

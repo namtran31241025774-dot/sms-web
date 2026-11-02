@@ -12,7 +12,6 @@ export type EmployeeStatus = "ACTIVE" | "ON_LEAVE" | "RESIGNED";
 export type BusinessRole =
   | "SALES"
   | "PRESALES"
-  | "PRESALES_MANAGER"
   | "SALES_MANAGER"
   | "FINANCE"
   | "ADMIN"

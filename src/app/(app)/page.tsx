@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
+import { can } from "@/lib/rbac";
 import { formatDate, formatVnd, LEAD_STATUS, LEVEL, OPP_STAGE, ORDER_STATUS, ROLE_LABEL } from "@/lib/domain";
 import { dashboard } from "@/lib/services/admin";
 import { SubmitButton } from "@/components/client";
@@ -9,6 +11,10 @@ import { completeTaskAction, markReadAction } from "./actions";
 
 export default async function Home({ searchParams }: PageProps<"/">) {
   const user = await requireUser();
+  // Vai trò không làm việc với cơ hội vào thẳng màn hình công việc của mình, không thấy số liệu pipeline.
+  if (user.role === "DELIVERY") redirect("/orders");
+  if (user.role === "FINANCE") redirect("/invoices");
+  if (user.role === "ADMIN") redirect("/admin");
   const sp = (await searchParams) as { ok?: string; error?: string };
   const d = dashboard(user.id);
   const stage = (s: string) => d.pipeline.find((p) => p.stage === s) ?? { n: 0, amount: 0 };
@@ -20,11 +26,11 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   return (
     <>
       <CommandBar>
-        <CommandLink href="/leads/new" icon="add">Lead mới</CommandLink>
+        {can(user.role, "lead.write") && <CommandLink href="/leads/new" icon="add">Lead mới</CommandLink>}
         <CommandLink href="/opportunities" icon="opportunity">Pipeline</CommandLink>
         <CommandSep />
-        <CommandLink href="/ai-review" icon="sparkle">Kiểm duyệt AI</CommandLink>
-        <CommandLink href="/approvals" icon="approval">Phê duyệt</CommandLink>
+        {can(user.role, "ai.review") && <CommandLink href="/ai-review" icon="sparkle">Kiểm duyệt AI</CommandLink>}
+        {can(user.role, "approval.manager") && <CommandLink href="/approvals" icon="approval">Phê duyệt</CommandLink>}
       </CommandBar>
       <Flash sp={sp} />
       <PageTitle title={`Xin chào, ${user.name.split(" ").pop()}`} subtitle={`${ROLE_LABEL[user.role]} · Tổng quan hoạt động Sales`} icon="home" />

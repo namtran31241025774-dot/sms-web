@@ -28,11 +28,9 @@ export function seedWp00(db: DatabaseSync) {
   // Demo accounts cho từng vai trò theo ROLES.md
   insUser("EMP-001", "Nguyễn Văn An", "an.nguyen@sms.local", "SALES", "SDR (Sales Development Rep)");
   insUser("EMP-002", "Trần Thị Bình", "binh.tran@sms.local", "SALES", "Account Executive (AE)");
-  insUser("EMP-003", "Lê Minh Châu", "chau.le@sms.local", "PRESALES", "Chuyên viên tư vấn kỹ thuật (SE)");
-  insUser("EMP-004", "Ngô Tuấn Phúc", "phuc.ngo@sms.local", "PRESALES_MANAGER", "Quản lý tư vấn giải pháp");
+  insUser("EMP-003", "Lê Minh Châu", "chau.le@sms.local", "PRESALES", "Chuyên viên tư vấn giải pháp (SE)");
   insUser("EMP-005", "Phạm Quốc Dũng", "dung.pham@sms.local", "SALES_MANAGER", "Quản lý kinh doanh");
   insUser("EMP-006", "Võ Thu Hà", "ha.vo@sms.local", "FINANCE", "Nhân viên Tài chính – Kế toán");
-  insUser("EMP-007", "Lê Hoàng Tuấn", "tuan.le@sms.local", "AI_MANAGER", "Người quản lý tác nhân AI");
   insUser("EMP-008", "Hoàng Gia Khánh", "khanh.hoang@sms.local", "ADMIN", "Người quản trị hệ thống");
 
   // Nạp toàn bộ thiết lập mặc định (BUSINESS-RULES.md)

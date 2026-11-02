@@ -4,6 +4,7 @@ import { get } from "@/lib/db";
 import { ROLE_LABEL } from "@/lib/domain";
 import { getNavForRole } from "@/lib/nav";
 import { unreadCount } from "@/lib/services/admin";
+import { pendingExpertReviews } from "@/lib/services/approvals";
 import { NavLink } from "@/components/client";
 import { Icon } from "@/components/icons";
 import { Persona } from "@/components/ui";
@@ -13,10 +14,10 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
   const unread = unreadCount(user.id);
   const pendingApprovals =
-    user.role === "SALES_MANAGER" || user.role === "LEGAL"
+    user.role === "SALES_MANAGER"
       ? (get<{ n: number }>(
-          "SELECT COUNT(*) AS n FROM approvals WHERE status='PENDING' AND kind IN (" + (user.role === "LEGAL" ? "'LEGAL_REVIEW'" : "'QUOTE_DISCOUNT','OPP_STAGE_GATE'") + ")",
-        )?.n ?? 0)
+          "SELECT COUNT(*) AS n FROM approvals WHERE status='PENDING' AND kind IN (" + "'QUOTE_DISCOUNT','OPP_STAGE_GATE'" + ")",
+        )?.n ?? 0) + pendingExpertReviews(user).length
       : 0;
   const pendingAi = get<{ n: number }>(
     "SELECT (SELECT COUNT(*) FROM ai_suggestions WHERE status='PENDING_REVIEW') + (SELECT COUNT(*) FROM opportunity_research WHERE status='PENDING_REVIEW') AS n",

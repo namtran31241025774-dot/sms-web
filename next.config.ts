@@ -4,6 +4,10 @@ import type { NextConfig } from "next";
 // nên dùng mô hình render động truyền thống (không bật Cache Components).
 const nextConfig: NextConfig = {
   cacheComponents: false,
+  serverExternalPackages: ["pdf-parse"],
+  experimental: {
+    serverActions: { bodySizeLimit: "6mb" },
+  },
   turbopack: {
     rules: {
       "*.css": {

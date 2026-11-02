@@ -41,7 +41,6 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
   const salesActor: Actor = { type: "USER", id: 1, name: "Sales Test", role: "SALES" };
   const salesMgrActor: Actor = { type: "USER", id: 2, name: "Manager Test", role: "SALES_MANAGER" };
   const presalesActor: Actor = { type: "USER", id: 3, name: "Presales Test", role: "PRESALES" };
-  const presalesMgrActor: Actor = { type: "USER", id: 4, name: "Presales Mgr Test", role: "PRESALES_MANAGER" };
   const aiActor: Actor = { type: "AI", agent: "QUALIFICATION", runId: 1 };
 
   let testLeadId: number;
@@ -390,10 +389,10 @@ describe("WP-03: Đánh giá khách hàng & Phát triển cơ hội (FR-30 → F
       // Nhân viên thường không có quyền duyệt
       expect(() => {
         reviewExpertSolution(salesActor, oppId, "APPROVED");
-      }).toThrow(/Chỉ Quản lý tư vấn giải pháp/);
+      }).toThrow(/Chỉ Quản lý kinh doanh/);
 
-      // PRESALES_MANAGER duyệt
-      reviewExpertSolution(presalesMgrActor, oppId, "APPROVED", "Phương án thiết kế đạt chuẩn kiến trúc");
+      // Quản lý kinh doanh duyệt
+      reviewExpertSolution(salesMgrActor, oppId, "APPROVED", "Phương án thiết kế đạt chuẩn kiến trúc");
       const approvedOpp = getOpportunity(oppId);
       expect(approvedOpp?.expert_review_status).toBe("APPROVED");
       expect(approvedOpp?.solution_confirmed).toBe(0);

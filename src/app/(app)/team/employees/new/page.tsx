@@ -90,11 +90,9 @@ export default async function NewEmployeePage() {
                 <label className="label">Vai trò nghiệp vụ (FR-77)</label>
                 <select name="business_role" className="select" defaultValue="SALES">
                   <option value="SALES">Nhân viên kinh doanh (SDR/AE/CS)</option>
-                  <option value="PRESALES">Chuyên viên tư vấn kỹ thuật (SE)</option>
-                  <option value="PRESALES_MANAGER">Quản lý tư vấn giải pháp</option>
+                  <option value="PRESALES">Chuyên viên tư vấn giải pháp (SE)</option>
                   <option value="SALES_MANAGER">Quản lý kinh doanh</option>
                   <option value="FINANCE">Nhân viên Tài chính – Kế toán</option>
-                  <option value="AI_MANAGER">Người quản lý tác nhân AI</option>
                   <option value="ADMIN">Người quản trị hệ thống</option>
                 </select>
               </div>

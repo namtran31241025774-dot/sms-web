@@ -4,9 +4,11 @@ import { requireUser } from "@/lib/auth";
 import { all } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { formatDate } from "@/lib/domain";
+import { approvalTarget, pendingExpertReviews } from "@/lib/services/approvals";
 import { SubmitButton } from "@/components/client";
 import { CommandBar, CommandLink, Empty, Flash, PageTitle } from "@/components/ui";
 import { approveMergeAction, rejectMergeAction } from "../leads/actions";
+import { decideStageGateAction } from "./actions";
 
 export const metadata: Metadata = { title: "Danh sách phê duyệt" };
 
@@ -45,6 +47,9 @@ export default async function ApprovalsPage({
   );
 
   const canApproveMerge = can(user.role, "lead.merge.approve");
+  const canDecideGate = can(user.role, "opp.manager_review");
+  const expertReviews = statusFilter === "PENDING" && can(user.role, "opp.expert_review") ? pendingExpertReviews(user) : [];
+  const total = approvals.length + expertReviews.length;
 
   return (
     <>
@@ -71,7 +76,7 @@ export default async function ApprovalsPage({
               statusFilter === "PENDING" ? "bg-[var(--brand)] text-white" : "bg-gray-100 text-ink-2"
             }`}
           >
-            Chờ xử lý ({statusFilter === "PENDING" ? approvals.length : "..."})
+            Chờ xử lý ({statusFilter === "PENDING" ? total : "..."})
           </Link>
           <Link
             href="/approvals?status=APPROVED"
@@ -94,11 +99,27 @@ export default async function ApprovalsPage({
         <div className="rounded-lg bg-surface shadow-[var(--shadow-4)]">
           <div className="flex items-center justify-between border-b border-[#f0f0f0] px-4 py-2 text-sm text-ink-3">
             <span>Danh sách yêu cầu phê duyệt</span>
-            <span>{approvals.length} bản ghi</span>
+            <span>{total} bản ghi</span>
           </div>
 
-          {approvals.length ? (
+          {total ? (
             <div className="divide-y divide-[#f0f0f0]">
+              {expertReviews.map((o) => (
+                <div key={`expert-${o.id}`} className="p-4 hover:bg-gray-50/60 transition-colors">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded bg-cyan-100 px-2 py-0.5 text-xs font-semibold text-cyan-800">DUYỆT CHUYÊN MÔN</span>
+                        <span className="text-xs text-ink-3">· {formatDate(o.updated_at, true)}</span>
+                      </div>
+                      <div className="text-sm font-medium text-ink-1">Hồ sơ giải pháp chờ duyệt chuyên môn (FR-42, BR-07)</div>
+                      <Link className="link text-xs font-semibold" href={`/opportunities/${o.id}?tab=solution`}>{o.code} · {o.name}</Link>
+                      <div className="text-xs text-ink-3">Người phụ trách: <span className="font-medium text-ink-2">{o.owner_name || "Chưa có"}</span></div>
+                    </div>
+                    <Link className="btn btn-sm" href={`/opportunities/${o.id}?tab=solution`}>Xem chi tiết và duyệt</Link>
+                  </div>
+                </div>
+              ))}
               {approvals.map((appr) => {
                 let parsedPayload: {
                   sourceLeadId?: number;
@@ -111,6 +132,7 @@ export default async function ApprovalsPage({
                 } catch {
                   // ignore
                 }
+                const target = approvalTarget(appr.kind, appr.entity_id);
 
                 return (
                   <div key={appr.id} className="p-4 hover:bg-gray-50/60 transition-colors">
@@ -157,6 +179,10 @@ export default async function ApprovalsPage({
                           </div>
                         )}
 
+                        {target && (
+                          <Link className="link text-xs font-semibold" href={target.href}>{target.label}</Link>
+                        )}
+
                         <div className="text-xs text-ink-3">
                           Người gửi yêu cầu: <span className="font-medium text-ink-2">{appr.requested_by_name || "Hệ thống"}</span>
                           {appr.decided_by_name && (
@@ -171,9 +197,32 @@ export default async function ApprovalsPage({
                         </div>
                       </div>
 
+                      {target && appr.kind !== "OPP_STAGE_GATE" && (
+                        <Link className="btn btn-sm" href={target.href}>
+                          {appr.status === "PENDING" ? "Xem chi tiết và duyệt" : "Xem chi tiết"}
+                        </Link>
+                      )}
+
                       {/* Nút thao tác khi PENDING */}
                       {appr.status === "PENDING" && (
                         <div className="flex flex-col sm:flex-row items-center gap-2">
+                          {appr.kind === "OPP_STAGE_GATE" && target && <Link className="btn btn-sm" href={target.href}>Xem chi tiết</Link>}
+                          {appr.kind === "OPP_STAGE_GATE" && canDecideGate && (
+                            <>
+                              <form action={decideStageGateAction} className="inline-flex items-center gap-1.5">
+                                <input type="hidden" name="id" value={appr.id} />
+                                <input type="hidden" name="decision" value="APPROVED" />
+                                <input name="comment" placeholder="Ý kiến duyệt..." className="input !h-7 !py-0 text-xs w-36" />
+                                <SubmitButton size="sm" variant="primary">Duyệt</SubmitButton>
+                              </form>
+                              <form action={decideStageGateAction} className="inline-flex items-center gap-1.5">
+                                <input type="hidden" name="id" value={appr.id} />
+                                <input type="hidden" name="decision" value="REJECTED" />
+                                <input name="comment" placeholder="Lý do từ chối..." required className="input !h-7 !py-0 text-xs w-36" />
+                                <SubmitButton size="sm" variant="danger">Từ chối</SubmitButton>
+                              </form>
+                            </>
+                          )}
                           {appr.kind === "MERGE" && canApproveMerge && (
                             <>
                               <form action={approveMergeAction} className="inline-flex items-center gap-1.5">

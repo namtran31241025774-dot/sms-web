@@ -1,3 +1,6 @@
+import { OpportunityDocuments } from "@/components/opportunity-documents";
+import { listOpportunityDocuments, pendingExtraction, pendingSolutionExtraction } from "@/lib/services/documents";
+import { agentMode } from "@/lib/agents/runtime";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -16,6 +19,8 @@ import {
   gateState,
   getOpportunity,
   getScopeDocument,
+  expertReviewInfo,
+  expertReviewMinAmount,
   isExpertReviewRequired,
   listOpportunityItems,
   listSolutions,
@@ -29,6 +34,7 @@ import { quotesOf } from "@/lib/services/quotes";
 import { SubmitButton } from "@/components/client";
 import { RuleEvaluationTable } from "@/components/rule-evaluation-table";
 import { ResearchFlow } from "@/components/research-flow";
+import { stageGateStatus } from "@/lib/services/approvals";
 import { Icon } from "@/components/icons";
 import { AgentRuns, AuditTrail, SALES_STAGES, Timeline } from "@/components/record";
 import { OpportunityNextActions } from "@/components/opportunity-next-actions";
@@ -70,11 +76,14 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
   const open = o.stage !== "WON" && o.stage !== "LOST";
   const canWrite = can(user.role, "opp.write") && open;
   const canSolution = can(user.role, "opp.solution") && open;
+  const pendingSolution = pendingSolutionExtraction(o.id);
   const canReopen = can(user.role, "opp.reopen") && !open;
   const canExpertReview = can(user.role, "opp.expert_review");
 
   const checklist = checklistStatus(o);
   const gate = gateState(o);
+  const gateStatus = stageGateStatus(o);
+  const documents = listOpportunityDocuments(o.id);
   const stakeholders = stakeholdersOf(o.id);
   const competitors = competitorsOf(o.id);
   const risks = risksOf(o.id);
@@ -86,6 +95,8 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
   const solutions = listSolutions(o.id);
   const stageHistory = stageHistoryOf(o.id);
   const expCheck = isExpertReviewRequired(o);
+  const expInfo = expertReviewInfo(o.id);
+  const canSubmitExpert = expCheck.required && (o.expert_review_status === "NONE" || o.expert_review_status === "REJECTED");
   const allProducts = listProducts();
 
   const order = get<{ id: number; code: string; status: string }>(
@@ -152,11 +163,11 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
         {o.stage === "DEVELOP" && expCheck.required && (
           <MessageBar
             intent={o.expert_review_status === "APPROVED" ? "success" : o.expert_review_status === "PENDING" ? "warning" : "error"}
-            title="Cổng duyệt chuyên môn Presales (FR-42, BR-07):"
+            title="Cổng duyệt chuyên môn giải pháp (FR-42, BR-07):"
           >
             {expCheck.reason} — Trạng thái:{" "}
             {o.expert_review_status === "APPROVED"
-              ? "Đã được Quản lý tư vấn giải pháp phê duyệt."
+              ? "Đã được Quản lý kinh doanh phê duyệt."
               : o.expert_review_status === "PENDING"
               ? "Đang chờ Quản lý duyệt."
               : "Bắt buộc duyệt trước khi chuyển sang Đề xuất giải pháp (Propose)."}
@@ -184,9 +195,10 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
           { key: "summary", label: "Tóm tắt" },
           { key: "scope", label: "Phạm vi triển khai", count: scopeDoc ? 1 : 0 },
           { key: "items", label: "Sản phẩm & Giải pháp", count: items.length },
-          { key: "solution", label: "Hồ sơ kỹ thuật Presales", count: solutions.length },
+          { key: "solution", label: "Hồ sơ kỹ thuật", count: solutions.length },
           { key: "stakeholders", label: "Stakeholders & Đối thủ", count: stakeholders.length + competitors.length },
           { key: "risks", label: "Quản lý rủi ro", count: risks.filter((r) => r.status === "OPEN").length },
+          { key: "documents", label: "Tài liệu", count: documents.length },
           { key: "research", label: "Nghiên cứu AI", count: research.length },
           { key: "quotes", label: "Báo giá", count: quotes.length },
           { key: "activities", label: "Hoạt động", count: activities.length },
@@ -231,7 +243,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                         ))}
                       </select>
                     </FormField>
-                    <FormField label="Presales phụ trách">
+                    <FormField label="Chuyên viên tư vấn giải pháp phụ trách">
                       <select name="presales_id" defaultValue={o.presales_id ?? ""} className="select">
                         <option value="">— Chưa phân công —</option>
                         {users("PRESALES").map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -523,14 +535,21 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
         {tab === "solution" && (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
             <div className="space-y-4">
-              <Card title="Hồ sơ giải pháp Presales & Phương án kỹ thuật (FR-41)" pad={false}>
+              {open && pendingSolution && (
+                <MessageBar intent="warning" title="Có hồ sơ kỹ thuật chờ xác nhận:" action={<Link className="link whitespace-nowrap text-sm" href={`${base}?tab=documents`}>Xem hồ sơ chờ</Link>}>
+                  {o.presales_name
+                    ? `Đọc từ ${pendingSolution.document_name}, đang chờ ${o.presales_name} xác nhận.`
+                    : `Đọc từ ${pendingSolution.document_name}. Cơ hội chưa có người xác nhận, hãy chọn Chuyên viên tư vấn giải pháp phụ trách ở tab Tóm tắt.`}
+                </MessageBar>
+              )}
+              <Card title="Hồ sơ giải pháp & Phương án kỹ thuật (FR-41)" pad={false}>
                 {solutions.length ? (
                   <div className="divide-y divide-[#f0f0f0]">
                     {solutions.map((sol) => (
                       <div key={sol.id} className="p-4 space-y-2">
                         <div className="flex items-center justify-between">
                           <h4 className="font-semibold text-brand text-base">{sol.title}</h4>
-                          <span className="text-xs text-ink-3">Tạo lúc: {formatDate(sol.created_at, true)} bởi {sol.creator_name ?? "Presales"}</span>
+                          <span className="text-xs text-ink-3">Tạo lúc: {formatDate(sol.created_at, true)} bởi {sol.creator_name ?? "Tư vấn giải pháp"}</span>
                         </div>
                         {sol.technical_approach && (
                           <div>
@@ -553,7 +572,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                     ))}
                   </div>
                 ) : (
-                  <Empty icon="lightbulb">Chưa có hồ sơ giải pháp kỹ thuật Presales</Empty>
+                  <Empty icon="lightbulb">Chưa có hồ sơ giải pháp kỹ thuật</Empty>
                 )}
               </Card>
 
@@ -568,25 +587,109 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                         labels={{ NONE: "Chưa gửi duyệt", PENDING: "Chờ phê duyệt", APPROVED: "Đã phê duyệt", REJECTED: "Bị từ chối" }}
                       />
                     </div>
-                    {expCheck.required && o.expert_review_status !== "APPROVED" && canSolution && (
+                    {canSubmitExpert && canSolution && solutions.length > 0 && (
                       <form action={submitExpertReviewAction}>
                         <input type="hidden" name="id" value={o.id} />
                         <SubmitButton variant="primary" icon="send">Gửi duyệt chuyên môn</SubmitButton>
                       </form>
                     )}
+                    {canSubmitExpert && canSolution && !solutions.length && (
+                      <span className="text-sm text-ink-3">Cần lập hồ sơ giải pháp trước khi gửi duyệt</span>
+                    )}
                   </div>
                   <p className="text-xs text-ink-3">
-                    Điều kiện áp dụng (BR-07): Có yêu cầu tích hợp với hệ thống khác, hoặc doanh thu ước tính ≥ 500,000,000 VND (hoặc công sức ≥ 30 mandays).
+                    Điều kiện áp dụng (BR-07): Có yêu cầu tích hợp với hệ thống khác, hoặc giá trị cơ hội ≥ {formatVnd(expertReviewMinAmount())}.
                   </p>
+                  {expInfo.reset && o.expert_review_status === "NONE" && (
+                    <p className="text-sm text-ink-2">Hồ sơ đã thay đổi sau lần phê duyệt trước, cần gửi duyệt lại.</p>
+                  )}
+                  {(o.expert_review_status === "APPROVED" || o.expert_review_status === "REJECTED") && expInfo.decision && (
+                    <p className="text-sm text-ink-2">
+                      {o.expert_review_status === "APPROVED" ? "Ý kiến" : "Lý do từ chối"} của {expInfo.decision.actor_label} ({formatDate(expInfo.decision.created_at, true)}): {expInfo.note ?? "Không ghi ý kiến"}
+                    </p>
+                  )}
+                  {o.expert_review_status === "PENDING" && (
+                    <div className="space-y-1 text-sm text-ink-2">
+                      <p>Lý do phải duyệt: {expCheck.reason}</p>
+                      {expInfo.submitted && <p>Người gửi: {expInfo.submitted.actor_label}, lúc {formatDate(expInfo.submitted.created_at, true)}</p>}
+                    </div>
+                  )}
+                  {o.expert_review_status !== "NONE" && (
+                    <div className="divide-y divide-[#f0f0f0] rounded border border-[#f0f0f0] text-sm">
+                      <section className="space-y-1 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <h4 className="font-semibold">Phạm vi triển khai</h4>
+                          <Link className="link text-xs" href={`${base}?tab=scope`}>Xem chi tiết</Link>
+                        </div>
+                        {scopeDoc ? (
+                          <>
+                            <p className="flex flex-wrap items-center gap-2 font-semibold text-ink-1">
+                              {scopeDoc.title}
+                              <StatusBadge status={scopeDoc.status} labels={{ DRAFT: "Bản nháp", SENT: "Đã gửi khách", CONFIRMED: "Khách đã xác nhận" }} />
+                            </p>
+                            {scopeDoc.content && <p className="whitespace-pre-wrap text-ink-2">{scopeDoc.content}</p>}
+                            {scopeDoc.deliverables && <p className="whitespace-pre-wrap text-ink-2">Bàn giao: {scopeDoc.deliverables}</p>}
+                          </>
+                        ) : (
+                          <p className="text-ink-3">Chưa có phạm vi triển khai</p>
+                        )}
+                      </section>
+                      <section className="space-y-1 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <h4 className="font-semibold">Sản phẩm và giải pháp</h4>
+                          <Link className="link text-xs" href={`${base}?tab=items`}>Xem chi tiết</Link>
+                        </div>
+                        {items.length ? (
+                          <ul className="space-y-1 text-ink-2">
+                            {items.map((it) => (
+                              <li key={it.id} className="flex justify-between gap-3">
+                                <span>{it.product_name} × {it.quantity} {it.product_unit}{it.discount_pct ? `, giảm ${it.discount_pct}%` : ""}</span>
+                                <span className="tabular-nums">{formatVnd(it.amount)}</span>
+                              </li>
+                            ))}
+                            <li className="flex justify-between gap-3 font-semibold text-ink-1">
+                              <span>Tổng</span>
+                              <span className="tabular-nums">{formatVnd(items.reduce((sum, it) => sum + it.amount, 0))}</span>
+                            </li>
+                          </ul>
+                        ) : (
+                          <p className="text-ink-3">Chưa có sản phẩm</p>
+                        )}
+                      </section>
+                      <section className="space-y-1 p-3">
+                        <h4 className="font-semibold">Hồ sơ kỹ thuật</h4>
+                        {solutions.length ? (
+                          solutions.map((sol) => (
+                            <div key={sol.id} className="text-ink-2">
+                              <p className="font-semibold text-ink-1">{sol.title}</p>
+                              {sol.technical_approach && <p className="whitespace-pre-wrap">Phương án: {sol.technical_approach}</p>}
+                              {sol.architecture && <p className="whitespace-pre-wrap">Kiến trúc: {sol.architecture}</p>}
+                              <p>Công sức: {sol.estimated_effort_mandays} mandays. Tích hợp hệ thống ngoài: {sol.integration_required ? "Có" : "Không"}.</p>
+                              {sol.risks && <p>Rủi ro kỹ thuật: {sol.risks}</p>}
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-ink-3">Chưa có hồ sơ kỹ thuật</p>
+                        )}
+                      </section>
+                      <p className="flex flex-wrap gap-x-4 p-3">
+                        <Link className="link" href={`${base}?tab=risks`}>Rủi ro đang mở: {risks.filter((r) => r.status === "OPEN").length}</Link>
+                        <Link className="link" href={`${base}?tab=documents`}>Tài liệu gốc: {documents.length}</Link>
+                      </p>
+                    </div>
+                  )}
 
-                  {/* Quyền duyệt của PRESALES_MANAGER */}
-                  {canExpertReview && o.expert_review_status === "PENDING" && (
+                  {/* Quyền duyệt của Quản lý kinh doanh */}
+                  {canExpertReview && open && o.expert_review_status === "PENDING" && (
                     <div className="rounded border border-brand/20 bg-brand/5 p-3 space-y-2">
-                      <span className="font-semibold text-sm text-brand">Dành cho Quản lý tư vấn giải pháp (PRESALES_MANAGER):</span>
+                      <span className="font-semibold text-sm text-brand">Dành cho Quản lý kinh doanh:</span>
+                      {!solutions.length && (
+                        <MessageBar intent="warning" title="Chưa có hồ sơ giải pháp:">Không thể phê duyệt khi chưa có nội dung, chỉ có thể từ chối để yêu cầu lập hồ sơ.</MessageBar>
+                      )}
                       <form action={expertReviewDecisionAction} className="flex gap-2">
                         <input type="hidden" name="id" value={o.id} />
-                        <input name="note" placeholder="Ý kiến phê duyệt hoặc lý do từ chối..." className="input flex-1" />
-                        <button name="decision" value="APPROVED" className="btn btn-primary btn-sm">Phê duyệt</button>
+                        <input name="note" placeholder="Ý kiến phê duyệt, bắt buộc ghi lý do nếu từ chối..." className="input flex-1" />
+                        {solutions.length > 0 && <button name="decision" value="APPROVED" className="btn btn-primary btn-sm">Phê duyệt</button>}
                         <button name="decision" value="REJECTED" className="btn btn-danger btn-sm">Từ chối</button>
                       </form>
                     </div>
@@ -787,7 +890,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                         {r.confidence !== null && <span className="text-xs text-ink-3">· Độ bao phủ dữ liệu {Math.round(r.confidence * 100)}% ({r.confidence_band === "LOW" ? "thấp – cần bổ sung dữ liệu" : r.confidence_band === "MEDIUM" ? "trung bình" : "cao"})</span>}
                         {r.ruleset_hash && <code className="text-[11px] text-ink-3">{r.ruleset_version}#{r.ruleset_hash}</code>}
                       </div>
-                      <ResearchFlow research={r} evals={evals} />
+                      <ResearchFlow research={r} evals={evals} gate={gateStatus} canReview={can(user.role, "opp.manager_review")} />
                       {r.ruleset_version && (
                         <div className="max-w-xl">
                           <ImportanceScale medium={settingNumber("importance_medium_amount")} high={settingNumber("importance_high_amount")} amount={o.amount} />
@@ -840,6 +943,18 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
         )}
 
         {/* TAB 8: QUOTES */}
+        {tab === "documents" && (
+          <OpportunityDocuments
+            opportunityId={o.id}
+            documents={documents}
+            extraction={pendingExtraction(o.id)}
+            pendingSolution={pendingSolution}
+            canSolution={open && can(user.role, "opp.solution")}
+            canWrite={open && can(user.role, "document.write")}
+            agentLive={agentMode() === "llm"}
+          />
+        )}
+
         {tab === "quotes" && (
           <Card title="Báo giá" pad={false} actions={o.stage === "PROPOSE" && can(user.role, "quote.write") && (
             <form action={createQuoteAction}><input type="hidden" name="id" value={o.id} /><SubmitButton size="sm" icon="add">Báo giá mới</SubmitButton></form>

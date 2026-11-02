@@ -6,11 +6,8 @@ const ALL_ROLES: Role[] = [
   "ADMIN",
   "SALES_MANAGER",
   "SALES",
-  "PRESALES_MANAGER",
   "PRESALES",
   "FINANCE",
-  "AI_MANAGER",
-  "LEGAL",
   "DELIVERY",
 ];
 
@@ -46,7 +43,7 @@ const PERMISSION_GROUPS: { groupName: string; permissions: { key: keyof typeof P
     permissions: [
       { key: "opp.read", label: "Xem cơ hội bán hàng (Opportunities)" },
       { key: "opp.write", label: "Cập nhật cơ hội & cấu hình dự kiến" },
-      { key: "opp.solution", label: "Lập hồ sơ giải pháp kỹ thuật Presales" },
+      { key: "opp.solution", label: "Lập hồ sơ giải pháp kỹ thuật" },
       { key: "opp.stage", label: "Đề nghị chuyển giai đoạn phễu" },
       { key: "opp.expert_review", label: "Rà soát chuyên môn giải pháp (FR-42)" },
       { key: "opp.manager_review", label: "Quản lý rà soát cơ hội (HG6)" },
@@ -108,7 +105,7 @@ export function RbacMatrixView() {
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-xs text-amber-900 space-y-1">
         <p className="font-semibold text-amber-950">Nguyên tắc phân quyền & Phạm vi dữ liệu (FR-98):</p>
         <ul className="list-disc list-inside space-y-0.5 text-amber-800">
-          <li><strong>Quyền AI độc lập:</strong> Quyền quản trị AI (<code className="bg-amber-100 px-1 rounded">AI_MANAGER</code>) được cấp riêng biệt, không mặc định có quyền quản trị tài khoản (<code className="bg-amber-100 px-1 rounded">ADMIN</code>) hay quyền duyệt nghiệp vụ bán hàng.</li>
+          <li><strong>Quyền AI:</strong> Người quản trị hệ thống cấu hình và giám sát Agent, nhưng không phê duyệt nghiệp vụ bán hàng và không sửa dữ liệu nguồn. Quản lý kinh doanh duyệt tiêu chí trước khi áp dụng.</li>
           <li><strong>Không tự cấp quyền:</strong> Việc tham gia Sale Pod hay đổi chức danh nghiệp vụ (<code className="bg-amber-100 px-1 rounded">employees</code>) không tự động cấp thêm quyền hệ thống (<code className="bg-amber-100 px-1 rounded">users</code>).</li>
           <li><strong>Kiểm soát ở máy chủ:</strong> Mọi thao tác ghi và đọc dữ liệu đều được xác thực và kiểm tra phạm vi (Data Scope) ở server qua Server Actions và Route Handlers.</li>
         </ul>

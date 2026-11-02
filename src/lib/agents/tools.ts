@@ -700,10 +700,10 @@ export function invokeTool(ctx: ToolContext, name: string, rawInput: unknown, lo
       // Ignored
     }
 
-    // BR-23: Nếu có bất kỳ lần gọi công cụ bị chặn vì quyền (DENIED), tạo cảnh báo cho AI_MANAGER
+    // BR-23: Nếu có bất kỳ lần gọi công cụ bị chặn vì quyền (DENIED), tạo cảnh báo cho ADMIN
     if (outcome === "DENIED") {
       try {
-        notifyRole("AI_MANAGER", `[Cảnh báo AI] Công cụ '${name}' bị chặn vì quyền khi chạy ${ctx.agent} #${ctx.runId}: ${errorMsg}`);
+        notifyRole("ADMIN", `[Cảnh báo AI] Công cụ '${name}' bị chặn vì quyền khi chạy ${ctx.agent} #${ctx.runId}: ${errorMsg}`);
       } catch {
         // Ignored
       }

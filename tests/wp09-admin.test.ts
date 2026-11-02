@@ -234,15 +234,14 @@ describe("WP-09: Quản trị hệ thống & Phân quyền (FR-96 → FR-100)", 
   });
 
   describe("FR-98: Phân quyền theo vai trò và nhóm bán hàng", () => {
-    it("FR-98: Ma trận RBAC phân định rõ quyền của 9 vai trò hệ thống", () => {
-      // ADMIN có quyền quản lý tài khoản, AI_MANAGER không có
+    it("FR-98: Ma trận RBAC phân định rõ quyền của 6 vai trò hệ thống", () => {
+      // ADMIN có quyền quản lý tài khoản
       expect(can("ADMIN", "admin.users")).toBe(true);
-      expect(can("AI_MANAGER", "admin.users")).toBe(false);
       expect(can("SALES_MANAGER", "admin.users")).toBe(false);
 
-      // AI_MANAGER có quyền cấu hình Agent, ADMIN và SALES_MANAGER không tự ý ghi đè
-      expect(can("AI_MANAGER", "ai.config.write")).toBe(true);
-      expect(can("ADMIN", "ai.config.write")).toBe(false);
+      // ADMIN cấu hình Agent, SALES_MANAGER không tự ý ghi đè
+      expect(can("ADMIN", "ai.config.write")).toBe(true);
+      expect(can("SALES_MANAGER", "ai.config.write")).toBe(false);
       expect(can("SALES", "ai.config.write")).toBe(false);
 
       // SALES_MANAGER có quyền duyệt hợp nhất Lead và duyệt chiết khấu, SALES chỉ có quyền đề nghị/trình
@@ -256,6 +255,14 @@ describe("WP-09: Quản trị hệ thống & Phân quyền (FR-96 → FR-100)", 
       // FINANCE chỉ quản lý hoá đơn, không có quyền duyệt báo giá
       expect(can("FINANCE", "invoice.finance")).toBe(true);
       expect(can("FINANCE", "quote.approve")).toBe(false);
+    });
+
+    it("FR-98: Hồ sơ chưa gắn team_id theo nhóm của người phụ trách", () => {
+      const record = { owner_id: 1, team_id: null, owner_team_ids: [1] };
+      expect(canSee({ id: 4, role: "SALES_MANAGER", teamIds: [1] }, record)).toBe(true);
+      expect(canSee({ id: 2, role: "SALES", teamIds: [1] }, record)).toBe(true);
+      expect(canSee({ id: 9, role: "SALES_MANAGER", teamIds: [2] }, record)).toBe(false);
+      expect(canSee({ id: 9, role: "SALES", teamIds: [2] }, record)).toBe(false);
     });
 
     it("FR-98: Kiểm soát phạm vi dữ liệu theo nhóm (Data Scope: canSee & scopeFilterSql)", () => {

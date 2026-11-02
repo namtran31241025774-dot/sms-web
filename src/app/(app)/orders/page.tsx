@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth";
+import { can } from "@/lib/rbac";
 import { CommandBar, CommandLink, PageTitle, StatusBadge } from "@/components/ui";
 import { ORDER_STATUS } from "@/lib/domain";
 import { listOrders } from "@/lib/services/orders";
@@ -28,15 +29,15 @@ export default async function OrdersPage(props: {
   return (
     <div className="flex flex-1 flex-col overflow-auto bg-surface">
       <CommandBar>
-        <CommandLink href="/orders/new" icon="add">
+        {can(user.role, "order.create") && <CommandLink href="/orders/new" icon="add">
           Tạo đơn hàng trực tiếp
-        </CommandLink>
-        <CommandLink href="/quotes" icon="quote">
+        </CommandLink>}
+        {can(user.role, "quote.read") && <CommandLink href="/quotes" icon="quote">
           Báo giá được chấp thuận
-        </CommandLink>
-        <CommandLink href="/invoices" icon="invoice">
+        </CommandLink>}
+        {can(user.role, "invoice.read") && <CommandLink href="/invoices" icon="invoice">
           Theo dõi hóa đơn
-        </CommandLink>
+        </CommandLink>}
       </CommandBar>
 
       <PageTitle
