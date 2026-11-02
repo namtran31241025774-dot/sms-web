@@ -7,12 +7,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
-import { get } from "@/lib/db";
+import { all, get } from "@/lib/db";
+import { discoverySurvey } from "@/lib/services/discovery";
+import { opportunityFlow, proposeFlow } from "@/lib/services/sales-flow";
 import { formatDate, formatVnd, LEVEL, LOST_REASONS_BR27, OPP_STAGE, QUOTE_STATUS, RISK_STATUS, STAKEHOLDER_ROLE } from "@/lib/domain";
 import { can } from "@/lib/rbac";
 import { listRuns } from "@/lib/services/ai-review";
 import { approvalsFor } from "@/lib/services/approvals";
-import { activitiesFor, auditTrail, settingNumber, users } from "@/lib/services/core";
+import { activitiesFor, auditTrail, users } from "@/lib/services/core";
 import { contactsOf, listCompetitors, listPriceLists, listProducts } from "@/lib/services/master";
 import {
   checklistStatus,
@@ -43,7 +45,9 @@ import {
   advanceAction,
   checklistAction,
   competitorAction,
+  createDiscoveryAppointmentAction,
   createQuoteAction,
+  saveDiscoverySurveyAction,
   expertReviewDecisionAction,
   lostAction,
   oppItemAction,
@@ -57,6 +61,20 @@ import {
   updateOppAction,
   verifyResearchAction,
 } from "../actions";
+
+const SURVEY_LABELS = [
+  ["business_goals", "Mục tiêu kinh doanh"],
+  ["current_process", "Quy trình vận hành hiện tại"],
+  ["pain_points", "Khó khăn đang gặp"],
+  ["software_needs", "Nhu cầu sử dụng phần mềm"],
+  ["expected_outcomes", "Kết quả kỳ vọng khi triển khai"],
+] as const;
+const TECHNICAL_LABELS = [
+  ["technical_integration", "Tích hợp với hệ thống hiện có"],
+  ["technical_infrastructure", "Hạ tầng triển khai (Cloud hoặc On-premise)"],
+  ["technical_security", "Bảo mật dữ liệu"],
+  ["technical_access", "Phân quyền người dùng"],
+] as const;
 
 export async function generateMetadata({ params }: PageProps<"/opportunities/[id]">): Promise<Metadata> {
   return { title: getOpportunity(Number((await params).id), await requirePermission('opp.read'))?.name ?? "Opportunity" };
@@ -94,6 +112,15 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
   const expInfo = expertReviewInfo(o.id);
   const canSubmitExpert = expCheck.required && (o.expert_review_status === "NONE" || o.expert_review_status === "REJECTED");
   const allProducts = listProducts();
+  const flow = o.stage === "DEVELOP" ? opportunityFlow(o) : o.stage === "PROPOSE" ? proposeFlow(o) : null;
+  const survey = discoverySurvey(o.id);
+  const accountContacts = contactsOf(o.account_id);
+  const appointments = all<{ id: number; due_at: string | null; meeting_method: string | null; presales_name: string | null }>(
+    `SELECT t.id, t.due_at, t.meeting_method,
+       (SELECT u.name FROM work_participants p JOIN users u ON u.id = p.user_id WHERE p.task_id = t.id AND p.role = 'PRESALES' LIMIT 1) AS presales_name
+     FROM tasks t WHERE t.entity_type = 'opportunity' AND t.entity_id = ? AND t.type = 'APPOINTMENT' ORDER BY t.due_at DESC`,
+    o.id,
+  );
 
   const order = get<{ id: number; code: string; status: string }>(
     "SELECT id, code, status FROM orders WHERE opportunity_id = ? ORDER BY id DESC LIMIT 1",
@@ -145,31 +172,18 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
       <ProcessFlow stages={SALES_STAGES} current={bpfStage} lost={o.stage === "LOST"} />
 
       {/* Luồng xử lý quy trình cho Develop và Propose (thay thế các thanh cảnh báo rời rạc) */}
-      <OpportunityProcessFlow
-        stage={o.stage}
-        oppId={o.id}
-        hasInitialResearch={research.length > 0}
-        hasPostSurveyResearch={research.length > 1}
-        hasPresales={!!o.presales_id}
-        hasCustomerNeed={!!o.customer_need}
-        scopeConfirmed={scopeDoc?.status === "CONFIRMED"}
-        solutionConfirmed={Boolean((o as { solution_confirmed?: number | boolean }).solution_confirmed)}
-        hasSolutions={solutions.length > 0}
-        hasItems={items.length > 0}
-        expertReviewRequired={expCheck.required}
-        expertReviewStatus={o.expert_review_status}
-        expertReviewReason={expCheck.reason ?? undefined}
-        hasStakeholders={stakeholders.length > 0}
-        hasCompetitors={competitors.length > 0}
-        gateStatus={gateStatus}
-        canReviewGate={can(user.role, "opp.manager_review")}
-        canExpertReview={canExpertReview}
-        hasQuotes={quotes.length > 0}
-        quotesRequireDiscountApproval={quotes.some((q) => q.max_discount_pct > settingNumber("discount_threshold_pct"))}
-        hasSentQuote={quotes.some((q) => q.status === "SENT" || q.status === "ACCEPTED")}
-        hasCustomerResponse={quotes.some((q) => q.status === "ACCEPTED" || q.status === "REJECTED")}
-        isQuoteAccepted={quotes.some((q) => q.status === "ACCEPTED")}
-      />
+      {flow && (
+        <OpportunityProcessFlow
+          flow={flow}
+          gateStatus={gateStatus}
+          canReviewGate={can(user.role, "opp.manager_review")}
+          expertReviewRequired={expCheck.required}
+          expertReviewStatus={o.expert_review_status}
+          expertReviewReason={expCheck.reason ?? undefined}
+          canExpertReview={canExpertReview}
+          solutionHref={`${base}?tab=solution`}
+        />
+      )}
 
       <div className="space-y-2 px-6">
         {o.stage === "LOST" && (
@@ -258,6 +272,95 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                   {canWrite && <div className="md:col-span-2"><SubmitButton icon="save">Lưu thông tin</SubmitButton></div>}
                 </form>
               </Card>
+
+              {/* Bước 2–3 của luồng Develop: hẹn khảo sát, phân công tư vấn, ghi kết quả khảo sát */}
+              <div id="discovery" className="scroll-mt-4">
+                <Card title="Khảo sát nhu cầu và lịch hẹn">
+                  <div className="space-y-5 text-sm">
+                    <section className="space-y-2">
+                      <h4 className="font-semibold">Lịch hẹn khảo sát</h4>
+                      {appointments.length ? (
+                        <ul className="divide-y divide-[#f0f0f0] rounded border border-[#f0f0f0]">
+                          {appointments.map((a) => (
+                            <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                              <span>{a.due_at ? formatDate(a.due_at, true) : "Chưa có giờ"} · {a.meeting_method ?? "Chưa rõ hình thức"}</span>
+                              <span className="text-xs text-ink-3">Tư vấn: {a.presales_name ?? "Chưa phân công"}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-ink-3">Chưa có lịch hẹn khảo sát với khách hàng.</p>
+                      )}
+                      {canWrite && o.stage === "DEVELOP" && (
+                        <form action={createDiscoveryAppointmentAction} className="grid grid-cols-1 gap-3 rounded border border-[#f0f0f0] bg-[#fafafa] p-3 md:grid-cols-2">
+                          <input type="hidden" name="id" value={o.id} />
+                          <FormField label="Thời gian" required>
+                            <input name="starts_at" type="datetime-local" required className="input" />
+                          </FormField>
+                          <FormField label="Hình thức" required>
+                            <select name="meeting_method" required className="select" defaultValue="">
+                              <option value="" disabled>Chọn hình thức…</option>
+                              <option>Họp trực tiếp</option>
+                              <option>Họp trực tuyến</option>
+                              <option>Điện thoại</option>
+                            </select>
+                          </FormField>
+                          <FormField label="Chuyên viên tư vấn giải pháp tham gia" required>
+                            <select name="presales_id" required className="select" defaultValue={o.presales_id ?? ""}>
+                              <option value="" disabled>Chọn người…</option>
+                              {users("PRESALES").map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                            </select>
+                          </FormField>
+                          <FormField label="Người tham dự phía khách hàng" required>
+                            <div className="space-y-1">
+                              {accountContacts.map((c) => (
+                                <label key={c.id} className="flex items-center gap-2">
+                                  <input type="checkbox" name="contact_id" value={c.id} defaultChecked={c.id === o.primary_contact_id} />
+                                  {c.full_name}{c.title ? ` – ${c.title}` : ""}
+                                </label>
+                              ))}
+                              {!accountContacts.length && <span className="text-ink-3">Doanh nghiệp chưa có người liên hệ</span>}
+                            </div>
+                          </FormField>
+                          <FormField label="Ghi chú" className="md:col-span-2">
+                            <input name="note" className="input" placeholder="Nội dung cần làm rõ theo bản nghiên cứu của Agent…" />
+                          </FormField>
+                          <div className="md:col-span-2"><SubmitButton icon="calendar">Hẹn khảo sát và phân công</SubmitButton></div>
+                        </form>
+                      )}
+                    </section>
+
+                    <form action={saveDiscoverySurveyAction} className="space-y-3">
+                      <input type="hidden" name="id" value={o.id} />
+                      <h4 className="font-semibold">Kết quả khảo sát nhu cầu</h4>
+                      <fieldset disabled={!canWrite || o.stage !== "DEVELOP"} className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        {SURVEY_LABELS.map(([key, label]) => (
+                          <FormField key={key} label={label}>
+                            <textarea name={key} defaultValue={survey?.[key] ?? ""} className="textarea !min-h-16" />
+                          </FormField>
+                        ))}
+                      </fieldset>
+                      {canWrite && o.stage === "DEVELOP" && <SubmitButton icon="save">Lưu khảo sát nhu cầu</SubmitButton>}
+                    </form>
+
+                    <form action={saveDiscoverySurveyAction} className="space-y-3">
+                      <input type="hidden" name="id" value={o.id} />
+                      <input type="hidden" name="section" value="technical" />
+                      <h4 className="font-semibold">Yêu cầu kỹ thuật</h4>
+                      <p className="text-xs text-ink-3">Chuyên viên tư vấn giải pháp ghi nhận.</p>
+                      <fieldset disabled={!canSolution || o.stage !== "DEVELOP"} className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        {TECHNICAL_LABELS.map(([key, label]) => (
+                          <FormField key={key} label={label}>
+                            <textarea name={key} defaultValue={survey?.[key] ?? ""} className="textarea !min-h-16" />
+                          </FormField>
+                        ))}
+                      </fieldset>
+                      {canSolution && o.stage === "DEVELOP" && <SubmitButton icon="save">Lưu yêu cầu kỹ thuật</SubmitButton>}
+                    </form>
+                    <p className="text-xs text-ink-3">Sửa kết quả khảo sát sẽ đưa biên bản phạm vi về bản nháp và bỏ xác nhận giải pháp, kết quả duyệt chuyên môn cũ để rà lại.</p>
+                  </div>
+                </Card>
+              </div>
 
               {/* Mở lại cơ hội */}
               {!open && canReopen && (
@@ -354,7 +457,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                     {approvalsFor("opportunity", o.id).map((a) => (
                       <li key={a.id} className="border-b border-[#f0f0f0] px-4 py-2 text-sm last:border-0">
                         <div className="flex items-center justify-between gap-2">
-                          <span>{a.kind === "OPP_STAGE_GATE" ? "Manager gate" : a.kind}</span>
+                          <span>{a.kind === "OPP_STAGE_GATE" ? "Quản lý kinh doanh rà soát" : a.kind === "QUOTE_DISCOUNT" ? "Duyệt chiết khấu" : a.kind}</span>
                           <StatusBadge status={a.status} labels={{ PENDING: "Chờ duyệt", APPROVED: "Đã duyệt", REJECTED: "Từ chối" }} />
                         </div>
                         <div className="text-xs text-ink-3">{a.reason}{a.decision_comment && ` · ${a.decided_by_name}: ${a.decision_comment}`}</div>

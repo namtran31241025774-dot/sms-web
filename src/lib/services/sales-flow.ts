@@ -34,14 +34,14 @@ export function opportunityFlow(o:Opportunity,user?:UserScope):ProcessFlow {
   const surveyed=['business_goals','current_process','pain_points','software_needs','expected_outcomes'].every(k=>!!row[k]);
   return flow('DEVELOP',[
     {id:'initial_research',title:'Agent lần 1 nghiên cứu bối cảnh',actor:'Agent',done:!!initial,href:href('research'),reason:initial ? null : 'Chưa có bản nghiên cứu ban đầu'},
-    {id:'discovery_appointment',title:'Xem nghiên cứu, hẹn lịch và phân công tư vấn',actor:'Nhân viên kinh doanh',done:initial?.status==='VERIFIED' && !!appointment && !!o.presales_id,href:href('activities'),reason:null},
-    {id:'survey',title:'Khảo sát nhu cầu và yêu cầu kỹ thuật',actor:'Nhân viên kinh doanh và Chuyên viên tư vấn giải pháp',done:surveyed,href:href('summary'),reason:surveyed ? null : 'Cần ghi đủ năm nội dung khảo sát'},
+    {id:'discovery_appointment',title:'Xem nghiên cứu, hẹn lịch và phân công tư vấn',actor:'Nhân viên kinh doanh',done:initial?.status==='VERIFIED' && !!appointment && !!o.presales_id,href:href('summary')+'#discovery',reason:null},
+    {id:'survey',title:'Khảo sát nhu cầu và yêu cầu kỹ thuật',actor:'Nhân viên kinh doanh và Chuyên viên tư vấn giải pháp',done:surveyed,href:href('summary')+'#discovery',reason:surveyed ? null : 'Cần ghi đủ năm nội dung khảo sát'},
     {id:'post_survey_research',title:'Agent lần 2 phân tích sau khảo sát',actor:'Agent',done:!!after,href:href('research'),reason:null},
     {id:'scope',title:'Xác nhận phạm vi với khách hàng',actor:'Nhân viên kinh doanh',done:getScopeDocument(o.id)?.status==='CONFIRMED',href:href('scope'),reason:null},
-    {id:'solution',title:'Hoàn thiện giải pháp, cấu hình và rà soát chuyên môn',actor:'Chuyên viên tư vấn giải pháp',done:!!o.solution_confirmed && listSolutions(o.id).length>0 && listOpportunityItems(o.id).length>0 && (!expert.required || o.expert_review_status==='APPROVED'),href:href('solutions'),reason:expert.required ? expert.reason ?? null : null},
+    {id:'solution',title:'Hoàn thiện giải pháp, cấu hình và rà soát chuyên môn',actor:'Chuyên viên tư vấn giải pháp',done:!!o.solution_confirmed && listSolutions(o.id).length>0 && listOpportunityItems(o.id).length>0 && (!expert.required || o.expert_review_status==='APPROVED'),href:href('solution'),reason:expert.required ? expert.reason ?? null : null},
     {id:'stakeholders',title:'Xác nhận bên liên quan',actor:'Nhân viên kinh doanh',done:!!o.stakeholders_confirmed,href:href('stakeholders'),reason:null},
     {id:'competitors',title:'Xác nhận đối thủ cạnh tranh',actor:'Nhân viên kinh doanh',done:!!o.competitors_confirmed,href:href('stakeholders'),reason:null},
-    {id:'advance',title:'Kiểm tra và chuyển sang Đề xuất giải pháp',actor:gate.required ? 'Nhân viên kinh doanh và Quản lý kinh doanh' : 'Nhân viên kinh doanh',done:o.stage!=='DEVELOP',href:href('stage'),reason:gate.required ? gate.reasons.join('; ') : null},
+    {id:'advance',title:'Kiểm tra và chuyển sang Đề xuất giải pháp',actor:gate.required ? 'Nhân viên kinh doanh và Quản lý kinh doanh' : 'Nhân viên kinh doanh',done:o.stage!=='DEVELOP',href:href('summary'),reason:gate.required ? gate.reasons.join('; ') : null},
   ]);
 }
 
