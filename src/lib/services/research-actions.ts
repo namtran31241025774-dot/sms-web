@@ -17,14 +17,14 @@ export function actOnRuleEvaluation(actor:Actor,evaluationId:number,input:RuleAc
   assertActorAccess(actor,'opportunity',e.opportunity_id);
   assert(get<{stage:string}>('SELECT stage FROM opportunities WHERE id=?',e.opportunity_id)?.stage==='DEVELOP','Chỉ xử lý quy tắc khi cơ hội đang Phát triển');
   assert(get<{status:string}>('SELECT status FROM opportunity_research WHERE id=?',e.research_id)?.status!=='DISMISSED','Bản nghiên cứu đã bị thay thế hoặc bỏ qua');
-  assert(!e.human_action,'Dòng quy tắc đã được xử lý');
+  assert(!e.human_action || (e.human_action==='FLAGGED' && ['RISK','TASK'].includes(input.action)),'Dòng quy tắc đã được xử lý');
   assert(input.note?.trim(),'Cần ghi chú hoặc lý do xử lý');
   assert((e.status==='WARNING' && input.action==='ACKNOWLEDGED') || (e.status==='HIT' && ['FLAGGED','RISK','TASK'].includes(input.action)),'Thao tác không phù hợp trạng thái quy tắc');
   const assigned=input.assigneeId ?? actor.id;
   if(input.action==='RISK' || input.action==='TASK') {
     assert(get("SELECT id FROM users WHERE id=? AND active=1 AND status='ACTIVE'",assigned),'Người phụ trách không còn hoạt động');
     const u=get<UserScope>('SELECT id,role FROM users WHERE id=?',assigned);
-    assert(u && recordVisible(u,'opportunity',e.opportunity_id),'Người phụ trách phải được truy cập cơ hội');
+    assert(u && can(u.role,'opp.read') && recordVisible(u,'opportunity',e.opportunity_id),'Người phụ trách phải được truy cập cơ hội');
   }
   return tx(()=>{
     let riskId:number|null=null,taskId:number|null=null;

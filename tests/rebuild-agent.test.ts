@@ -69,6 +69,9 @@ describe('Rebuild Agent phases and human review',()=>{
     expect(()=>actOnRuleEvaluation(actor,hit.id,{action:'FLAGGED',note:''})).toThrow();
     actOnRuleEvaluation(actor,hit.id,{action:'FLAGGED',note:'Chưa gặp người quyết định, trình quản lý'});
     expect(managerGate(getOpportunity(id)!).required).toBe(true);
+    const handled=actOnRuleEvaluation(actor,hit.id,{action:'RISK',note:'Chuyển thành rủi ro để xử lý',assigneeId:1});
+    expect(get<{responsible_user_id:number}>('SELECT responsible_user_id FROM opportunity_risks WHERE id=?',handled.riskId)?.responsible_user_id).toBe(1);
+    expect(get<{human_action:string}>('SELECT human_action FROM ai_rule_evaluations WHERE id=?',hit.id)?.human_action).toBe('RISK');
   });
   it('FR-43 BUG-050: refreshed research cannot duplicate an existing or handled risk',async()=>{
     const id=opportunity();const first=await research(id);
