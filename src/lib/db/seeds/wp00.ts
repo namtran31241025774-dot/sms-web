@@ -18,10 +18,8 @@ export function seedWp00(db: DatabaseSync) {
       INSERT INTO users (employee_id, name, email, password_hash, role, title, status, active)
       VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', 1)
       ON CONFLICT(email) DO UPDATE SET
-        employee_id = excluded.employee_id,
-        password_hash = excluded.password_hash,
-        role = excluded.role,
-        title = excluded.title;
+        employee_id = COALESCE(users.employee_id, excluded.employee_id),
+        password_hash = CASE WHEN users.password_hash IS NULL OR users.password_hash='' THEN excluded.password_hash ELSE users.password_hash END;
     `).run(employeeId, name, email, defaultPasswordHash, role, title);
   };
 
@@ -38,9 +36,7 @@ export function seedWp00(db: DatabaseSync) {
     db.prepare(`
       INSERT INTO settings (key, value, description)
       VALUES (?, ?, ?)
-      ON CONFLICT(key) DO UPDATE SET
-        value = excluded.value,
-        description = excluded.description;
+      ON CONFLICT(key) DO NOTHING;
     `).run(key, item.value, item.description);
   }
 }
