@@ -852,6 +852,9 @@ export function recordCustomerResponse(
   const v = getQuoteVersion(versionId);
   assert(v, "Không tìm thấy phiên bản báo giá");
   assert(v.status === "SENT", "Chỉ ghi nhận phản hồi cho báo giá đã gửi khách hàng");
+  const parent=getQuote(v.quote_id)!;
+  assert(!['SUPERSEDED','REJECTED','EXPIRED'].includes(parent.status),'Báo giá đã bị thu hồi hoặc thay thế');
+  assert(['PROPOSE','CLOSE'].includes(getOpportunity(parent.opportunity_id)?.stage ?? ''),'Cơ hội đã đóng, không ghi nhận phản hồi báo giá mới');
   assert(getLatestQuoteVersion(v.quote_id)?.id===v.id,'Phiên bản báo giá đã bị thay thế');
   if(contactId) assert(get('SELECT c.id FROM contacts c JOIN opportunities o ON o.account_id=c.account_id JOIN quotes q ON q.opportunity_id=o.id WHERE q.id=? AND c.id=?',v.quote_id,contactId),'Người phản hồi không thuộc doanh nghiệp của báo giá');
 

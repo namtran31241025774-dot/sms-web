@@ -173,7 +173,7 @@ Thư mục làm việc: `D:\Năm 3\System Architecture\sms-chuc-nang`, worktree 
 | F3 | Năm trường khảo sát và bốn trường kỹ thuật; giữ customer_need; thay đổi làm mất xác nhận cũ | services/discovery.ts | rebuild-discovery.test.ts: FR-37 FR-41 F3 |
 | F8 | Tải Word/PDF theo loại, gắn đúng hồ sơ kỹ thuật, chặn gắn nhầm cơ hội | services/documents.ts | rebuild-discovery.test.ts: FR-41 F8 |
 | F9 | Develop không áp chiết khấu mới; tạo báo giá từ cấu hình, định giá lại theo bảng giá; hồ sơ nội bộ tách proposal gửi khách | services/opportunities.ts, quotes.ts, proposals.ts | rebuild-bugs.test.ts; rebuild-actions.test.ts |
-| P1 | Sáu bước Propose suy từ phiên bản báo giá, proposal và phản hồi | services/sales-flow.ts | rebuild-agent.test.ts; rebuild-journey.test.ts |
+| P1 | Sáu bước Propose suy từ phiên bản báo giá, proposal và phản hồi; bản mới cần proposal đúng phiên bản | services/sales-flow.ts | rebuild-feedback-privacy.test.ts: FR-50 P1; rebuild-journey.test.ts |
 | P2 | Ghi người/thời điểm/nội dung theo đúng phiên bản; chặn chấp thuận hết hạn/thay thế | services/quotes.ts | rebuild-feedback-privacy.test.ts: FR-54 P2 |
 | Q1 | BANT 0/8/15/25; tổng đạt ngưỡng và Authority=25; lý do/căn cứ từng tiêu chí; Agent không ghi điểm chính thức | bant-policy.ts, qualification.ts, agents/tools.ts | rebuild-qualification.test.ts: FR-32 Q1 |
 | Q2, Q3 | Trace công cụ và kết quả rule; email nháp tại Lead; HG1 mới gửi | services/ai-review.ts | rebuild-qualification.test.ts: FR-19 FR-32 Q2 Q3 |
@@ -187,7 +187,7 @@ Thư mục làm việc: `D:\Năm 3\System Architecture\sms-chuc-nang`, worktree 
 | BUG-039, chất lượng AI thật | Chưa nghiệm thu volume Render hoặc AI thật; ngoài kiểm tra mock/local được cho phép | Không deploy, không gọi OpenAI thật | Không coi unit test là bằng chứng chất lượng AI thật |
 
 Kết quả kiểm tra:
-- `npm install` đã chạy; `npm test` và `npm run check` xanh: **267 test / 30 tệp test**; typecheck và lint xanh.
+- `npm install` đã chạy; `npm test` và `npm run check` xanh: **268 test / 30 tệp test**; typecheck và lint xanh.
 - DB mới `data/codex.db`: có OPP-2026-0004, Develop, ngân sách 700 triệu; `integrity_check=ok`, không lỗi FK.
 - Bản sao DB cũ `data/migration-legacy.db` lấy snapshot SQLite từ showcase.db: chạy đủ ba migration mới; 4 cơ hội trước/sau, giữ bant_threshold, số lỗi FK trước/sau đều 0, `integrity_check=ok`. Không sửa DB nguồn.
 - Ca xuyên suốt trong test dùng service của người dùng để xác nhận nghiên cứu, hẹn khảo sát, ghi khảo sát, chốt phạm vi/giải pháp, duyệt chuyên môn và BR-06, lập/gửi/chấp thuận báo giá, tạo đơn, lập/phát hành/thu hóa đơn và chấp nhận bàn giao. Không biến thao tác người dùng thành quyền tự quyết của Agent.
