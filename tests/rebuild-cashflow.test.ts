@@ -16,5 +16,7 @@ it('FR-65 FR-99 C3: cashflow is fail-closed until roles configured and does not 
   const f=cashflowForecast({id:5,role:'FINANCE'}),entries=[...f.months.flatMap(x=>x.entries),...f.undated].filter(x=>x.orderId===o);
   expect(entries.reduce((s,e)=>s+e.amount,0)).toBe(800);expect(entries.filter(e=>e.kind==='INVOICE')[0].amount).toBe(400);
   expect(entries.filter(e=>e.kind==='BILLING_SCHEDULE')[0].amount).toBe(400);expect(entries.filter(e=>e.kind==='UNBILLED_ORDER')).toHaveLength(0);
+  const usd=run("INSERT INTO orders(code,opportunity_id,account_id,total,grand_total,currency,created_by,price_locked_at) VALUES (?, ?, ?,999,999,'USD',1,datetime('now'))",`CASH-USD-${a}`,opp,a).id;
+  const multi=cashflowForecast({id:5,role:'FINANCE'});expect(multi.excludedCurrencies).toContain('USD');expect([...multi.months.flatMap(m=>m.entries),...multi.undated].some(e=>e.orderId===usd)).toBe(false);
  }finally{if(before===undefined) delete process.env.SMS_CASHFLOW_ROLES;else process.env.SMS_CASHFLOW_ROLES=before;}
 });
