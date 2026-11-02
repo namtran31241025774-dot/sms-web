@@ -1,4 +1,5 @@
 import type { LlmMessage, LlmProvider, LlmResponse, LlmToolDefinition } from "./types";
+import {privateMessages} from './privacy';
 
 export class OpenAiProvider implements LlmProvider {
   readonly name = "openai";
@@ -28,7 +29,7 @@ export class OpenAiProvider implements LlmProvider {
     if (!model) throw new Error("Chưa chọn model được phép");
     const body: Record<string, unknown> = {
       model,
-      messages: messages.map((m) => ({
+      messages: privateMessages(messages).map((m) => ({
         role: m.role,
         content: m.content,
         ...(m.name ? { name: m.name } : {}),
