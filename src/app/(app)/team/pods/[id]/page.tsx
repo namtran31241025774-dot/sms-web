@@ -121,7 +121,7 @@ export default async function PodDetailPage({
 
           {/* Lịch sử thành viên đã từng tham gia */}
           {members.some((m) => m.is_active === 0) && (
-            <Card title="Lịch sử thành viên đã rời nhóm (FR-80)">
+            <Card title="Lịch sử thành viên đã rời nhóm">
               <div className="divide-y divide-stroke text-xs">
                 {members
                   .filter((m) => m.is_active === 0)
@@ -143,7 +143,7 @@ export default async function PodDetailPage({
         {/* Cột 2: Thêm thành viên & Chỉnh sửa thông tin Pod */}
         <div className="space-y-6">
           {canWrite && (
-            <Card title="Thêm thành viên vào Pod (FR-80)">
+            <Card title="Thêm thành viên vào Pod">
               <form action={addTeamMemberAction} className="space-y-3 text-xs">
                 <input type="hidden" name="team_id" value={team.id} />
 
@@ -171,7 +171,7 @@ export default async function PodDetailPage({
             </Card>
           )}
 
-          <Card title="Cập nhật thông tin & Phạm vi (FR-79, FR-81)">
+          <Card title="Cập nhật thông tin và Phạm vi">
             <form action={updateTeamAction} className="space-y-3 text-xs">
               <input type="hidden" name="id" value={team.id} />
 

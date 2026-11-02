@@ -10,15 +10,15 @@ type Eval = { status: string };
 
 // Bước QLKD rà soát theo trạng thái thật của cổng; bản đã bỏ qua thì giữ ảnh chụp lúc chạy.
 function managerStep(gate: StageGateStatus | undefined, snapshotNeeded: boolean, verified: boolean, dismissed: boolean, canReview: boolean): Pick<FlowStep, "state" | "note" | "href" | "hrefLabel"> {
-  if (dismissed || !gate) return { state: "skipped", note: snapshotNeeded ? "Bắt buộc trước khi sang Propose (HG6)" : "Không thuộc diện BR-06" };
+  if (dismissed || !gate) return { state: "skipped", note: snapshotNeeded ? "Bắt buộc trước khi sang giai đoạn Đề xuất giải pháp" : "Không thuộc diện rà soát" };
   const decided = gate.decidedBy ? ` · ${gate.decidedBy}` : "";
   if (gate.status === "APPROVED") return { state: "done", note: `Đã duyệt${decided}${gate.comment ? `: ${gate.comment}` : ""}` };
-  if (gate.passed) return { state: "done", note: "Cơ hội đã qua giai đoạn Develop" };
-  if (!gate.required) return { state: "skipped", note: "Không thuộc diện BR-06" };
+  if (gate.passed) return { state: "done", note: "Cơ hội đã qua giai đoạn Phát triển cơ hội" };
+  if (!gate.required) return { state: "skipped", note: "Không thuộc diện rà soát" };
   const review = canReview ? { href: "/approvals", hrefLabel: "Mở Phê duyệt" } : {};
   if (gate.status === "PENDING") return { state: "active", note: `Đang chờ ${gate.deciders.join(", ")} duyệt`, ...review };
-  if (gate.status === "REJECTED") return { state: "active", note: `Bị từ chối${decided}: ${gate.comment ?? ""}. AE bổ sung rồi bấm Giai đoạn kế tiếp để gửi lại` };
-  return { state: verified ? "active" : "todo", note: "Chưa gửi. Hệ thống gửi QLKD khi AE bấm Giai đoạn kế tiếp" };
+  if (gate.status === "REJECTED") return { state: "active", note: `Bị từ chối${decided}: ${gate.comment ?? ""}. NVKD bổ sung rồi bấm Giai đoạn kế tiếp để gửi lại` };
+  return { state: verified ? "active" : "todo", note: "Chưa gửi. Hệ thống gửi QLKD khi NVKD bấm Giai đoạn kế tiếp" };
 }
 
 export function ResearchFlow({ research, evals, gate, canReview = false }: { research: Research; evals: Eval[]; gate?: StageGateStatus; canReview?: boolean }) {
@@ -42,11 +42,11 @@ export function ResearchFlow({ research, evals, gate, canReview = false }: { res
       note: evals.length ? `${count("HIT")} vi phạm · ${count("WARNING")} cảnh báo · ${count("NOT_EVALUABLE")} thiếu dữ liệu` : "Bản cũ, chưa có bộ quy tắc",
     },
     { key: "explain", title: "Diễn giải", owner: "LLM", detail: "", state: "done", note: run ? `${run.model}${tokens ? ` · ${tokens} token` : ""}` : "—" },
-    { key: "save", title: "Kiểm căn cứ & lưu", owner: "SYSTEM", detail: "", state: "done", note: `Bản #${research.id} · ${sources} nguồn đã xác thực` },
+    { key: "save", title: "Kiểm căn cứ và lưu", owner: "SYSTEM", detail: "", state: "done", note: `Bản #${research.id} · ${sources} nguồn đã xác thực` },
     {
-      key: "verify", title: "AE xác minh", owner: "HUMAN", detail: "",
+      key: "verify", title: "NVKD xác minh", owner: "HUMAN", detail: "",
       state: verified ? "done" : dismissed ? "skipped" : "active",
-      note: verified ? `Đã xác minh${research.reviewed_by_name ? ` · ${research.reviewed_by_name}` : ""}` : dismissed ? "Đã bỏ qua / thay bằng bản mới" : "Đang chờ AE (HG4)",
+      note: verified ? `Đã xác minh${research.reviewed_by_name ? ` · ${research.reviewed_by_name}` : ""}` : dismissed ? "Đã bỏ qua / thay bằng bản mới" : "Đang chờ Nhân viên kinh doanh xác minh",
     },
     { key: "manager", title: "QLKD rà soát", owner: "HUMAN", detail: "", ...managerStep(gate, needManager, verified, dismissed, canReview) },
   ];

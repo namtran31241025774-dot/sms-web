@@ -124,7 +124,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
               <thead>
                 <tr>
                   {view !== "trash" && <th className="w-10"></th>}
-                  <th>Công ty & Chủ đề</th>
+                  <th>Công ty và Chủ đề</th>
                   <th>Người liên hệ</th>
                   <th>Phân loại</th>
                   <th>Nguồn</th>

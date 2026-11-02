@@ -15,19 +15,19 @@ export default async function NewAccountPage({ searchParams }: PageProps<"/accou
   return (
     <>
       <CommandBar>
-        <button type="submit" form="new-acc" className="cmd">Lưu & đóng</button>
+        <button type="submit" form="new-acc" className="cmd">Lưu và đóng</button>
         <CommandLink href="/accounts" icon="arrowLeft">Quay lại</CommandLink>
       </CommandBar>
       <Flash sp={sp} />
 
-      <PageTitle title="Tạo Doanh nghiệp mới (Account)" subtitle="Master Data · FR-08" icon="account" />
+      <PageTitle title="Tạo Doanh nghiệp mới (Account)" subtitle="Dữ liệu gốc" icon="account" />
 
       <form id="new-acc" action={createAccountAction} className="grid max-w-4xl gap-4 px-6 pb-8">
         <MessageBar intent="info">
           Doanh nghiệp (Account) là thực thể pháp nhân trung tâm, liên kết với các người liên hệ (Contacts) và các cơ hội bán hàng (Opportunities).
         </MessageBar>
 
-        <Card title="Thông tin pháp nhân & Hoạt động">
+        <Card title="Thông tin pháp nhân và Hoạt động">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <FormField label="Tên doanh nghiệp" required>
               <input name="name" required className="input" placeholder="Công ty CP / TNHH..." />

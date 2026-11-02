@@ -83,14 +83,14 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       },
       {
         href: "/reports",
-        label: "Báo cáo & Dự báo",
+        label: "Báo cáo và Dự báo",
         icon: "opportunity",
         roles: ["SALES", "SALES_MANAGER", "ADMIN"],
       },
     ],
   },
   {
-    label: "Thực hiện & thu tiền",
+    label: "Thực hiện và thu tiền",
     items: [
       {
         href: "/orders",
@@ -107,11 +107,11 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     ],
   },
   {
-    label: "Danh mục & Đội ngũ",
+    label: "Danh mục và Đội ngũ",
     items: [
       {
         href: "/catalog",
-        label: "Sản phẩm & bảng giá",
+        label: "Sản phẩm và bảng giá",
         icon: "product",
         roles: ["SALES", "PRESALES", "SALES_MANAGER", "FINANCE"],
       },

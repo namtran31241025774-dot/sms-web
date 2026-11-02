@@ -8,7 +8,7 @@ import { all } from "@/lib/db";
 import { formatVnd } from "@/lib/domain";
 import { Card, CommandBar, CommandLink, PageTitle, Flash } from "@/components/ui";
 
-export const metadata: Metadata = { title: "Báo cáo cơ hội & Dự báo doanh số" };
+export const metadata: Metadata = { title: "Báo cáo cơ hội và Dự báo doanh số" };
 
 export default async function ReportsPage({
   searchParams,
@@ -61,7 +61,7 @@ export default async function ReportsPage({
     <>
       <CommandBar>
         <CommandLink href={exportHref} icon="invoice">
-          Xuất báo cáo CSV (FR-99)
+          Xuất báo cáo CSV
         </CommandLink>
         <CommandLink href="/admin?tab=rbac" icon="settings">
           Xem phân quyền RBAC
@@ -74,8 +74,8 @@ export default async function ReportsPage({
       <Flash sp={sp} />
 
       <PageTitle
-        title="Báo cáo phễu cơ hội & Dự báo doanh thu"
-        subtitle="Tổng hợp giá trị thương vụ theo giai đoạn · Dự báo có trọng số theo chuẩn BR-14 · Phân bổ theo Sale Pod (FR-99)"
+        title="Báo cáo phễu cơ hội và Dự báo doanh thu"
+        subtitle="Tổng hợp giá trị thương vụ theo giai đoạn · Dự báo có trọng số theo giai đoạn · Phân bổ theo Sale Pod"
         icon="opportunity"
       />
 
@@ -144,7 +144,7 @@ export default async function ReportsPage({
 
           <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg shadow-sm">
             <div className="text-[11px] font-semibold text-emerald-900 uppercase tracking-wider">
-              Dự báo doanh thu (BR-14)
+              Dự báo doanh thu
             </div>
             <div className="mt-2 text-xl font-bold text-emerald-700">
               {formatVnd(report.weightedForecastRevenue)}
@@ -166,7 +166,7 @@ export default async function ReportsPage({
         </div>
 
         {/* BẢNG 1: CHI TIẾT THEO GIAI ĐOẠN PHỄU (BR-14) */}
-        <Card title="Phân tích cơ hội theo giai đoạn & Trọng số dự báo (BR-14)">
+        <Card title="Phân tích cơ hội theo giai đoạn và Trọng số dự báo">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-[#fcfcfc] border-b border-stroke text-ink-2 font-semibold">
@@ -174,7 +174,7 @@ export default async function ReportsPage({
                   <th className="px-4 py-2.5">Giai đoạn bán hàng</th>
                   <th className="px-4 py-2.5 text-center">Số lượng</th>
                   <th className="px-4 py-2.5 text-right">Tổng giá trị (VND)</th>
-                  <th className="px-4 py-2.5 text-center">Xác suất chuyển đổi (BR-14)</th>
+                  <th className="px-4 py-2.5 text-center">Xác suất chuyển đổi</th>
                   <th className="px-4 py-2.5 text-right">Dự báo doanh thu có trọng số (VND)</th>
                 </tr>
               </thead>
@@ -230,7 +230,7 @@ export default async function ReportsPage({
                       <th className="px-3 py-2">Sale Pod</th>
                       <th className="px-3 py-2 text-center">Số deal</th>
                       <th className="px-3 py-2 text-right">Pipeline</th>
-                      <th className="px-3 py-2 text-right">Dự báo (BR-14)</th>
+                      <th className="px-3 py-2 text-right">Dự báo</th>
                       <th className="px-3 py-2 text-right">Đã thắng</th>
                     </tr>
                   </thead>
@@ -270,7 +270,7 @@ export default async function ReportsPage({
                       <th className="px-3 py-2">Nhân viên</th>
                       <th className="px-3 py-2 text-center">Số deal</th>
                       <th className="px-3 py-2 text-right">Pipeline</th>
-                      <th className="px-3 py-2 text-right">Dự báo (BR-14)</th>
+                      <th className="px-3 py-2 text-right">Dự báo</th>
                       <th className="px-3 py-2 text-right">Đã thắng</th>
                     </tr>
                   </thead>

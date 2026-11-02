@@ -48,7 +48,7 @@ export default async function ContactDetailPage({
 
       <PageTitle
         title={contact.full_name}
-        subtitle={`${contact.title || "Người liên hệ"} · Doanh nghiệp: ${contact.account_name} · FR-09, FR-14`}
+        subtitle={`${contact.title || "Người liên hệ"} · Doanh nghiệp: ${contact.account_name}`}
         icon="contact"
       />
 
@@ -94,11 +94,11 @@ export default async function ContactDetailPage({
 
         {/* Lịch sử công tác (Affiliation History · FR-14, DEC-21) */}
         <Card
-          title="Lịch sử công tác & Doanh nghiệp liên kết (FR-14, DEC-21)"
+          title="Lịch sử công tác và Doanh nghiệp liên kết"
           actions={<span className="text-xs text-ink-3">Bảo toàn liên kết quá khứ</span>}
         >
           <p className="mb-4 text-xs text-ink-2">
-            Theo quyết định kiến trúc DEC-21: Một người liên hệ có đúng một doanh nghiệp hiện hành. Khi thay đổi nơi làm việc,
+            Một người liên hệ có đúng một doanh nghiệp hiện hành. Khi thay đổi nơi làm việc,
             hệ thống tự động đóng liên kết cũ (ghi nhận ngày kết thúc) và mở liên kết mới, giữ nguyên lịch sử giao dịch và tương tác trước đó.
           </p>
 
@@ -141,7 +141,7 @@ export default async function ContactDetailPage({
         </Card>
 
         {/* Form chuyển đơn vị công tác (FR-14) */}
-        <Card title="Chuyển đơn vị công tác mới (FR-14)">
+        <Card title="Chuyển đơn vị công tác mới">
           <form action={changeAffiliationAction} className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <input type="hidden" name="id" value={contact.id} />
 

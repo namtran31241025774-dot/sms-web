@@ -15,16 +15,16 @@ export default async function NewContactPage({ searchParams }: PageProps<"/conta
   return (
     <>
       <CommandBar>
-        <button type="submit" form="new-contact" className="cmd">Lưu & đóng</button>
+        <button type="submit" form="new-contact" className="cmd">Lưu và đóng</button>
         <CommandLink href="/contacts" icon="arrowLeft">Quay lại</CommandLink>
       </CommandBar>
       <Flash sp={sp} />
 
-      <PageTitle title="Thêm Người liên hệ mới" subtitle="Contact · Master Data · FR-09" icon="contact" />
+      <PageTitle title="Thêm Người liên hệ mới" subtitle="Người liên hệ · Dữ liệu gốc" icon="contact" />
 
       <form id="new-contact" action={createContactAction} className="grid max-w-4xl gap-4 px-6 pb-8">
         <MessageBar intent="info">
-          Mỗi người liên hệ gắn với một doanh nghiệp hiện hành và được tự động ghi nhận vào lịch sử công tác (Affiliation) theo quy định DEC-21.
+          Mỗi người liên hệ gắn với một doanh nghiệp hiện hành và được tự động ghi nhận vào lịch sử công tác (Affiliation).
         </MessageBar>
 
         <Card title="Thông tin người liên hệ">

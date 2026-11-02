@@ -91,7 +91,7 @@ export default async function AgentsPage({ searchParams }: PageProps<"/agents">)
             <RuleLogicMatrix rules={OPPORTUNITY_RULES.map((r) => ({ id: r.id, br: r.br, title: r.title, logic: { input: r.logic.input, missing: "missing" in r.logic ? fillLogic(r.logic.missing) : undefined, hit: "hit" in r.logic ? fillLogic(r.logic.hit) : undefined, warn: "warn" in r.logic ? fillLogic(r.logic.warn) : undefined, pass: fillLogic(r.logic.pass) } }))} />
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
               <div className="rounded-md border border-[#f0f0f0] p-3">
-                <div className="label">Mức quan trọng (OPP-R01, BR-08)</div>
+                <div className="label">Mức quan trọng (OPP-R01)</div>
                 <ImportanceScale medium={settingNumber("importance_medium_amount")} high={settingNumber("importance_high_amount")} />
                 <p className="text-[11px] text-ink-3">Khách ≥ {settingNumber("segment_enterprise_min_employees")} nhân sự (Enterprise) luôn là CAO.</p>
               </div>
@@ -176,7 +176,7 @@ function AgentAnatomy({ agent, refreshHours }: { agent: AgentProfile; refreshHou
   const writes = tools.filter((t) => t.access === "WRITE");
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-      <Card title="1 · Nhiệm vụ & kích hoạt">
+      <Card title="1 · Nhiệm vụ và kích hoạt">
         <p className="text-sm text-ink-2">{agent.mission}</p>
         <div className="label mt-3">Chạy khi</div>
         <ul className="list-disc space-y-0.5 pl-5 text-sm">{agent.triggers.map((t) => <li key={t}>{t.replace("{h}", String(refreshHours))}</li>)}</ul>
@@ -201,7 +201,7 @@ function AgentAnatomy({ agent, refreshHours }: { agent: AgentProfile; refreshHou
       <Card title="5 · Cổng con người">
         <ul className="space-y-1.5 text-sm">{agent.gates.map((g) => <li key={g.code} className="flex gap-2"><code className="shrink-0 text-[11px] text-[#107c10]">{g.code}</code><span>{g.title} — <b>{g.who}</b></span></li>)}</ul>
       </Card>
-      <Card title="6 · Đầu ra & dấu vết">
+      <Card title="6 · Đầu ra và dấu vết">
         <ul className="list-disc space-y-0.5 pl-5 text-sm">{agent.outputs.map((t) => <li key={t}><code className="text-[12px]">{t}</code></li>)}</ul>
         <p className="mt-2 text-xs text-ink-3">Mỗi lần chạy lưu ở <code>ai_runs</code> + <code>tool_calls</code>: người/sự kiện kích hoạt, model, token, chi phí, công cụ đã gọi.</p>
       </Card>

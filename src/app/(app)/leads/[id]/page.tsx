@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
-import { BANT_KEYS, BANT_LABEL, BANT_SCALE, DISQUALIFY_REASONS, formatDate, LEAD_SOURCE, LEAD_STATUS } from "@/lib/domain";
+import { DISQUALIFY_REASONS, formatDate, LEAD_SOURCE, LEAD_STATUS } from "@/lib/domain";
 import { can } from "@/lib/rbac";
 import { listRuns, listSuggestions } from "@/lib/services/ai-review";
 import { activitiesFor, auditTrail, settingNumber, users } from "@/lib/services/core";
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui";
 import { RatingBadge } from "@/components/customers/rating-badge";
 import { QualificationPanel } from "@/components/qualify";
+import { BantQualificationView } from "@/components/bant-qualification-view";
 import { get } from "@/lib/db";
 import {
   addLeadActivityAction,
@@ -140,7 +141,7 @@ export default async function LeadPage({ params, searchParams }: PageProps<"/lea
 
       <div className="space-y-2 px-6">
         {pendingMerge && (
-          <MessageBar intent="info" title="Có yêu cầu hợp nhất đang chờ Quản lý kinh doanh duyệt (DEC-04):">
+          <MessageBar intent="info" title="Có yêu cầu hợp nhất đang chờ Quản lý kinh doanh duyệt:">
             <div className="flex flex-col gap-2">
               <div className="text-xs">
                 {pendingMerge.reason} (Người yêu cầu: {pendingMerge.requested_by_name || "Nhân viên kinh doanh"})
@@ -163,7 +164,7 @@ export default async function LeadPage({ params, searchParams }: PageProps<"/lea
           </MessageBar>
         )}
         {dups.length > 0 && (
-          <MessageBar intent="warning" title="Phát hiện trùng lặp (BR-21):">
+          <MessageBar intent="warning" title="Phát hiện trùng lặp:">
             <div>
               {dups.map((d, i) => (
                 <span key={i}>
@@ -203,7 +204,7 @@ export default async function LeadPage({ params, searchParams }: PageProps<"/lea
         tabs={[
           { key: "summary", label: "Tóm tắt" },
           { key: "activities", label: "Hoạt động", count: activities.length },
-          { key: "agent", label: "Agent & nhật ký", count: suggestions.length },
+          { key: "agent", label: "Agent và nhật ký", count: suggestions.length },
         ]}
       />
 
@@ -284,30 +285,16 @@ export default async function LeadPage({ params, searchParams }: PageProps<"/lea
               {/* Slot bàn giao cho WP-03 */}
               <QualificationPanel leadId={lead.id} />
 
-              <Card title={`BANT — ngưỡng đạt chuẩn ${threshold}/100`}>
-                <form action={bantAction} className="space-y-3">
-                  <input type="hidden" name="id" value={lead.id} />
-                  <fieldset disabled={!open || !canWrite} className="space-y-3">
-                    {BANT_KEYS.map((k) => {
-                      const v = lead[`bant_${k}` as const];
-                      return (
-                        <div key={k} className="grid grid-cols-[170px_1fr_70px] items-center gap-3">
-                          <span className="text-sm">{BANT_LABEL[k]}</span>
-                          <span className="h-2 rounded-full bg-[#f0f0f0]">
-                            <span className="block h-2 rounded-full bg-brand" style={{ width: `${(v / 25) * 100}%` }} />
-                          </span>
-                          <input name={k} type="number" min={0} max={25} defaultValue={v} className="input !min-h-7 !py-0.5 text-right" aria-label={BANT_LABEL[k]} />
-                          <span className="col-span-3 text-[11px] text-ink-3">{BANT_SCALE[k]}</span>
-                        </div>
-                      );
-                    })}
-                    <FormField label="Bằng chứng / ghi chú BANT">
-                      <textarea name="bant_notes" defaultValue={lead.bant_notes ?? ""} className="textarea" />
-                    </FormField>
-                    {open && canWrite && <SubmitButton icon="save">Cập nhật BANT</SubmitButton>}
-                  </fieldset>
-                </form>
-              </Card>
+              {/* Đánh giá chuẩn BANT 4 tiêu chí và Khung quan sát Qualification Agent */}
+              <BantQualificationView
+                lead={lead}
+                threshold={threshold}
+                suggestions={suggestions}
+                runs={listRuns({ entityType: "lead", entityId: lead.id })}
+                canWrite={open && canWrite}
+                canReviewAi={can(user.role, "ai.review")}
+                bantAction={bantAction}
+              />
 
               {open && can(user.role, "lead.convert") && (
                 <Card title="Chuyển đổi (Qualify → Develop)">

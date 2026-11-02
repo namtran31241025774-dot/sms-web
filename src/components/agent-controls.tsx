@@ -49,12 +49,12 @@ export function ControlLayers({ stats, preRun }: { stats: LayerStats; preRun: Pr
       body: <Metric value={stats.evidence} label="căn cứ đã xác thực" tone="text-[#107c10]" />,
     },
     {
-      n: 5, title: "Bộ quy tắc khóa kết quả", icon: "check", where: "rules.ts (BR-28)", exit: "Thay giá trị LLM bằng kết quả quy tắc",
+      n: 5, title: "Bộ quy tắc khóa kết quả", icon: "check", where: "rules.ts", exit: "Thay giá trị LLM bằng kết quả quy tắc",
       blocks: "Mức quan trọng, rủi ro có mã, thứ tự hành động, cổng duyệt do backend tính; thiếu dữ liệu → Chưa đánh giá được",
       body: <div className="grid grid-cols-3 gap-2"><Metric value={stats.hits} label="vi phạm" tone="text-[#c50f1f]" /><Metric value={stats.missing} label="thiếu dữ liệu" /><Metric value={stats.overridden} label="LLM bị thay" /></div>,
     },
     {
-      n: 6, title: "Con người quyết định", icon: "person", where: "HG1 – HG8", exit: "Không đổi hồ sơ khi chưa duyệt",
+      n: 6, title: "Con người quyết định", icon: "person", where: "Các cổng duyệt", exit: "Không đổi hồ sơ khi chưa duyệt",
       blocks: "Email, loại / chuyển đổi Lead, xác minh nghiên cứu, rủi ro, chuyển giai đoạn đều cần người có thẩm quyền",
       body: <div className="grid grid-cols-2 gap-2"><Metric value={stats.pending} label="đang chờ duyệt" tone="text-[#0f6cbd]" /><Metric value={stats.decided} label="đã quyết định" tone="text-[#107c10]" /></div>,
     },

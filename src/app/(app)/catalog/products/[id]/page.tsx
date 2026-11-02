@@ -99,7 +99,7 @@ export default async function ProductDetailPage({
               <form action={deactivateProductAction} className="inline">
                 <input type="hidden" name="id" value={product.id} />
                 <button type="submit" className="cmd text-rose-600 hover:bg-rose-50">
-                  Ngừng kinh doanh (FR-22)
+                  Ngừng kinh doanh
                 </button>
               </form>
             ) : (
@@ -117,7 +117,7 @@ export default async function ProductDetailPage({
 
       <PageTitle
         title={`${product.code} – ${product.name}`}
-        subtitle={`Loại: ${product.type} · Đơn vị: ${product.unit} · FR-21 → FR-26`}
+        subtitle={`Loại: ${product.type} · Đơn vị: ${product.unit}`}
         icon="product"
         right={
           <div className="flex items-center gap-2">
@@ -130,7 +130,7 @@ export default async function ProductDetailPage({
       <div className="grid max-w-5xl gap-6 px-6 pb-12">
         {product.active === 0 && (
           <MessageBar intent="warning">
-            Sản phẩm này đang ở trạng thái <strong>Ngừng kinh doanh (FR-22)</strong>. Sản phẩm sẽ không hiển thị khi lập các báo giá hoặc cơ hội mới, nhưng toàn bộ dữ liệu lịch sử trên báo giá và đơn hàng trước đây được bảo toàn nguyên vẹn.
+            Sản phẩm này đang ở trạng thái <strong>Ngừng kinh doanh</strong>. Sản phẩm sẽ không hiển thị khi lập các báo giá hoặc cơ hội mới, nhưng toàn bộ dữ liệu lịch sử trên báo giá và đơn hàng trước đây được bảo toàn nguyên vẹn.
           </MessageBar>
         )}
 
@@ -138,7 +138,7 @@ export default async function ProductDetailPage({
         <form id="update-product" action={updateProductAction} className="grid gap-4">
           <input type="hidden" name="id" value={product.id} />
 
-          <Card title="Thông tin sản phẩm & Dịch vụ">
+          <Card title="Thông tin sản phẩm và Dịch vụ">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField label="Mã sản phẩm (Code)" hint="Mã định danh không thể thay đổi">
                 <input disabled value={product.code} className="input uppercase font-mono bg-gray-50" />
@@ -151,9 +151,9 @@ export default async function ProductDetailPage({
                   defaultValue={product.type}
                   className="select"
                 >
-                  <option value="PACKAGE">Gói giải pháp (Package - FR-25)</option>
+                  <option value="PACKAGE">Gói giải pháp (Package)</option>
                   <option value="SUBSCRIPTION">Thuê bao phần mềm (Subscription)</option>
-                  <option value="MODULE">Mô-đun tính năng (Module - FR-24)</option>
+                  <option value="MODULE">Mô-đun tính năng (Module)</option>
                   <option value="SERVICE">Dịch vụ triển khai (Service)</option>
                   <option value="TRAINING">Dịch vụ đào tạo (Training)</option>
                 </select>
@@ -206,7 +206,7 @@ export default async function ProductDetailPage({
             </div>
           </Card>
 
-          <Card title="Chính sách quyền sử dụng (License Policy · FR-26)">
+          <Card title="Chính sách quyền sử dụng (License Policy ·)">
             <FormField label="Cấu hình chính sách bản quyền (JSON hoặc diễn giải)">
               <textarea
                 name="license_policy"
@@ -229,7 +229,7 @@ export default async function ProductDetailPage({
         {/* NẾU LÀ GÓI GIẢI PHÁP (PACKAGE): HIỂN THỊ THÀNH PHẦN (FR-25) */}
         {isPackage && (
           <Card
-            title="Thành phần của gói giải pháp (Package Components · FR-25)"
+            title="Thành phần của gói giải pháp (Package Components ·)"
             actions={<span className="text-xs text-ink-3">{components.length} thành phần</span>}
           >
             <p className="mb-4 text-xs text-ink-2">
@@ -340,7 +340,7 @@ export default async function ProductDetailPage({
         )}
 
         {/* Đơn giá trong các bảng giá */}
-        <Card title="Đơn giá hiện hành trong các Bảng giá (FR-27)">
+        <Card title="Đơn giá hiện hành trong các Bảng giá">
           {priceListRows.length > 0 ? (
             <Grid>
               <thead>

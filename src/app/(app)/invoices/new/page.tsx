@@ -47,8 +47,8 @@ export default async function NewInvoicePage(props: {
 
       <PageTitle
         icon="invoice"
-        title="Lập Hồ sơ Hóa đơn nháp từ Đơn hàng (FR-64)"
-        subtitle="Hệ thống đối chiếu giá trị và mốc thanh toán từ đơn hàng để nhận diện sai lệch (BR-12, DEC-23)"
+        title="Lập Hồ sơ Hóa đơn nháp từ Đơn hàng"
+        subtitle="Hệ thống đối chiếu giá trị và mốc thanh toán từ đơn hàng để nhận diện sai lệch"
       />
 
       <div className="mx-auto w-full max-w-4xl p-6">
@@ -94,7 +94,7 @@ export default async function NewInvoicePage(props: {
                 </div>
 
                 <div className="mt-3 text-xs text-ink-subtle">
-                  Giá trị tối đa còn có thể xuất hóa đơn (BR-12):{" "}
+                  Giá trị tối đa còn có thể xuất hóa đơn:{" "}
                   <strong className="text-primary">{remainingBillable.toLocaleString("vi-VN")} đ</strong>
                 </div>
               </div>
@@ -102,12 +102,12 @@ export default async function NewInvoicePage(props: {
           </div>
 
           <div className="rounded-lg border border-stroke bg-surface p-6 shadow-xs space-y-4">
-            <h2 className="text-base font-semibold text-ink">2. Thông tin kỳ & Mốc thanh toán (FR-65)</h2>
+            <h2 className="text-base font-semibold text-ink">2. Thông tin kỳ và Mốc thanh toán</h2>
 
             {milestones.length > 0 && (
               <FormField
                 label="Mốc thanh toán đã thỏa thuận trong đơn hàng"
-                hint="Chọn mốc thanh toán đã chốt ở đơn hàng (BR-11) hoặc để trống nếu xuất theo giá trị tùy chỉnh"
+                hint="Chọn mốc thanh toán đã chốt ở đơn hàng hoặc để trống nếu xuất theo giá trị tùy chỉnh"
               >
                 <select
                   name="milestoneId"
@@ -138,7 +138,7 @@ export default async function NewInvoicePage(props: {
               <FormField
                 label="Giá trị hóa đơn (gồm thuế VAT)"
                 required
-                hint="Tổng tiền hóa đơn không được vượt quá số dư còn lại của đơn hàng (BR-12)"
+                hint="Tổng tiền hóa đơn không được vượt quá số dư còn lại của đơn hàng"
               >
                 <input
                   type="number"
@@ -157,7 +157,7 @@ export default async function NewInvoicePage(props: {
               <FormField
                 label="Hạn thanh toán (Due Date)"
                 required
-                hint="Thời hạn thanh toán trước khi kích hoạt quy trình cảnh báo công nợ (FR-71, BR-13)"
+                hint="Thời hạn thanh toán trước khi kích hoạt quy trình cảnh báo công nợ"
               >
                 <input
                   type="date"
@@ -184,7 +184,7 @@ export default async function NewInvoicePage(props: {
               Hủy bỏ
             </Link>
             <button type="submit" className="btn btn-primary text-sm">
-              Lập hóa đơn nháp & Tiếp tục &rarr;
+              Lập hóa đơn nháp và Tiếp tục &rarr;
             </button>
           </div>
         </form>

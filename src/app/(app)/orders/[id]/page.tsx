@@ -66,12 +66,12 @@ export default async function OrderDetailPage(props: {
         <form action={lockOrderPriceAction} className="inline-block">
           <input type="hidden" name="orderId" value={order.id} />
           <button type="submit" className="btn btn-ghost text-xs flex items-center gap-1.5">
-            🔒 Xác nhận khóa giá (BR-22)
+            🔒 Xác nhận khóa giá
           </button>
         </form>
 
         <CommandLink href={`/invoices/new?orderId=${order.id}`} icon="invoice">
-          Lập hóa đơn từ đơn hàng (FR-64)
+          Lập hóa đơn từ đơn hàng
         </CommandLink>
 
         {order.quote_id && (
@@ -97,7 +97,7 @@ export default async function OrderDetailPage(props: {
         {/* CỘT TRÁI (2/3): Dòng sản phẩm, Lịch thanh toán, Bàn giao kỹ thuật */}
         <div className="lg:col-span-2 space-y-6">
           {/* Card 1: Hạng mục sản phẩm trong đơn hàng */}
-          <Card title="Hạng mục sản phẩm & Dịch vụ (Khóa giá BR-22)">
+          <Card title="Hạng mục sản phẩm và Dịch vụ (Khóa giá)">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-stroke bg-surface-subtle text-xs font-semibold text-ink-subtle">
@@ -150,7 +150,7 @@ export default async function OrderDetailPage(props: {
           </Card>
 
           {/* Card 2: Thiết lập điều khoản thanh toán (FR-59, BR-11) */}
-          <Card title="Lịch thanh toán các đợt (BR-11)">
+          <Card title="Lịch thanh toán các đợt">
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-stroke pb-3 text-xs">
                 <div>
@@ -163,7 +163,7 @@ export default async function OrderDetailPage(props: {
                 <div>
                   {isMilestoneBalanced ? (
                     <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
-                      ✓ Đã cân bằng (BR-11)
+                      ✓ Đã cân bằng
                     </span>
                   ) : (
                     <span className="rounded bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800">
@@ -239,7 +239,7 @@ export default async function OrderDetailPage(props: {
                     Đặt lại lịch 50% - 50% tự động cân bằng
                   </button>
                   <span className="text-xs text-ink-subtle">
-                    (BR-11 bắt buộc tổng lịch thanh toán bằng đúng tổng giá trị đơn hàng)
+ (bắt buộc tổng lịch thanh toán bằng đúng tổng giá trị đơn hàng)
                   </span>
                 </form>
               </div>
@@ -247,7 +247,7 @@ export default async function OrderDetailPage(props: {
           </Card>
 
           {/* Card 3: Hồ sơ bàn giao kỹ thuật & Nghiệm thu (FR-61, FR-62, DEC-10) */}
-          <Card title="Hồ sơ bàn giao kỹ thuật & Nghiệm thu (DEC-10)">
+          <Card title="Hồ sơ bàn giao kỹ thuật và Nghiệm thu">
             <div className="space-y-6">
               {handoversWithItems.length === 0 ? (
                 <p className="text-sm text-ink-subtle">Chưa có hồ sơ bàn giao kỹ thuật nào.</p>
@@ -342,7 +342,7 @@ export default async function OrderDetailPage(props: {
               {/* Thêm biên bản bàn giao mới */}
               <details className="rounded-lg border border-stroke p-3 bg-surface text-xs">
                 <summary className="font-semibold text-ink cursor-pointer">
-                  + Thêm biên bản bàn giao kỹ thuật mới (FR-62)
+                  + Thêm biên bản bàn giao kỹ thuật mới
                 </summary>
                 <form action={createHandoverAction} className="mt-3 space-y-3">
                   <input type="hidden" name="orderId" value={order.id} />
@@ -375,7 +375,7 @@ export default async function OrderDetailPage(props: {
         {/* CỘT PHẢI (1/3): Tài chính, Tiến độ triển khai, Chuyển tiếp sau bán */}
         <div className="space-y-6">
           {/* Card: Tổng hợp tài chính */}
-          <Card title="Tổng quan tài chính & Khóa giá">
+          <Card title="Tổng quan tài chính và Khóa giá">
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-ink-subtle">Tổng tiền hàng:</span>
@@ -416,7 +416,7 @@ export default async function OrderDetailPage(props: {
           </Card>
 
           {/* Card: Cập nhật tiến độ triển khai (FR-61) */}
-          <Card title="Tiến độ triển khai (FR-61)">
+          <Card title="Tiến độ triển khai">
             <form action={updateFulfillmentProgressAction} className="space-y-3 text-xs">
               <input type="hidden" name="orderId" value={order.id} />
               <FormField label="Trạng thái thực hiện">
@@ -454,7 +454,7 @@ export default async function OrderDetailPage(props: {
           </Card>
 
           {/* Card: Hoàn thành đơn hàng & Chuyển giao sau bán (FR-63) */}
-          <Card title="Chuyển tiếp hồ sơ sau bán (FR-63)">
+          <Card title="Chuyển tiếp hồ sơ sau bán">
             <form action={completeOrderAndTransitionPostSalesAction} className="space-y-3 text-xs">
               <input type="hidden" name="orderId" value={order.id} />
 
@@ -495,7 +495,7 @@ export default async function OrderDetailPage(props: {
               </FormField>
 
               <div className="rounded bg-amber-50 p-2 text-[11px] text-amber-800 border border-amber-200">
-                Lưu ý (FR-63): Hoàn thành đơn hàng độc lập với tiến độ thu tiền; không tự động thay đổi trạng thái hóa đơn/thanh toán.
+                Lưu ý: Hoàn thành đơn hàng độc lập với tiến độ thu tiền; không tự động thay đổi trạng thái hóa đơn/thanh toán.
               </div>
 
               <button
@@ -503,7 +503,7 @@ export default async function OrderDetailPage(props: {
                 className="btn btn-primary text-xs w-full"
                 disabled={order.status === "FULFILLED"}
               >
-                {order.status === "FULFILLED" ? "✓ Đã chuyển tiếp sau bán" : "Hoàn thành đơn & Chuyển sau bán"}
+                {order.status === "FULFILLED" ? "✓ Đã chuyển tiếp sau bán" : "Hoàn thành đơn và Chuyển sau bán"}
               </button>
             </form>
           </Card>

@@ -84,7 +84,7 @@ export default async function InvoiceDetailPage(props: {
               type="submit"
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand bg-brand/10 hover:bg-brand/20 rounded transition"
             >
-              <span>✓</span> Xác nhận kiểm tra nháp (DEC-09)
+              <span>✓</span> Xác nhận kiểm tra nháp
             </button>
           </form>
         )}
@@ -97,7 +97,7 @@ export default async function InvoiceDetailPage(props: {
               type="submit"
               className="btn btn-primary text-xs flex items-center gap-1.5"
             >
-              <span>🚀</span> Phát hành qua ERP & Gửi khách (HG8)
+              <span>🚀</span> Phát hành qua ERP và Gửi khách
             </button>
           </form>
         )}
@@ -110,7 +110,7 @@ export default async function InvoiceDetailPage(props: {
               type="submit"
               className="btn btn-secondary text-xs flex items-center gap-1.5"
             >
-              <span>💳</span> Tạo liên kết thanh toán online (FR-70)
+              <span>💳</span> Tạo liên kết thanh toán online
             </button>
           </form>
         )}
@@ -122,9 +122,9 @@ export default async function InvoiceDetailPage(props: {
             <button
               type="submit"
               className="btn btn-ghost text-xs text-danger font-medium flex items-center gap-1.5 hover:bg-danger/10"
-              title="Gửi email thông báo nhắc nợ tới khách hàng (áp dụng cửa sổ 7 ngày theo BR-13)"
+              title="Gửi email thông báo nhắc nợ tới khách hàng (áp dụng cửa sổ 7 ngày)"
             >
-              <span>📩</span> Gửi nhắc nợ thanh toán (BR-13)
+              <span>📩</span> Gửi nhắc nợ thanh toán
             </button>
           </form>
         )}
@@ -147,7 +147,7 @@ export default async function InvoiceDetailPage(props: {
                 {unpaidBalance.toLocaleString("vi-VN")} đ.
               </span>
             </div>
-            <span className="text-xs text-ink-subtle">Quy tắc dunning nhắc nợ: cách nhau 7 ngày (BR-13)</span>
+            <span className="text-xs text-ink-subtle">Quy tắc dunning nhắc nợ: cách nhau 7 ngày</span>
           </div>
         </div>
       )}
@@ -177,7 +177,7 @@ export default async function InvoiceDetailPage(props: {
                 <span className="text-primary">{invoice.amount.toLocaleString("vi-VN")} đ</span>
               </div>
               <div className="flex justify-between border-t border-stroke pt-2 text-sm">
-                <span className="text-ink-subtle">Đã thanh toán (DEC-23):</span>
+                <span className="text-ink-subtle">Đã thanh toán:</span>
                 <span className="font-semibold text-success">
                   {invoice.paid_amount.toLocaleString("vi-VN")} đ
                 </span>
@@ -193,12 +193,12 @@ export default async function InvoiceDetailPage(props: {
 
           {/* Cột 2: Cổng kiểm soát & Phát hành */}
           <div className="rounded-lg border border-stroke bg-surface p-5 shadow-xs space-y-4">
-            <h3 className="font-semibold text-ink border-b border-stroke pb-3">Cổng kiểm soát & Phát hành</h3>
+            <h3 className="font-semibold text-ink border-b border-stroke pb-3">Cổng kiểm soát và Phát hành</h3>
 
             <div className="space-y-3 text-xs">
               <div className="rounded-md border border-stroke bg-surface-subtle p-3">
                 <div className="font-semibold text-ink flex items-center justify-between">
-                  <span>Kiểm tra bản nháp (DEC-09)</span>
+                  <span>Kiểm tra bản nháp</span>
                   {invoice.reviewed_at ? (
                     <Badge tone="success">Đã kiểm tra</Badge>
                   ) : (
@@ -220,7 +220,7 @@ export default async function InvoiceDetailPage(props: {
 
               <div className="rounded-md border border-stroke bg-surface-subtle p-3">
                 <div className="font-semibold text-ink flex items-center justify-between">
-                  <span>Cổng HG8: Hóa đơn chính thức</span>
+                  <span>Hóa đơn chính thức</span>
                   {invoice.erp_ref ? (
                     <Badge tone="brand">Đã cấp số ERP</Badge>
                   ) : (
@@ -236,7 +236,7 @@ export default async function InvoiceDetailPage(props: {
                   </div>
                 ) : (
                   <p className="mt-1 text-ink-subtle">
-                    Hóa đơn nháp chưa được gửi cho khách hàng. Chỉ khi tiếp nhận số chính thức từ ERP mới gửi email cho khách (DEC-08).
+                    Hóa đơn nháp chưa được gửi cho khách hàng. Chỉ khi tiếp nhận số chính thức từ ERP mới gửi email cho khách.
                   </p>
                 )}
               </div>
@@ -245,7 +245,7 @@ export default async function InvoiceDetailPage(props: {
 
           {/* Cột 3: Lịch & Thông tin khách hàng */}
           <div className="rounded-lg border border-stroke bg-surface p-5 shadow-xs space-y-4">
-            <h3 className="font-semibold text-ink border-b border-stroke pb-3">Kỳ hạn & Khách hàng</h3>
+            <h3 className="font-semibold text-ink border-b border-stroke pb-3">Kỳ hạn và Khách hàng</h3>
 
             <div className="space-y-2 text-xs">
               <div>
@@ -292,7 +292,7 @@ export default async function InvoiceDetailPage(props: {
         {/* Hàng 2: Chi tiết các dòng hàng hóa đơn (FR-64) */}
         <div className="rounded-lg border border-stroke bg-surface shadow-xs">
           <div className="border-b border-stroke px-6 py-4">
-            <h3 className="font-semibold text-ink">Chi tiết sản phẩm & Dịch vụ trong hóa đơn (FR-64)</h3>
+            <h3 className="font-semibold text-ink">Chi tiết sản phẩm và Dịch vụ trong hóa đơn</h3>
           </div>
           <div className="overflow-x-auto p-4">
             <table className="w-full text-left text-sm">
@@ -327,7 +327,7 @@ export default async function InvoiceDetailPage(props: {
           {/* Lịch sử thanh toán đã phân bổ */}
           <div className="rounded-lg border border-stroke bg-surface p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-stroke pb-3">
-              <h3 className="font-semibold text-ink">Lịch sử thanh toán phân bổ (FR-69, DEC-23)</h3>
+              <h3 className="font-semibold text-ink">Lịch sử thanh toán phân bổ</h3>
               <span className="text-xs text-ink-subtle">{allocations.length} lượt giao dịch</span>
             </div>
 
@@ -397,7 +397,7 @@ export default async function InvoiceDetailPage(props: {
                       className="input text-xs py-1 flex-1"
                     />
                     <button type="submit" className="btn btn-primary text-xs px-3 py-1">
-                      Ghi nhận (DEC-23)
+                      Ghi nhận
                     </button>
                   </div>
                 </form>
@@ -408,7 +408,7 @@ export default async function InvoiceDetailPage(props: {
           {/* Cổng thanh toán trực tuyến (FR-70, DEC-13) */}
           <div className="rounded-lg border border-stroke bg-surface p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-stroke pb-3">
-              <h3 className="font-semibold text-ink">Cổng thanh toán trực tuyến (FR-70)</h3>
+              <h3 className="font-semibold text-ink">Cổng thanh toán trực tuyến</h3>
               <span className="text-xs text-ink-subtle">Tích hợp Payment Gateway</span>
             </div>
 
@@ -459,7 +459,7 @@ export default async function InvoiceDetailPage(props: {
         {/* Hàng 4: Yêu cầu điều chỉnh / hủy hóa đơn (FR-73) */}
         <div className="rounded-lg border border-stroke bg-surface p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-stroke pb-3">
-            <h3 className="font-semibold text-ink">Đề nghị & Xử lý điều chỉnh / Hủy hóa đơn (FR-73)</h3>
+            <h3 className="font-semibold text-ink">Đề nghị và Xử lý điều chỉnh / Hủy hóa đơn</h3>
             <span className="text-xs text-ink-subtle">Kiểm soát phân quyền theo vai trò</span>
           </div>
 
@@ -547,7 +547,7 @@ export default async function InvoiceDetailPage(props: {
         {/* Hàng 5: Lịch sử thay đổi & Sự kiện đồng bộ ERP (FR-74, FR-72) */}
         <div className="rounded-lg border border-stroke bg-surface p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between border-b border-stroke pb-3">
-            <h3 className="font-semibold text-ink">Lịch sử chứng từ & Sự kiện Kế toán (FR-74, FR-72)</h3>
+            <h3 className="font-semibold text-ink">Lịch sử chứng từ và Sự kiện Kế toán</h3>
             <span className="text-xs text-ink-subtle">{history.audits.length} bản ghi nhật ký</span>
           </div>
 
@@ -576,7 +576,7 @@ export default async function InvoiceDetailPage(props: {
 
             {/* Sự kiện đồng bộ ERP */}
             <div>
-              <h4 className="font-semibold text-ink mb-2">Sự kiện trao đổi dữ liệu ERP (FR-72):</h4>
+              <h4 className="font-semibold text-ink mb-2">Sự kiện trao đổi dữ liệu ERP:</h4>
               {history.syncEvents.length === 0 ? (
                 <p className="text-ink-subtle italic">Chưa có sự kiện trao đổi với ERP.</p>
               ) : (

@@ -23,7 +23,7 @@ import {
 } from "@/components/ui";
 import { updateDiscountPolicyAction } from "./actions";
 
-export const metadata: Metadata = { title: "Danh mục sản phẩm & Bảng giá" };
+export const metadata: Metadata = { title: "Danh mục sản phẩm và Bảng giá" };
 
 export default async function CatalogPage({
   searchParams,
@@ -74,8 +74,8 @@ export default async function CatalogPage({
       <Flash sp={sp} />
 
       <PageTitle
-        title="Sản phẩm, Dịch vụ & Bảng giá"
-        subtitle="Quản lý danh mục gói SaaS, mô-đun, bảng giá theo phân khúc và hạn mức duyệt chiết khấu · FR-21 → FR-29"
+        title="Sản phẩm, Dịch vụ và Bảng giá"
+        subtitle="Quản lý danh mục gói SaaS, mô-đun, bảng giá theo phân khúc và hạn mức duyệt chiết khấu"
         icon="product"
       />
 
@@ -83,9 +83,9 @@ export default async function CatalogPage({
         base="/catalog"
         current={tab}
         tabs={[
-          { key: "products", label: "Sản phẩm & Dịch vụ", count: products.length },
-          { key: "price_lists", label: "Bảng giá & Phân khúc", count: priceLists.length },
-          { key: "discounts", label: "Chính sách chiết khấu (BR-05)" },
+          { key: "products", label: "Sản phẩm và Dịch vụ", count: products.length },
+          { key: "price_lists", label: "Bảng giá và Phân khúc", count: priceLists.length },
+          { key: "discounts", label: "Chính sách chiết khấu" },
         ]}
       />
 
@@ -135,7 +135,7 @@ export default async function CatalogPage({
 
             <div className="rounded-lg bg-surface shadow-[var(--shadow-4)]">
               <div className="flex items-center justify-between border-b border-[#f0f0f0] px-4 py-2.5 text-sm text-ink-3">
-                <span>Danh mục sản phẩm & dịch vụ</span>
+                <span>Danh mục sản phẩm và dịch vụ</span>
                 <span>{products.length} bản ghi</span>
               </div>
 
@@ -190,7 +190,7 @@ export default async function CatalogPage({
         {tab === "price_lists" && (
           <div className="space-y-4">
             <MessageBar intent="info">
-              Theo quyết định kiến trúc BR-03 & BR-22: Mỗi bảng giá có loại tiền tệ duy nhất, thời gian hiệu lực và thuế suất GTGT theo từng dòng. Bảng giá tự động gán theo phân khúc khách hàng (SMB dưới 200 nhân sự, Enterprise từ 200 nhân sự trở lên).
+              Mỗi bảng giá có loại tiền tệ duy nhất, thời gian hiệu lực và thuế suất GTGT theo từng dòng. Bảng giá tự động gán theo phân khúc khách hàng (SMB dưới 200 nhân sự, Enterprise từ 200 nhân sự trở lên).
             </MessageBar>
 
             <div className="rounded-lg bg-surface shadow-[var(--shadow-4)]">
@@ -257,16 +257,16 @@ export default async function CatalogPage({
         {/* TAB 3: CHÍNH SÁCH CHIẾT KHẤU */}
         {tab === "discounts" && (
           <div className="max-w-3xl space-y-4">
-            <Card title="Chính sách chiết khấu và hạn mức duyệt (FR-29, BR-05)">
+            <Card title="Chính sách chiết khấu và hạn mức duyệt">
               <div className="space-y-4">
                 <div className="rounded-md border border-stroke bg-gray-50/60 p-4 text-sm space-y-2">
-                  <div className="font-semibold text-ink-1">Quy tắc nghiệp vụ BR-05:</div>
+                  <div className="font-semibold text-ink-1">Quy tắc chiết khấu:</div>
                   <ul className="list-disc pl-5 space-y-1 text-xs text-ink-2">
                     <li>
                       <strong>Chiết khấu tự động (≤ {discountThreshold}%):</strong> Nhân viên kinh doanh (SALES) được phép tự áp dụng vào báo giá mà không cần phê duyệt.
                     </li>
                     <li>
-                      <strong>Chiết khấu cần duyệt (&gt; {discountThreshold}% đến {discountMax}%):</strong> Cần Quản lý kinh doanh (SALES_MANAGER) phê duyệt thông qua Cổng kiểm soát HG7 trước khi gửi cho khách hàng.
+                      <strong>Chiết khấu cần duyệt (&gt; {discountThreshold}% đến {discountMax}%):</strong> Cần Quản lý kinh doanh (SALES_MANAGER) phê duyệt trước khi gửi cho khách hàng.
                     </li>
                     <li>
                       <strong>Chiết khấu vượt mức (&gt; {discountMax}%):</strong> Hệ thống chặn hoàn toàn, không cho phép áp dụng.
@@ -316,7 +316,7 @@ export default async function CatalogPage({
                   </form>
                 ) : (
                   <MessageBar intent="info">
-                    Bạn chỉ có quyền xem chính sách chiết khấu. Chỉ Quản lý kinh doanh (SALES_MANAGER) mới có quyền chỉnh sửa các tham số này (FR-29).
+                    Bạn chỉ có quyền xem chính sách chiết khấu. Chỉ Quản lý kinh doanh (SALES_MANAGER) mới có quyền chỉnh sửa các tham số này.
                   </MessageBar>
                 )}
               </div>

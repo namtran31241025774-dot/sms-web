@@ -15,7 +15,7 @@ export default async function NewProductPage() {
     <>
       <CommandBar>
         <button type="submit" form="new-product" className="cmd">
-          Lưu & đóng
+          Lưu và đóng
         </button>
         <CommandLink href="/catalog" icon="arrowLeft">
           Quay lại danh mục
@@ -24,13 +24,13 @@ export default async function NewProductPage() {
 
       <PageTitle
         title="Thêm Sản phẩm, Dịch vụ hoặc Mô-đun mới"
-        subtitle="Catalog · Master Data · FR-21, FR-24, FR-25"
+        subtitle="Danh mục · Dữ liệu gốc"
         icon="product"
       />
 
       <form id="new-product" action={createProductAction} className="grid max-w-4xl gap-4 px-6 pb-10">
         <MessageBar intent="info">
-          Hệ thống tự động kiểm tra trùng mã sản phẩm. Cập nhật danh mục không tự thay đổi nội dung đã được xác nhận trên các báo giá hoặc đơn hàng đã có (FR-21).
+          Hệ thống tự động kiểm tra trùng mã sản phẩm. Cập nhật danh mục không tự thay đổi nội dung đã được xác nhận trên các báo giá hoặc đơn hàng đã có.
         </MessageBar>
 
         <Card title="Thông tin sản phẩm">
@@ -46,9 +46,9 @@ export default async function NewProductPage() {
 
             <FormField label="Loại sản phẩm" required>
               <select name="type" required className="select" defaultValue="SUBSCRIPTION">
-                <option value="PACKAGE">Gói giải pháp toàn diện (Package - FR-25)</option>
+                <option value="PACKAGE">Gói giải pháp toàn diện (Package)</option>
                 <option value="SUBSCRIPTION">Thuê bao phần mềm (Subscription)</option>
-                <option value="MODULE">Mô-đun tính năng (Module - FR-24)</option>
+                <option value="MODULE">Mô-đun tính năng (Module)</option>
                 <option value="SERVICE">Dịch vụ triển khai (Service)</option>
                 <option value="TRAINING">Dịch vụ đào tạo (Training)</option>
               </select>
@@ -59,7 +59,7 @@ export default async function NewProductPage() {
                 name="name"
                 required
                 className="input"
-                placeholder="Ví dụ: Sales Cloud Enterprise, Triển khai & tích hợp ERP..."
+                placeholder="Ví dụ: Sales Cloud Enterprise, Triển khai và tích hợp ERP..."
               />
             </FormField>
 
@@ -98,7 +98,7 @@ export default async function NewProductPage() {
           </div>
         </Card>
 
-        <Card title="Chính sách quyền sử dụng (License Policy · FR-26)">
+        <Card title="Chính sách quyền sử dụng (License Policy ·)">
           <div className="space-y-3">
             <p className="text-xs text-ink-3">
               Quy định điều kiện cấp phép quyền sử dụng, số lượng tối thiểu và chu kỳ tính cước làm căn cứ cho cơ hội và báo giá tham chiếu thống nhất.

@@ -74,7 +74,7 @@ export default async function AccountDetailPage({ params, searchParams }: PagePr
         base={base}
         current={tab}
         tabs={[
-          { key: "summary", label: "Tổng quan & 360°" },
+          { key: "summary", label: "Tổng quan và 360°" },
           { key: "contacts", label: "Người liên hệ", count: contacts.length },
           { key: "opportunities", label: "Cơ hội bán hàng", count: opportunities.length },
           { key: "activities", label: "Lịch sử tương tác", count: interactions.length },

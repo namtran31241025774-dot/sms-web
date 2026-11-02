@@ -22,14 +22,14 @@ export default async function NewLeadPage({ searchParams }: PageProps<"/leads/ne
   return (
     <>
       <CommandBar>
-        <button type="submit" form="new-lead" className="cmd">Lưu & đóng</button>
+        <button type="submit" form="new-lead" className="cmd">Lưu và đóng</button>
         <CommandLink href="/leads" icon="arrowLeft">Quay lại</CommandLink>
       </CommandBar>
       <Flash sp={sp} />
       <PageTitle title="Tạo Lead mới" subtitle="Khách hàng tiềm năng · Qualify" icon="lead" />
       <form id="new-lead" action={createLeadAction} className="grid max-w-5xl gap-4 px-6 pb-8">
         <MessageBar intent="info">
-          Hệ thống tự chuẩn hóa email/SĐT/địa chỉ và cảnh báo nếu phát hiện trùng lặp theo quy tắc BR-21. Bản ghi trùng chỉ được gắn cờ cảnh báo, không tự ý gộp.
+          Hệ thống tự chuẩn hóa email/SĐT/địa chỉ và cảnh báo nếu phát hiện trùng lặp. Bản ghi trùng chỉ được gắn cờ cảnh báo, không tự ý gộp.
         </MessageBar>
 
         {/* FR-11: Liên kết Account / Contact có sẵn để tự động điền */}
@@ -57,7 +57,7 @@ export default async function NewLeadPage({ searchParams }: PageProps<"/leads/ne
           </p>
         </Card>
 
-        <Card title="Thông tin khách hàng & Nhu cầu">
+        <Card title="Thông tin khách hàng và Nhu cầu">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <FormField label="Tên công ty" required>
               <input name="company_name" required className="input" placeholder="Tên doanh nghiệp..." />

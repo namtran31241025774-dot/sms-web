@@ -25,7 +25,7 @@ export default async function NewTeamPage() {
 
       <PageTitle
         title="Tạo Sale Pod bán hàng mới"
-        subtitle="Cơ cấu nhóm bán hàng và phạm vi phụ trách (FR-79, FR-81)"
+        subtitle="Cơ cấu nhóm bán hàng và phạm vi phụ trách"
         icon="people"
       />
 
@@ -50,14 +50,14 @@ export default async function NewTeamPage() {
                   type="text"
                   name="name"
                   required
-                  placeholder="vd: Sale Pod Doanh nghiệp vừa & nhỏ TP.HCM"
+                  placeholder="vd: Sale Pod Doanh nghiệp vừa và nhỏ TP.HCM"
                   className="input"
                 />
               </div>
             </div>
 
             <div>
-              <label className="label">Trưởng nhóm (Leader - FR-80)</label>
+              <label className="label">Trưởng nhóm (Leader)</label>
               <select name="leader_id" className="select">
                 <option value="">-- Chưa chỉ định --</option>
                 {leaders.map((u) => (
@@ -70,7 +70,7 @@ export default async function NewTeamPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="label">Khu vực địa lý (Territory - FR-81)</label>
+                <label className="label">Khu vực địa lý (Territory)</label>
                 <input
                   type="text"
                   name="territory"
@@ -80,7 +80,7 @@ export default async function NewTeamPage() {
               </div>
 
               <div>
-                <label className="label">Phân khúc khách hàng (FR-81, BR-03)</label>
+                <label className="label">Phân khúc khách hàng</label>
                 <select name="target_segment" className="select" defaultValue="ALL">
                   <option value="ALL">Tất cả phân khúc</option>
                   <option value="SMB">Doanh nghiệp vừa và nhỏ (SMB - dưới 200 nhân sự)</option>
@@ -90,7 +90,7 @@ export default async function NewTeamPage() {
             </div>
 
             <div>
-              <label className="label">Dòng sản phẩm phụ trách (FR-81)</label>
+              <label className="label">Dòng sản phẩm phụ trách</label>
               <input
                 type="text"
                 name="product_line"

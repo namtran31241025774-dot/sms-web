@@ -40,7 +40,7 @@ export default async function InvoicesPage(props: {
     <div className="flex flex-1 flex-col overflow-auto bg-surface">
       <CommandBar>
         <CommandLink href="/invoices/new" icon="add">
-          Lập hóa đơn nháp (FR-64)
+          Lập hóa đơn nháp
         </CommandLink>
         <CommandLink href="/orders" icon="order">
           Danh sách đơn hàng
@@ -51,15 +51,15 @@ export default async function InvoicesPage(props: {
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-ink-subtle hover:bg-surface-hover rounded transition"
             title="Đồng bộ hóa đơn và trạng thái đối soát từ hệ thống kế toán ERP"
           >
-            <span>🔄</span> Đồng bộ ERP (FR-72)
+            <span>🔄</span> Đồng bộ ERP
           </button>
         </form>
       </CommandBar>
 
       <PageTitle
         icon="invoice"
-        title="Quản lý Hóa đơn & Thanh toán (FR-64 → FR-74)"
-        subtitle="Theo dõi hóa đơn nháp, kiểm soát phát hành qua ERP (HG8 / DEC-08), thanh toán trực tuyến và đối soát kế toán"
+        title="Quản lý Hóa đơn và Thanh toán"
+        subtitle="Theo dõi hóa đơn nháp, kiểm soát phát hành qua ERP, thanh toán trực tuyến và đối soát kế toán"
       />
 
       {/* Thống kê tài chính nhanh */}
@@ -73,7 +73,7 @@ export default async function InvoicesPage(props: {
         </div>
 
         <div className="rounded-lg border border-stroke bg-surface p-4 shadow-xs">
-          <div className="text-xs font-medium text-ink-subtle">Đã thực thu (DEC-23)</div>
+          <div className="text-xs font-medium text-ink-subtle">Đã thực thu</div>
           <div className="mt-1 text-xl font-bold text-success">
             {totalPaid.toLocaleString("vi-VN")} đ
           </div>
@@ -91,7 +91,7 @@ export default async function InvoicesPage(props: {
         </div>
 
         <div className="rounded-lg border border-stroke bg-surface p-4 shadow-xs">
-          <div className="text-xs font-medium text-ink-subtle">Hóa đơn quá hạn (BR-13)</div>
+          <div className="text-xs font-medium text-ink-subtle">Hóa đơn quá hạn</div>
           <div className="mt-1 text-xl font-bold text-danger">
             {dunningReports.length}
           </div>
@@ -106,11 +106,11 @@ export default async function InvoicesPage(props: {
             <div className="flex items-center gap-2">
               <span className="text-base">⚠️</span>
               <span className="text-xs font-semibold text-warning-contrast">
-                Cảnh báo công nợ (FR-71): Có {dunningReports.length} hóa đơn đã quá hạn thanh toán chưa hoàn tất.
+                Cảnh báo công nợ: Có {dunningReports.length} hóa đơn đã quá hạn thanh toán chưa hoàn tất.
               </span>
             </div>
             <span className="text-xs text-ink-subtle">
-              Chu kỳ nhắc thanh toán: tối thiểu 7 ngày (BR-13)
+              Chu kỳ nhắc thanh toán: tối thiểu 7 ngày
             </span>
           </div>
         </div>
@@ -180,7 +180,7 @@ export default async function InvoicesPage(props: {
                   <th className="px-4 py-3 text-right">Đã thanh toán</th>
                   <th className="px-4 py-3">Hạn thanh toán</th>
                   <th className="px-4 py-3 text-center">Trạng thái</th>
-                  <th className="px-4 py-3">Mã ERP (HG8)</th>
+                  <th className="px-4 py-3">Mã ERP</th>
                   <th className="px-4 py-3 text-right">Thao tác</th>
                 </tr>
               </thead>
@@ -247,7 +247,7 @@ export default async function InvoicesPage(props: {
                           <StatusBadge status={inv.status} labels={INVOICE_STATUS} />
                           {inv.status === "DRAFT" && inv.reviewed_at && (
                             <span className="rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium text-brand">
-                              ✓ Đã kiểm tra (DEC-09)
+                              ✓ Đã kiểm tra
                             </span>
                           )}
                         </div>

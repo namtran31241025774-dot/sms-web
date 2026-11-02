@@ -1,3 +1,5 @@
+import { OpportunityProcessFlow } from "@/components/opportunity-process-flow";
+import { OpportunityResearchView } from "@/components/opportunity-research-view";
 import { OpportunityDocuments } from "@/components/opportunity-documents";
 import { listOpportunityDocuments, pendingExtraction, pendingSolutionExtraction } from "@/lib/services/documents";
 import { agentMode } from "@/lib/agents/runtime";
@@ -11,12 +13,10 @@ import { can } from "@/lib/rbac";
 import { listRuns } from "@/lib/services/ai-review";
 import { approvalsFor } from "@/lib/services/approvals";
 import { activitiesFor, auditTrail, settingNumber, users } from "@/lib/services/core";
-import { ImportanceScale } from "@/components/agent-controls";
 import { contactsOf, listCompetitors, listPriceLists, listProducts } from "@/lib/services/master";
 import {
   checklistStatus,
   competitorsOf,
-  gateState,
   getOpportunity,
   getScopeDocument,
   expertReviewInfo,
@@ -32,12 +32,9 @@ import {
 } from "@/lib/services/opportunities";
 import { quotesOf } from "@/lib/services/quotes";
 import { SubmitButton } from "@/components/client";
-import { RuleEvaluationTable } from "@/components/rule-evaluation-table";
-import { ResearchFlow } from "@/components/research-flow";
 import { stageGateStatus } from "@/lib/services/approvals";
 import { Icon } from "@/components/icons";
 import { AgentRuns, AuditTrail, SALES_STAGES, Timeline } from "@/components/record";
-import { OpportunityNextActions } from "@/components/opportunity-next-actions";
 import {
   Badge, Card, CommandAction, CommandBar, CommandLink, CommandSep, Empty, Flash, FormField, Grid, HeaderField, MessageBar, PageTitle, Persona, ProcessFlow, StatusBadge, Tabs,
 } from "@/components/ui";
@@ -81,7 +78,6 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
   const canExpertReview = can(user.role, "opp.expert_review");
 
   const checklist = checklistStatus(o);
-  const gate = gateState(o);
   const gateStatus = stageGateStatus(o);
   const documents = listOpportunityDocuments(o.id);
   const stakeholders = stakeholdersOf(o.id);
@@ -105,7 +101,6 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
   );
   const base = `/opportunities/${o.id}`;
   const bpfStage = o.stage === "WON" ? "FULFILL" : o.stage === "LOST" ? "CLOSE" : o.stage;
-  const pendingResearch = research.find((r) => r.status === "PENDING_REVIEW");
 
   return (
     <>
@@ -149,57 +144,57 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
       />
       <ProcessFlow stages={SALES_STAGES} current={bpfStage} lost={o.stage === "LOST"} />
 
+      {/* Luồng xử lý quy trình cho Develop và Propose (thay thế các thanh cảnh báo rời rạc) */}
+      <OpportunityProcessFlow
+        stage={o.stage}
+        oppId={o.id}
+        hasInitialResearch={research.length > 0}
+        hasPostSurveyResearch={research.length > 1}
+        hasPresales={!!o.presales_id}
+        hasCustomerNeed={!!o.customer_need}
+        scopeConfirmed={scopeDoc?.status === "CONFIRMED"}
+        solutionConfirmed={Boolean((o as { solution_confirmed?: number | boolean }).solution_confirmed)}
+        hasSolutions={solutions.length > 0}
+        hasItems={items.length > 0}
+        expertReviewRequired={expCheck.required}
+        expertReviewStatus={o.expert_review_status}
+        expertReviewReason={expCheck.reason ?? undefined}
+        hasStakeholders={stakeholders.length > 0}
+        hasCompetitors={competitors.length > 0}
+        gateStatus={gateStatus}
+        canReviewGate={can(user.role, "opp.manager_review")}
+        canExpertReview={canExpertReview}
+        hasQuotes={quotes.length > 0}
+        quotesRequireDiscountApproval={quotes.some((q) => q.max_discount_pct > settingNumber("discount_threshold_pct"))}
+        hasSentQuote={quotes.some((q) => q.status === "SENT" || q.status === "ACCEPTED")}
+        hasCustomerResponse={quotes.some((q) => q.status === "ACCEPTED" || q.status === "REJECTED")}
+        isQuoteAccepted={quotes.some((q) => q.status === "ACCEPTED")}
+      />
+
       <div className="space-y-2 px-6">
         {o.stage === "LOST" && (
-          <MessageBar intent="warning" title={`Cơ hội đã đóng thất bại (LOST): ${o.lost_reason_code ?? ""}`}>
+          <MessageBar intent="warning" title={`Cơ hội đã đóng thất bại: ${o.lost_reason_code ?? ""}`}>
             {o.lost_reason}
           </MessageBar>
         )}
         {o.reopened_at && (
-          <MessageBar intent="info" title="Cơ hội đã được mở lại theo quy tắc BR-17:">
+          <MessageBar intent="info" title="Cơ hội đã được mở lại:">
             Mở lại lúc {formatDate(o.reopened_at, true)} — Lý do: {o.reopen_reason}
           </MessageBar>
-        )}
-        {o.stage === "DEVELOP" && expCheck.required && (
-          <MessageBar
-            intent={o.expert_review_status === "APPROVED" ? "success" : o.expert_review_status === "PENDING" ? "warning" : "error"}
-            title="Cổng duyệt chuyên môn giải pháp (FR-42, BR-07):"
-          >
-            {expCheck.reason} — Trạng thái:{" "}
-            {o.expert_review_status === "APPROVED"
-              ? "Đã được Quản lý kinh doanh phê duyệt."
-              : o.expert_review_status === "PENDING"
-              ? "Đang chờ Quản lý duyệt."
-              : "Bắt buộc duyệt trước khi chuyển sang Đề xuất giải pháp (Propose)."}
-          </MessageBar>
-        )}
-        {o.stage === "DEVELOP" && gate.required && (
-          <MessageBar intent={gate.approval?.status === "APPROVED" ? "success" : "warning"} title="Cổng Quản lý kinh doanh rà soát (BR-06):">
-            {gate.reasons.join("; ")} —{" "}
-            {gate.approval?.status === "APPROVED"
-              ? "Đã được Sales Manager duyệt."
-              : gate.approval?.status === "PENDING"
-              ? "Đang chờ Sales Manager rà soát."
-              : "Cần Sales Manager rà soát khi chuyển sang Propose."}
-          </MessageBar>
-        )}
-        {pendingResearch && (
-          <MessageBar intent="info" title="Opportunity Agent có nghiên cứu mới chờ AE xác minh." action={<Link className="link whitespace-nowrap text-sm" href={`${base}?tab=research`}>Xem nghiên cứu</Link>} />
         )}
       </div>
 
       <Tabs
         base={base}
-        current={tab}
+        current={tab === "scope" ? "items" : tab}
         tabs={[
           { key: "summary", label: "Tóm tắt" },
-          { key: "scope", label: "Phạm vi triển khai", count: scopeDoc ? 1 : 0 },
-          { key: "items", label: "Sản phẩm & Giải pháp", count: items.length },
-          { key: "solution", label: "Hồ sơ kỹ thuật", count: solutions.length },
-          { key: "stakeholders", label: "Stakeholders & Đối thủ", count: stakeholders.length + competitors.length },
-          { key: "risks", label: "Quản lý rủi ro", count: risks.filter((r) => r.status === "OPEN").length },
-          { key: "documents", label: "Tài liệu", count: documents.length },
           { key: "research", label: "Nghiên cứu AI", count: research.length },
+          { key: "documents", label: "Tài liệu", count: documents.length },
+          { key: "items", label: "Phạm vi và sản phẩm", count: items.length + (scopeDoc ? 1 : 0) },
+          { key: "solution", label: "Hồ sơ kỹ thuật", count: solutions.length },
+          { key: "stakeholders", label: "Bên liên quan và đối thủ", count: stakeholders.length + competitors.length },
+          { key: "risks", label: "Rủi ro", count: risks.filter((r) => r.status === "OPEN").length },
           { key: "quotes", label: "Báo giá", count: quotes.length },
           { key: "activities", label: "Hoạt động", count: activities.length },
           { key: "audit", label: "Nhật ký" },
@@ -211,7 +206,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
         {tab === "summary" && (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_380px]">
             <div className="space-y-4">
-              <Card title="Thông tin Cơ hội (FR-35)">
+              <Card title="Thông tin cơ hội">
                 <form id="opp-form" action={updateOppAction} className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <input type="hidden" name="id" value={o.id} />
                   <fieldset disabled={!canWrite} className="contents">
@@ -264,13 +259,13 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                 </form>
               </Card>
 
-              {/* Mở lại cơ hội theo BR-17 */}
+              {/* Mở lại cơ hội */}
               {!open && canReopen && (
-                <Card title="Mở lại Cơ hội đã đóng (BR-17)">
+                <Card title="Mở lại cơ hội đã đóng">
                   <form action={reopenAction} className="space-y-3">
                     <input type="hidden" name="id" value={o.id} />
                     <p className="text-sm text-ink-2">
-                      Quy tắc BR-17: Chỉ Quản lý kinh doanh (SALES_MANAGER) được mở lại cơ hội trong vòng 90 ngày kể từ ngày đóng, bắt buộc ghi rõ lý do.
+                      Chỉ Quản lý kinh doanh (SALES_MANAGER) được mở lại cơ hội trong vòng 90 ngày kể từ ngày đóng, bắt buộc ghi rõ lý do.
                     </p>
                     <FormField label="Lý do mở lại cơ hội" required>
                       <input name="reason" required placeholder="VD: Khách hàng tái khởi động ngân sách quý 4..." className="input" />
@@ -280,15 +275,15 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                 </Card>
               )}
 
-              {/* Đóng cơ hội thất bại theo BR-27 */}
+              {/* Đóng cơ hội thất bại */}
               {open && can(user.role, "opp.stage") && (
-                <Card title="Đóng Cơ hội: Thất bại (FR-47, BR-27)">
+                <Card title="Đóng cơ hội thất bại">
                   <div id="lost" />
                   <form action={lostAction} className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
                     <input type="hidden" name="id" value={o.id} />
-                    <FormField label="Lý do thất bại (BR-27)" required>
+                    <FormField label="Lý do thất bại" required>
                       <select name="reason" required className="select" defaultValue="">
-                        <option value="" disabled>Chọn lý do theo chuẩn BR-27…</option>
+                        <option value="" disabled>Chọn lý do thất bại…</option>
                         {LOST_REASONS_BR27.map((r) => <option key={r} value={r}>{r}</option>)}
                       </select>
                     </FormField>
@@ -323,7 +318,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
             </div>
 
             <div className="space-y-4">
-              <Card title="Checklist Develop (4 mục kiểm soát - FR-46)">
+              <Card title="Mục kiểm soát giai đoạn Phát triển cơ hội">
                 <ul className="space-y-1">
                   {checklist.map((c) => {
                     const allowed = c.key === "solution_confirmed" ? canSolution : canWrite;
@@ -374,10 +369,10 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
           </div>
         )}
 
-        {/* TAB 2: SCOPE DOCUMENT (FR-37) */}
-        {tab === "scope" && (
-          <div className="space-y-4 max-w-4xl">
-            <Card title="Biên bản phạm vi triển khai & Nhu cầu chi tiết (FR-37)">
+        {/* TAB: SCOPE & ITEMS (Phạm vi và sản phẩm) */}
+        {(tab === "items" || tab === "scope") && (
+          <div className="space-y-6">
+            <Card title="Biên bản phạm vi triển khai và nhu cầu chi tiết">
               <form action={scopeDocAction} className="space-y-4">
                 <input type="hidden" name="id" value={o.id} />
                 {scopeDoc && <input type="hidden" name="doc_id" value={scopeDoc.id} />}
@@ -414,7 +409,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                   />
                 </FormField>
 
-                <FormField label="Nhu cầu chi tiết & Phạm vi hệ thống">
+                <FormField label="Nhu cầu chi tiết và phạm vi hệ thống">
                   <textarea
                     name="content"
                     defaultValue={scopeDoc?.content ?? o.customer_need ?? ""}
@@ -441,13 +436,9 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                 )}
               </form>
             </Card>
-          </div>
-        )}
 
-        {/* TAB 3: ITEMS (FR-38) */}
-        {tab === "items" && (
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
-            <Card title="Danh sách sản phẩm, dịch vụ & Gói giải pháp (FR-38)" pad={false}>
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
+              <Card title="Danh sách sản phẩm, dịch vụ và cấu hình dự kiến" pad={false}>
               {items.length ? (
                 <Grid>
                   <thead>
@@ -528,6 +519,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                 </form>
               </Card>
             )}
+            </div>
           </div>
         )}
 
@@ -542,7 +534,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                     : `Đọc từ ${pendingSolution.document_name}. Cơ hội chưa có người xác nhận, hãy chọn Chuyên viên tư vấn giải pháp phụ trách ở tab Tóm tắt.`}
                 </MessageBar>
               )}
-              <Card title="Hồ sơ giải pháp & Phương án kỹ thuật (FR-41)" pad={false}>
+              <Card title="Hồ sơ giải pháp và phương án kỹ thuật" pad={false}>
                 {solutions.length ? (
                   <div className="divide-y divide-[#f0f0f0]">
                     {solutions.map((sol) => (
@@ -576,8 +568,8 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                 )}
               </Card>
 
-              {/* Cổng Duyệt chuyên môn FR-42 & BR-07 */}
-              <Card title="Cổng Duyệt chuyên môn giải pháp (FR-42, BR-07)">
+              {/* Cổng Duyệt chuyên môn */}
+              <Card title="Cổng duyệt chuyên môn giải pháp">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -598,7 +590,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                     )}
                   </div>
                   <p className="text-xs text-ink-3">
-                    Điều kiện áp dụng (BR-07): Có yêu cầu tích hợp với hệ thống khác, hoặc giá trị cơ hội ≥ {formatVnd(expertReviewMinAmount())}.
+                    Điều kiện áp dụng: Có yêu cầu tích hợp với hệ thống khác hoặc giá trị cơ hội ≥ {formatVnd(expertReviewMinAmount())}.
                   </p>
                   {expInfo.reset && o.expert_review_status === "NONE" && (
                     <p className="text-sm text-ink-2">Hồ sơ đã thay đổi sau lần phê duyệt trước, cần gửi duyệt lại.</p>
@@ -716,7 +708,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                   </FormField>
                   <label className="flex items-center gap-2 text-sm cursor-pointer pt-1">
                     <input type="checkbox" name="integration_required" value="1" className="accent-[var(--brand)]" />
-                    Có yêu cầu tích hợp với hệ thống ngoài (Kích hoạt BR-07)
+                    Có yêu cầu tích hợp với hệ thống ngoài (Kích hoạt)
                   </label>
                   <FormField label="Rủi ro kỹ thuật">
                     <input name="risks" placeholder="Rủi ro về dữ liệu cũ, API độ trễ..." className="input" />
@@ -728,12 +720,12 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
           </div>
         )}
 
-        {/* TAB 5: STAKEHOLDERS & COMPETITORS (FR-39, FR-40, BR-19) */}
+        {/* TAB: STAKEHOLDERS & COMPETITORS */}
         {tab === "stakeholders" && (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <Card title="Bản đồ các bên liên quan (FR-39, BR-19)" pad={false}>
+            <Card title="Bản đồ các bên liên quan" pad={false}>
               <div className="p-3 bg-[#fafafa] border-b text-xs text-ink-3">
-                BR-19: Hỗ trợ 1 người liên hệ giữ nhiều vai trò trong cùng một cơ hội (VD: Người quyết định + Người dùng).
+                Hỗ trợ 1 người liên hệ giữ nhiều vai trò trong cùng một cơ hội (VD: Người quyết định, Người dùng).
               </div>
               <ul>
                 {stakeholders.map((s) => (
@@ -762,7 +754,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
               )}
             </Card>
 
-            <Card title="Đối thủ cạnh tranh (FR-40)" pad={false}>
+            <Card title="Đối thủ cạnh tranh" pad={false}>
               <ul>
                 {competitors.map((c) => (
                   <li key={c.id} className="flex items-start gap-2 border-b border-[#f0f0f0] px-4 py-2.5 text-sm last:border-0">
@@ -793,12 +785,12 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
           </div>
         )}
 
-        {/* TAB 6: RISKS (FR-43, HG5) */}
+        {/* TAB: RISKS */}
         {tab === "risks" && (
           <div className="space-y-4 max-w-4xl">
-            <Card title="Quản lý rủi ro cơ hội (FR-43, Cổng HG5)" pad={false}>
+            <Card title="Rủi ro cơ hội" pad={false}>
               <div className="p-3 bg-[#fafafa] border-b text-xs text-ink-3">
-                Cổng HG5: Bốn trạng thái OPEN, MITIGATED, RESOLVED, DISMISSED. Bỏ qua rủi ro (DISMISSED) bắt buộc phải có lý do giải trình.
+                Bốn trạng thái: Đang mở (OPEN), Đã giảm thiểu (MITIGATED), Đã xử lý (RESOLVED), Đã bỏ qua (DISMISSED). Bỏ qua rủi ro bắt buộc phải có lý do giải trình.
               </div>
               <ul>
                 {risks.map((r) => (
@@ -818,7 +810,7 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
 
                     {r.status === "DISMISSED" && (
                       <div className="text-xs text-ink-3 pl-2 border-l-2 border-ink-3">
-                        Lý do bỏ qua (HG5): {r.dismiss_reason} {r.resolved_at && `(${formatDate(r.resolved_at, true)})`}
+                        Lý do bỏ qua: {r.dismiss_reason} {r.resolved_at && `(${formatDate(r.resolved_at, true)})`}
                       </div>
                     )}
 
@@ -862,82 +854,17 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
           </div>
         )}
 
-        {/* TAB 7: AI RESEARCH */}
+        {/* TAB: AI RESEARCH */}
         {tab === "research" && (
           <div className="space-y-4">
-            {research.length ? (
-              research.map((r) => {
-                const rRisks = JSON.parse(r.risks_json) as { description: string; severity: string; rule_id?: string | null; unclassified?: boolean }[];
-                const sources = JSON.parse(r.sources_json) as { ref: string; detail: string }[];
-                const evals = ruleEvaluationsOf(r.id);
-                return (
-                  <Card
-                    key={r.id}
-                    title={
-                      <span className="flex items-center gap-2">
-                        <Icon name="sparkle" size={16} className="text-[#5c2e91]" /> Opportunity Research #{r.id}
-                        <StatusBadge status={r.status} labels={{ PENDING_REVIEW: "Chờ AE xác minh", VERIFIED: "Đã xác minh", DISMISSED: "Bỏ qua" }} />
-                      </span>
-                    }
-                    actions={<span className="text-xs text-ink-3">{formatDate(r.created_at, true)}{r.reviewed_by_name && ` · ${r.reviewed_by_name}`}</span>}
-                  >
-                    <form action={verifyResearchAction} className="space-y-3 text-sm">
-                      <input type="hidden" name="id" value={o.id} />
-                      <input type="hidden" name="research_id" value={r.id} />
-                      <div className="flex flex-wrap items-center gap-2">
-                        Mức quan trọng (theo quy tắc): <StatusBadge status={r.importance} labels={LEVEL} />
-                        {r.llm_importance && r.llm_importance !== r.importance && <span className="text-xs text-ink-3">LLM đề xuất {LEVEL[r.llm_importance as keyof typeof LEVEL] ?? r.llm_importance}, đã thay bằng kết quả quy tắc</span>}
-                        {r.confidence !== null && <span className="text-xs text-ink-3">· Độ bao phủ dữ liệu {Math.round(r.confidence * 100)}% ({r.confidence_band === "LOW" ? "thấp – cần bổ sung dữ liệu" : r.confidence_band === "MEDIUM" ? "trung bình" : "cao"})</span>}
-                        {r.ruleset_hash && <code className="text-[11px] text-ink-3">{r.ruleset_version}#{r.ruleset_hash}</code>}
-                      </div>
-                      <ResearchFlow research={r} evals={evals} gate={gateStatus} canReview={can(user.role, "opp.manager_review")} />
-                      {r.ruleset_version && (
-                        <div className="max-w-xl">
-                          <ImportanceScale medium={settingNumber("importance_medium_amount")} high={settingNumber("importance_high_amount")} amount={o.amount} />
-                        </div>
-                      )}
-                      <p className="text-ink-2">{r.summary}</p>
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <div>
-                          <div className="label">Rủi ro</div>
-                          <ul className="space-y-1">
-                            {rRisks.map((x, i) => (
-                              <li key={i} className="flex items-start gap-2">
-                                {r.status === "PENDING_REVIEW" && <input type="checkbox" name="risk" value={i} defaultChecked className="mt-0.5" />}
-                                <span><StatusBadge status={x.severity} labels={LEVEL} /> {x.rule_id ? <code className="text-[11px]">{x.rule_id}</code> : x.unclassified ? <span className="text-[11px] text-ink-3">Chưa phân loại (LLM)</span> : null} {x.description}</span>
-                              </li>
-                            ))}
-                            {!rRisks.length && <li className="text-ink-3">Không có</li>}
-                          </ul>
-                        </div>
-                        <div>
-                          <div className="label">Tối đa 3 hành động ưu tiên</div>
-                          <OpportunityNextActions serialized={r.next_actions_json} />
-                        </div>
-                        <div>
-                          <div className="label">Nguồn dẫn</div>
-                          <ul className="space-y-1 text-xs text-ink-2">
-                            {sources.map((s, i) => <li key={i}><code className="text-[11px]">{s.ref}</code> — {s.detail}</li>)}
-                            {!sources.length && <li className="text-ink-3">Không có</li>}
-                          </ul>
-                        </div>
-                      </div>
-                      <RuleEvaluationTable rows={evals} />
-                      {r.status === "PENDING_REVIEW" && can(user.role, "ai.review") && (
-                        <div className="flex flex-wrap items-center gap-3 border-t border-[#f0f0f0] pt-3">
-                          <label className="flex items-center gap-2"><input type="checkbox" name="apply_importance" defaultChecked /> Áp dụng mức quan trọng vào hồ sơ</label>
-                          <SubmitButton variant="primary" icon="check">Xác minh & cập nhật hồ sơ</SubmitButton>
-                          <SubmitButton name="dismiss" value="1" icon="dismiss">Bỏ qua</SubmitButton>
-                          <span className="text-xs text-ink-3">Rủi ro được chọn sẽ thêm vào danh sách rủi ro mở.</span>
-                        </div>
-                      )}
-                    </form>
-                  </Card>
-                );
-              })
-            ) : (
-              <Card><Empty icon="sparkle">Chưa có nghiên cứu. Bấm “Chạy Opportunity Agent” trên thanh lệnh.</Empty></Card>
-            )}
+            <OpportunityResearchView
+              opportunity={o}
+              researchList={research}
+              getRuleEvals={ruleEvaluationsOf}
+              gateStatus={gateStatus}
+              canVerify={open && can(user.role, "ai.review")}
+              verifyAction={verifyResearchAction}
+            />
             <AgentRuns runs={listRuns({ entityType: "opportunity", entityId: o.id })} />
           </div>
         )}

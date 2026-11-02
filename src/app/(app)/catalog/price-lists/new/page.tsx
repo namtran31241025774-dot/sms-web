@@ -13,7 +13,7 @@ export default async function NewPriceListPage() {
     <>
       <CommandBar>
         <button type="submit" form="new-pricelist" className="cmd">
-          Lưu & tiếp tục
+          Lưu và tiếp tục
         </button>
         <CommandLink href="/catalog?tab=price_lists" icon="arrowLeft">
           Quay lại danh sách
@@ -22,13 +22,13 @@ export default async function NewPriceListPage() {
 
       <PageTitle
         title="Tạo Bảng giá mới"
-        subtitle="Pricing · Master Data · FR-27, FR-28, BR-03, BR-22"
+        subtitle="Bảng giá · Dữ liệu gốc"
         icon="money"
       />
 
       <form id="new-pricelist" action={createPriceListAction} className="grid max-w-3xl gap-4 px-6 pb-10">
         <MessageBar intent="info">
-          Theo quy tắc BR-22: Mỗi bảng giá sử dụng duy nhất một loại tiền tệ (VND, USD...). Bảng giá có thể áp dụng chung hoặc gắn theo phân khúc khách hàng SMB / Enterprise (BR-03).
+          Mỗi bảng giá sử dụng duy nhất một loại tiền tệ (VND, USD...). Bảng giá có thể áp dụng chung hoặc gắn theo phân khúc khách hàng SMB / Enterprise.
         </MessageBar>
 
         <Card title="Thông tin bảng giá">
@@ -42,10 +42,10 @@ export default async function NewPriceListPage() {
               />
             </FormField>
 
-            <FormField label="Phân khúc khách hàng áp dụng" required hint="Quy tắc phân khúc BR-03">
+            <FormField label="Phân khúc khách hàng áp dụng" required>
               <select name="customer_segment" required className="select" defaultValue="ALL">
                 <option value="ALL">Áp dụng toàn bộ (ALL)</option>
-                <option value="SMB">Doanh nghiệp vừa & nhỏ (SMB &lt; 200 nhân sự)</option>
+                <option value="SMB">Doanh nghiệp vừa và nhỏ (SMB &lt; 200 nhân sự)</option>
                 <option value="ENTERPRISE">Doanh nghiệp lớn (Enterprise ≥ 200 nhân sự)</option>
               </select>
             </FormField>

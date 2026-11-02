@@ -20,7 +20,7 @@ export default async function NewEmployeePage() {
 
       <PageTitle
         title="Thêm hồ sơ nhân viên mới"
-        subtitle="Hồ sơ nghiệp vụ nhân sự bán hàng (FR-75) · Tách biệt với tài khoản đăng nhập hệ thống"
+        subtitle="Hồ sơ nghiệp vụ nhân sự bán hàng · Tách biệt với tài khoản đăng nhập hệ thống"
         icon="people"
       />
 
@@ -87,7 +87,7 @@ export default async function NewEmployeePage() {
               </div>
 
               <div>
-                <label className="label">Vai trò nghiệp vụ (FR-77)</label>
+                <label className="label">Vai trò nghiệp vụ</label>
                 <select name="business_role" className="select" defaultValue="SALES">
                   <option value="SALES">Nhân viên kinh doanh (SDR/AE/CS)</option>
                   <option value="PRESALES">Chuyên viên tư vấn giải pháp (SE)</option>
@@ -108,7 +108,7 @@ export default async function NewEmployeePage() {
               </div>
 
               <div>
-                <label className="label">Khả năng nhận việc (FR-78)</label>
+                <label className="label">Khả năng nhận việc</label>
                 <select name="can_accept_work" className="select" defaultValue="1">
                   <option value="1">Sẵn sàng nhận khách hàng / cơ hội</option>
                   <option value="0">Tạm ngưng nhận việc mới</option>

@@ -26,7 +26,7 @@ export function RuleEvaluationTable({ rows }: { rows: Row[] }) {
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="text-left text-ink-3">
-            <tr><th className="px-3 py-1">Quy tắc</th><th className="px-3 py-1">Quan sát</th><th className="px-3 py-1">Ngưỡng</th><th className="px-3 py-1">Kết quả</th><th className="px-3 py-1">Giải thích &amp; giới hạn</th><th className="px-3 py-1">Việc cần làm</th></tr>
+            <tr><th className="px-3 py-1">Quy tắc</th><th className="px-3 py-1">Quan sát</th><th className="px-3 py-1">Ngưỡng</th><th className="px-3 py-1">Kết quả</th><th className="px-3 py-1">Giải thích và giới hạn</th><th className="px-3 py-1">Việc cần làm</th></tr>
           </thead>
           <tbody>
             {rows.map((r) => {

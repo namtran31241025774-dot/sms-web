@@ -28,7 +28,7 @@ import {
   rollbackConfigAction,
 } from "./actions";
 
-export const metadata: Metadata = { title: "Quản trị & Giám sát Tác nhân AI" };
+export const metadata: Metadata = { title: "Quản trị và Giám sát Tác nhân AI" };
 
 export default async function AdminAiPage({ searchParams }: PageProps<"/admin/ai">) {
   const user = await requireUser();
@@ -53,8 +53,8 @@ export default async function AdminAiPage({ searchParams }: PageProps<"/admin/ai
     <>
       <CommandBar>
         <CommandLink href="/admin/ai?tab=runs" icon="bot">Nhật ký lần chạy</CommandLink>
-        <CommandLink href="/admin/ai?tab=configs" icon="settings">Cấu hình & Phiên bản</CommandLink>
-        <CommandLink href="/admin/ai?tab=reports" icon="chartBar">Báo cáo hiệu quả & Sửa đổi</CommandLink>
+        <CommandLink href="/admin/ai?tab=configs" icon="settings">Cấu hình và Phiên bản</CommandLink>
+        <CommandLink href="/admin/ai?tab=reports" icon="chartBar">Báo cáo hiệu quả và Sửa đổi</CommandLink>
         <CommandSep />
         <CommandLink href="/ai-review" icon="sparkle">Mở Hộp thư Kiểm duyệt (AI Review)</CommandLink>
       </CommandBar>
@@ -62,8 +62,8 @@ export default async function AdminAiPage({ searchParams }: PageProps<"/admin/ai
       <Flash sp={sp} />
 
       <PageTitle
-        title="Quản trị & Giám sát Tác nhân AI"
-        subtitle="Giám sát vận hành 2 tác nhân AI, kiểm soát ngân sách token (BR-16), phiên bản cấu hình (DEC-27) và công tắc khẩn cấp (FR-93)"
+        title="Quản trị và Giám sát Tác nhân AI"
+        subtitle="Giám sát vận hành 2 tác nhân AI, kiểm soát ngân sách token, phiên bản cấu hình và công tắc khẩn cấp"
         icon="bot"
         right={
           <div className="flex items-center gap-3">
@@ -115,7 +115,7 @@ export default async function AdminAiPage({ searchParams }: PageProps<"/admin/ai
         {stats.isFailureRateAlert && (
           <div className="rounded-lg bg-amber-50 border border-amber-300 p-4 text-xs text-amber-900 flex items-center gap-2">
             <span className="text-base font-bold">⚠️ CẢNH BÁO TỶ LỆ LỖI:</span>
-            <span>Tỷ lệ chạy lỗi trong 24h qua đạt <strong>{stats.failureRatePct}%</strong> (vượt ngưỡng cho phép {20}% theo BR-23). Vui lòng kiểm tra nhật ký lần chạy.</span>
+            <span>Tỷ lệ chạy lỗi trong 24h qua đạt <strong>{stats.failureRatePct}%</strong> (vượt ngưỡng cho phép {20}%). Vui lòng kiểm tra nhật ký lần chạy.</span>
           </div>
         )}
 
@@ -144,19 +144,19 @@ export default async function AdminAiPage({ searchParams }: PageProps<"/admin/ai
             icon="chartBar"
             label="Tỷ lệ lỗi 24h"
             value={`${stats.failureRatePct}%`}
-            sub={`${stats.failedRuns24h} lỗi / ${stats.runs24h} lần chạy (BR-23)`}
+            sub={`${stats.failedRuns24h} lỗi / ${stats.runs24h} lần chạy`}
           />
           <Kpi
             icon="dismissCircle"
             label="Công cụ bị chặn (DENIED)"
             value={stats.deniedCalls24h}
-            sub="24 giờ qua (Quyền & Bảo mật)"
+            sub="24 giờ qua (Quyền và Bảo mật)"
           />
           <Kpi
             icon="sparkle"
             label="Phản hồi người dùng"
             value={`${stats.feedbackStats.positive} 👍 / ${stats.feedbackStats.negative} 👎`}
-            sub={`${stats.feedbackStats.neutral} trung tính (FR-90)`}
+            sub={`${stats.feedbackStats.neutral} trung tính`}
           />
         </div>
 
@@ -176,7 +176,7 @@ export default async function AdminAiPage({ searchParams }: PageProps<"/admin/ai
               currentTab === "configs" ? "border-accent text-accent font-semibold" : "border-transparent text-ink-2 hover:text-ink"
             }`}
           >
-            Cấu hình & Phiên bản (agent_configs)
+            Cấu hình và Phiên bản (agent_configs)
           </Link>
           <Link
             href="/admin/ai?tab=reports"
@@ -184,7 +184,7 @@ export default async function AdminAiPage({ searchParams }: PageProps<"/admin/ai
               currentTab === "reports" ? "border-accent text-accent font-semibold" : "border-transparent text-ink-2 hover:text-ink"
             }`}
           >
-            Báo cáo hiệu quả & Tỷ lệ sửa (BR-26, BR-27)
+            Báo cáo hiệu quả và Tỷ lệ sửa
           </Link>
         </div>
 
@@ -262,7 +262,7 @@ export default async function AdminAiPage({ searchParams }: PageProps<"/admin/ai
                                 type="submit"
                                 className="rounded bg-accent/10 border border-accent/20 px-2.5 py-1 text-[11px] text-accent hover:bg-accent hover:text-white transition-colors font-medium"
                               >
-                                Chạy lại (FR-94)
+                                Chạy lại
                               </button>
                             </form>
                           )}
@@ -420,7 +420,7 @@ export default async function AdminAiPage({ searchParams }: PageProps<"/admin/ai
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="rounded-lg border border-edge bg-surface p-4 space-y-2">
-                <div className="text-xs font-semibold text-ink-3 uppercase">Tỷ lệ con người sửa Email (BR-26)</div>
+                <div className="text-xs font-semibold text-ink-3 uppercase">Tỷ lệ con người sửa Email</div>
                 <div className="text-2xl font-bold text-ink">{report.email.editRatePct}%</div>
                 <div className="text-xs text-ink-3">
                   {report.email.editedCount} email bị sửa trên tổng {report.email.totalApproved} email đã duyệt
@@ -428,7 +428,7 @@ export default async function AdminAiPage({ searchParams }: PageProps<"/admin/ai
               </div>
 
               <div className="rounded-lg border border-edge bg-surface p-4 space-y-2">
-                <div className="text-xs font-semibold text-ink-3 uppercase">Bàn giao sai chuẩn từ Lead (BR-27)</div>
+                <div className="text-xs font-semibold text-ink-3 uppercase">Bàn giao sai chuẩn từ Lead</div>
                 <div className="text-2xl font-bold text-danger-ink">{report.misclassification.ratePct}%</div>
                 <div className="text-xs text-ink-3">
                   {report.misclassification.misclassifiedCount} cơ hội thất bại do đánh giá sai trên tổng {report.misclassification.totalLost} cơ hội LOST
@@ -436,7 +436,7 @@ export default async function AdminAiPage({ searchParams }: PageProps<"/admin/ai
               </div>
 
               <div className="rounded-lg border border-edge bg-surface p-4 space-y-2">
-                <div className="text-xs font-semibold text-ink-3 uppercase">Mục tiêu kiểm soát ảo giác (NFR-08)</div>
+                <div className="text-xs font-semibold text-ink-3 uppercase">Mục tiêu kiểm soát ảo giác</div>
                 <div className="text-2xl font-bold text-success-ink">&lt; 5.0%</div>
                 <div className="text-xs text-ink-3">Đo qua bộ dữ liệu chuẩn hóa và kiểm tra trích dẫn</div>
               </div>
@@ -444,7 +444,7 @@ export default async function AdminAiPage({ searchParams }: PageProps<"/admin/ai
 
             {/* Suggestions Rejection Rate table */}
             <div className="space-y-2">
-              <h4 className="font-semibold text-xs text-ink-2 uppercase">Tỷ lệ đề xuất bị từ chối theo loại (BR-26)</h4>
+              <h4 className="font-semibold text-xs text-ink-2 uppercase">Tỷ lệ đề xuất bị từ chối theo loại</h4>
               <div className="rounded-lg border border-edge bg-surface overflow-hidden">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-surface-subtle text-ink-3 border-b border-edge">

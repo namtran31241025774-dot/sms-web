@@ -47,8 +47,8 @@ export default async function QuotesPage(props: {
 
       <PageTitle
         icon="quote"
-        title="Danh sách Báo giá & Phiên bản (FR-49 → FR-55)"
-        subtitle="Quản lý báo giá, kiểm soát chiết khấu (HG7, BR-05), hiệu lực (BR-09) và phiên bản thương lượng (DEC-22)"
+        title="Danh sách Báo giá và Phiên bản"
+        subtitle="Quản lý báo giá, kiểm soát chiết khấu, hiệu lực và phiên bản thương lượng"
       />
 
       {/* Bộ lọc & Tìm kiếm */}

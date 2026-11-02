@@ -39,7 +39,7 @@ export default async function NewUserPage({
 
       <PageTitle
         title="Tạo tài khoản người dùng mới"
-        subtitle="Cấp phát tài khoản đăng nhập hệ thống · Liên kết hồ sơ nhân sự (FR-96) · Phân quyền vai trò (FR-98)"
+        subtitle="Cấp phát tài khoản đăng nhập hệ thống · Liên kết hồ sơ nhân sự · Phân quyền vai trò"
         icon="person"
       />
 
@@ -78,7 +78,7 @@ export default async function NewUserPage({
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="label">Vai trò phân quyền hệ thống (FR-98)</label>
+                <label className="label">Vai trò phân quyền hệ thống</label>
                 <select name="role" className="select" defaultValue="SALES" required>
                   <option value="SALES">Nhân viên kinh doanh (SALES)</option>
                   <option value="PRESALES">Chuyên viên tư vấn giải pháp (PRESALES)</option>
@@ -102,7 +102,7 @@ export default async function NewUserPage({
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="label">Liên kết hồ sơ nhân viên (FR-96, FR-75)</label>
+                <label className="label">Liên kết hồ sơ nhân viên</label>
                 <select name="employee_id" className="select" defaultValue="">
                   <option value="">-- Không liên kết --</option>
                   {employees.map((emp) => (
@@ -117,7 +117,7 @@ export default async function NewUserPage({
               </div>
 
               <div>
-                <label className="label">Gán vào Sale Pod (Phạm vi dữ liệu - FR-98)</label>
+                <label className="label">Gán vào Sale Pod (phạm vi dữ liệu)</label>
                 <select name="team_id" className="select" defaultValue="">
                   <option value="">-- Chưa gán nhóm --</option>
                   {teams.map((t) => (
@@ -141,7 +141,7 @@ export default async function NewUserPage({
                 className="input font-mono"
               />
               <p className="text-[11px] text-ink-3 mt-1">
-                Mật khẩu sẽ được mã hóa an toàn bằng thuật toán scrypt (DEC-14, FR-97).
+                Mật khẩu sẽ được mã hóa an toàn bằng thuật toán scrypt.
               </p>
             </div>
 

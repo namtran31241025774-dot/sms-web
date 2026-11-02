@@ -63,7 +63,7 @@ export default function LeadImportPage() {
       </CommandBar>
 
       <PageTitle
-        title="Nhập khách hàng tiềm năng từ CSV (FR-03)"
+        title="Nhập khách hàng tiềm năng từ CSV"
         subtitle="Hỗ trợ ánh xạ cột, kiểm tra lỗi và phát hiện trùng lặp trước khi lưu"
         icon="copy"
       />
@@ -87,7 +87,7 @@ export default function LeadImportPage() {
               onClick={handlePreview}
               className="btn btn-primary"
             >
-              Kiểm tra & Xem trước
+              Kiểm tra và Xem trước
             </button>
           </div>
         </Card>
@@ -97,7 +97,7 @@ export default function LeadImportPage() {
             {preview.duplicateCount > 0 && (
               <div className="mb-3">
                 <MessageBar intent="warning">
-                  Có {preview.duplicateCount} dòng phát hiện nghi vấn trùng lặp theo quy tắc BR-21. Bản ghi vẫn có thể nhập và sẽ được gắn cờ để xử lý sau.
+                  Có {preview.duplicateCount} dòng phát hiện nghi vấn trùng lặp. Bản ghi vẫn có thể nhập và sẽ được gắn cờ để xử lý sau.
                 </MessageBar>
               </div>
             )}

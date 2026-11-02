@@ -64,7 +64,7 @@ export default async function ApprovalsPage({
 
       <PageTitle
         title="Danh sách phê duyệt (Approvals)"
-        subtitle="Quản lý phê duyệt các cổng kiểm soát và hợp nhất hồ sơ trùng lặp (DEC-04, HG1-HG8)"
+        subtitle="Quản lý phê duyệt các cổng kiểm soát và hợp nhất hồ sơ trùng lặp"
         icon="approval"
       />
 
@@ -112,7 +112,7 @@ export default async function ApprovalsPage({
                         <span className="rounded bg-cyan-100 px-2 py-0.5 text-xs font-semibold text-cyan-800">DUYỆT CHUYÊN MÔN</span>
                         <span className="text-xs text-ink-3">· {formatDate(o.updated_at, true)}</span>
                       </div>
-                      <div className="text-sm font-medium text-ink-1">Hồ sơ giải pháp chờ duyệt chuyên môn (FR-42, BR-07)</div>
+                      <div className="text-sm font-medium text-ink-1">Hồ sơ giải pháp chờ duyệt chuyên môn</div>
                       <Link className="link text-xs font-semibold" href={`/opportunities/${o.id}?tab=solution`}>{o.code} · {o.name}</Link>
                       <div className="text-xs text-ink-3">Người phụ trách: <span className="font-medium text-ink-2">{o.owner_name || "Chưa có"}</span></div>
                     </div>

@@ -86,7 +86,7 @@ export default async function UserDetailPage({
       <div className="px-6 pb-12 grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* CỘT 1: CẬP NHẬT THÔNG TIN & PHÂN QUYỀN (FR-96, FR-98) */}
         <div className="lg:col-span-2 space-y-6">
-          <Card title="Thông tin tài khoản & Phân quyền hệ thống (FR-96, FR-98)">
+          <Card title="Thông tin tài khoản và Phân quyền hệ thống">
             <form action={updateUserAction} className="space-y-4 text-xs">
               <input type="hidden" name="id" value={targetUser.id} />
 
@@ -116,7 +116,7 @@ export default async function UserDetailPage({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="label">Vai trò phân quyền (Role RBAC - FR-98)</label>
+                  <label className="label">Vai trò phân quyền (RBAC)</label>
                   <select
                     name="role"
                     defaultValue={targetUser.role}
@@ -146,7 +146,7 @@ export default async function UserDetailPage({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="label">Liên kết hồ sơ nhân sự (FR-96, FR-75)</label>
+                  <label className="label">Liên kết hồ sơ nhân sự</label>
                   <select
                     name="employee_id"
                     defaultValue={targetUser.employee_id ?? ""}
@@ -163,7 +163,7 @@ export default async function UserDetailPage({
                 </div>
 
                 <div>
-                  <label className="label">Sale Pod phụ trách (Phạm vi dữ liệu - FR-98)</label>
+                  <label className="label">Sale Pod phụ trách (phạm vi dữ liệu)</label>
                   <select
                     name="team_id"
                     defaultValue={targetUser.team_id ?? ""}
@@ -189,7 +189,7 @@ export default async function UserDetailPage({
           </Card>
 
           {/* Lịch sử hoạt động và kiểm toán liên quan */}
-          <Card title="Nhật ký thao tác liên quan (Audit Trail - FR-100)">
+          <Card title="Nhật ký thao tác liên quan ">
             {auditLogs.length === 0 ? (
               <div className="text-zinc-500 text-xs italic">Chưa có bản ghi nhật ký nào</div>
             ) : (
@@ -223,7 +223,7 @@ export default async function UserDetailPage({
         {/* CỘT 2: TRẠNG THÁI & ĐẶT LẠI MẬT KHẨU (FR-96, FR-97) */}
         <div className="space-y-6">
           {/* Card trạng thái tài khoản */}
-          <Card title="Trạng thái tài khoản (FR-96)">
+          <Card title="Trạng thái tài khoản">
             <div className="space-y-4 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-ink-3">Tình trạng hiện tại:</span>
@@ -271,7 +271,7 @@ export default async function UserDetailPage({
 
           {/* Card đặt lại mật khẩu */}
           {canManage && (
-            <Card title="Đặt lại mật khẩu (FR-97)">
+            <Card title="Đặt lại mật khẩu">
               <form action={resetPasswordAction} className="space-y-3 text-xs">
                 <input type="hidden" name="id" value={targetUser.id} />
 

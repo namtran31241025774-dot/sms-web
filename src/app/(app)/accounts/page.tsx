@@ -21,7 +21,7 @@ export default async function AccountsPage({ searchParams }: PageProps<"/account
 
       <PageTitle
         title="Doanh nghiệp (Accounts)"
-        subtitle="Quản lý hồ sơ khách hàng doanh nghiệp · FR-08, FR-13"
+        subtitle="Quản lý hồ sơ khách hàng doanh nghiệp"
         icon="account"
       />
 

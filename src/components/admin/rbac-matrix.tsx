@@ -13,11 +13,11 @@ const ALL_ROLES: Role[] = [
 
 const PERMISSION_GROUPS: { groupName: string; permissions: { key: keyof typeof PERMISSION_MATRIX; label: string }[] }[] = [
   {
-    groupName: "1.0 Khách hàng & Người liên hệ (WP-01)",
+    groupName: "1.0 Khách hàng và Người liên hệ (WP-01)",
     permissions: [
       { key: "lead.read", label: "Xem khách hàng tiềm năng (Leads)" },
       { key: "lead.write", label: "Tạo / Cập nhật Lead" },
-      { key: "lead.qualify", label: "Đánh giá BANT & Sàng lọc Lead" },
+      { key: "lead.qualify", label: "Đánh giá BANT và Sàng lọc Lead" },
       { key: "lead.convert", label: "Chuyển đổi Lead thành Cơ hội" },
       { key: "lead.disqualify", label: "Đánh dấu loại Lead" },
       { key: "lead.merge.request", label: "Yêu cầu hợp nhất Lead trùng lặp" },
@@ -29,49 +29,49 @@ const PERMISSION_GROUPS: { groupName: string; permissions: { key: keyof typeof P
     ],
   },
   {
-    groupName: "2.0 Danh mục sản phẩm & Bảng giá (WP-02)",
+    groupName: "2.0 Danh mục sản phẩm và Bảng giá (WP-02)",
     permissions: [
       { key: "catalog.read", label: "Tra cứu sản phẩm, gói, mô-đun" },
       { key: "catalog.write", label: "Quản lý gói, tính năng phần mềm" },
       { key: "pricelist.read", label: "Tra cứu bảng giá và chính sách" },
-      { key: "pricelist.write", label: "Thiết lập bảng giá chuẩn & phân khúc" },
-      { key: "discount.policy.write", label: "Cấu hình chính sách chiết khấu (BR-05)" },
+      { key: "pricelist.write", label: "Thiết lập bảng giá chuẩn và phân khúc" },
+      { key: "discount.policy.write", label: "Cấu hình chính sách chiết khấu" },
     ],
   },
   {
-    groupName: "3.0 Cơ hội bán hàng & Báo giá (WP-03, WP-04)",
+    groupName: "3.0 Cơ hội bán hàng và Báo giá (WP-03, WP-04)",
     permissions: [
       { key: "opp.read", label: "Xem cơ hội bán hàng (Opportunities)" },
-      { key: "opp.write", label: "Cập nhật cơ hội & cấu hình dự kiến" },
+      { key: "opp.write", label: "Cập nhật cơ hội và cấu hình dự kiến" },
       { key: "opp.solution", label: "Lập hồ sơ giải pháp kỹ thuật" },
       { key: "opp.stage", label: "Đề nghị chuyển giai đoạn phễu" },
-      { key: "opp.expert_review", label: "Rà soát chuyên môn giải pháp (FR-42)" },
-      { key: "opp.manager_review", label: "Quản lý rà soát cơ hội (HG6)" },
-      { key: "opp.reopen", label: "Mở lại cơ hội đã đóng (BR-17)" },
+      { key: "opp.expert_review", label: "Rà soát chuyên môn giải pháp" },
+      { key: "opp.manager_review", label: "Quản lý rà soát cơ hội" },
+      { key: "opp.reopen", label: "Mở lại cơ hội đã đóng" },
       { key: "quote.read", label: "Xem báo giá" },
       { key: "quote.write", label: "Lập báo giá nháp" },
-      { key: "quote.approve", label: "Duyệt chiết khấu vượt hạn mức (HG7)" },
+      { key: "quote.approve", label: "Duyệt chiết khấu vượt hạn mức" },
       { key: "quote.send", label: "Gửi báo giá chính thức cho khách" },
     ],
   },
   {
-    groupName: "4.0 Đơn hàng, Hoá đơn & Thanh toán (WP-05, WP-06)",
+    groupName: "4.0 Đơn hàng, Hoá đơn và Thanh toán (WP-05, WP-06)",
     permissions: [
       { key: "order.read", label: "Xem đơn hàng" },
       { key: "order.create", label: "Tạo đơn hàng từ báo giá" },
-      { key: "order.create_direct", label: "Tạo đơn hàng thủ công (BR-10)" },
+      { key: "order.create_direct", label: "Tạo đơn hàng thủ công" },
       { key: "fulfillment.update", label: "Ghi nhận tiến độ bàn giao kỹ thuật" },
       { key: "invoice.read", label: "Xem hoá đơn và công nợ" },
       { key: "invoice.create", label: "Lập hoá đơn nháp" },
-      { key: "invoice.finance", label: "Phát hành hoá đơn & đối soát thanh toán" },
+      { key: "invoice.finance", label: "Phát hành hoá đơn và đối soát thanh toán" },
       { key: "payment.write", label: "Xác nhận kết quả thanh toán" },
     ],
   },
   {
-    groupName: "6.0 Quản lý Đội ngũ Sales & Phân công (WP-07)",
+    groupName: "6.0 Quản lý Đội ngũ Sales và Phân công (WP-07)",
     permissions: [
       { key: "team.read", label: "Xem đội ngũ, Sale Pods và chỉ tiêu cá nhân" },
-      { key: "team.write", label: "Quản lý hồ sơ nhân viên & Sale Pods" },
+      { key: "team.write", label: "Quản lý hồ sơ nhân viên và Sale Pods" },
       { key: "task.read", label: "Xem danh sách việc cần làm và lịch hẹn" },
       { key: "task.write", label: "Giao việc, cập nhật tiến độ công việc" },
     ],
@@ -87,9 +87,9 @@ const PERMISSION_GROUPS: { groupName: string; permissions: { key: keyof typeof P
     ],
   },
   {
-    groupName: "7.2 Quản trị hệ thống & Báo cáo (WP-09)",
+    groupName: "7.2 Quản trị hệ thống và Báo cáo (WP-09)",
     permissions: [
-      { key: "admin.users", label: "Quản lý tài khoản người dùng & Khóa tài khoản" },
+      { key: "admin.users", label: "Quản lý tài khoản người dùng và Khóa tài khoản" },
       { key: "admin.permissions", label: "Thiết lập phân quyền và xem ma trận RBAC" },
       { key: "admin.scope", label: "Thiết lập phạm vi dữ liệu theo nhóm" },
       { key: "admin.settings", label: "Cấu hình tham số hệ thống và BR" },
@@ -103,7 +103,7 @@ export function RbacMatrixView() {
   return (
     <div className="space-y-6">
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-xs text-amber-900 space-y-1">
-        <p className="font-semibold text-amber-950">Nguyên tắc phân quyền & Phạm vi dữ liệu (FR-98):</p>
+        <p className="font-semibold text-amber-950">Nguyên tắc phân quyền và Phạm vi dữ liệu:</p>
         <ul className="list-disc list-inside space-y-0.5 text-amber-800">
           <li><strong>Quyền AI:</strong> Người quản trị hệ thống cấu hình và giám sát Agent, nhưng không phê duyệt nghiệp vụ bán hàng và không sửa dữ liệu nguồn. Quản lý kinh doanh duyệt tiêu chí trước khi áp dụng.</li>
           <li><strong>Không tự cấp quyền:</strong> Việc tham gia Sale Pod hay đổi chức danh nghiệp vụ (<code className="bg-amber-100 px-1 rounded">employees</code>) không tự động cấp thêm quyền hệ thống (<code className="bg-amber-100 px-1 rounded">users</code>).</li>
@@ -115,7 +115,7 @@ export function RbacMatrixView() {
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="bg-[#f8f9fa] border-b border-stroke text-ink-2 font-semibold">
-              <th className="py-3 px-4 min-w-[280px]">Chức năng & Quyền hạn nghiệp vụ</th>
+              <th className="py-3 px-4 min-w-[280px]">Chức năng và Quyền hạn nghiệp vụ</th>
               {ALL_ROLES.map((role) => (
                 <th key={role} className="py-3 px-2 text-center min-w-[90px]">
                   <div className="text-[11px] font-bold text-ink">{role}</div>

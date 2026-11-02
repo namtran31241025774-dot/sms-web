@@ -49,7 +49,7 @@ export default async function EmployeeDetailPage({
       <div className="px-6 pb-12 grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Cột 1: Thông tin hồ sơ & Chỉnh sửa */}
         <div className="lg:col-span-2 space-y-6">
-          <Card title="Hồ sơ nghiệp vụ nhân viên (FR-76, FR-77)">
+          <Card title="Hồ sơ nghiệp vụ nhân viên">
             <form action={updateEmployeeAction} className="space-y-4 text-xs">
               <input type="hidden" name="id" value={employee.id} />
 
@@ -113,7 +113,7 @@ export default async function EmployeeDetailPage({
                   />
                 </div>
                 <div>
-                  <label className="label">Vai trò nghiệp vụ (FR-77)</label>
+                  <label className="label">Vai trò nghiệp vụ</label>
                   <select
                     name="business_role"
                     defaultValue={employee.business_role}
@@ -151,7 +151,7 @@ export default async function EmployeeDetailPage({
           {/* Khối lượng công việc đang phụ trách (FR-78, FR-84) */}
           <Card title="Khối lượng công việc đang phụ trách (Workload)">
             <p className="text-xs text-ink-3 mb-4">
-              Tổng hợp Leads, Cơ hội và Công việc đang mở để sẵn sàng chuẩn bị bàn giao nếu thay đổi nhân sự (FR-78, FR-84).
+              Tổng hợp Leads, Cơ hội và Công việc đang mở để sẵn sàng chuẩn bị bàn giao nếu thay đổi nhân sự.
             </p>
 
             <div className="grid grid-cols-3 gap-3 mb-4 text-center">
@@ -195,7 +195,7 @@ export default async function EmployeeDetailPage({
 
         {/* Cột 2: Cập nhật trạng thái làm việc (FR-78) */}
         <div className="space-y-6">
-          <Card title="Trạng thái làm việc & Nhận việc (FR-78)">
+          <Card title="Trạng thái làm việc và Nhận việc">
             <form action={updateWorkStatusAction} className="space-y-4 text-xs">
               <input type="hidden" name="id" value={employee.id} />
 

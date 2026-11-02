@@ -21,7 +21,7 @@ export default async function ContactsPage({ searchParams }: PageProps<"/contact
 
       <PageTitle
         title="Người liên hệ (Contacts)"
-        subtitle="Quản lý thông tin đầu mối liên hệ và lịch sử công tác · FR-09, FR-14"
+        subtitle="Quản lý thông tin đầu mối liên hệ và lịch sử công tác"
         icon="contact"
       />
 

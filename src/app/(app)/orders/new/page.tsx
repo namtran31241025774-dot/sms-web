@@ -36,7 +36,7 @@ export default async function NewOrderPage() {
 
       <PageTitle
         icon="order"
-        title="Tạo Đơn hàng Trực tiếp (FR-57, BR-10)"
+        title="Tạo Đơn hàng Trực tiếp"
         subtitle="Dành cho Quản lý kinh doanh hoặc nhân viên được phân quyền trực tiếp (allow_direct_order)"
       />
 
@@ -100,12 +100,12 @@ export default async function NewOrderPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <FormField
                     label="Chiết khấu (%)"
-                    hint="BR-05: ≤ 10% tự duyệt, > 10% đến 30% cần quyền Quản lý kinh doanh, > 30% chặn"
+                    hint="≤ 10% tự duyệt, > 10% đến 30% cần quyền Quản lý kinh doanh, > 30% chặn"
                   >
                     <input type="number" name="discountPct" min={0} max={30} step={0.5} defaultValue={0} className="input text-sm" />
                   </FormField>
 
-                  <FormField label="Thuế suất VAT (%)" hint="BR-22: Mặc định 10%">
+                  <FormField label="Thuế suất VAT (%)" hint="Mặc định 10%">
                     <input type="number" name="taxPct" min={0} max={20} defaultValue={10} className="input text-sm" />
                   </FormField>
                 </div>

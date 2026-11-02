@@ -93,7 +93,7 @@ export default async function PriceListDetailPage({
 
       <PageTitle
         title={priceList.name}
-        subtitle={`Loại tiền: ${priceList.currency} · Phân khúc: ${priceList.customer_segment} · FR-27, FR-28, BR-22`}
+        subtitle={`Loại tiền: ${priceList.currency} · Phân khúc: ${priceList.customer_segment}`}
         icon="money"
         right={
           <div className="flex items-center gap-2">
@@ -108,7 +108,7 @@ export default async function PriceListDetailPage({
         <form id="update-pricelist" action={updatePriceListAction} className="grid gap-4">
           <input type="hidden" name="id" value={priceList.id} />
 
-          <Card title="Cấu hình bảng giá (BR-03, BR-22)">
+          <Card title="Cấu hình bảng giá">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField label="Tên bảng giá" required className="md:col-span-2">
                 <input
@@ -120,7 +120,7 @@ export default async function PriceListDetailPage({
                 />
               </FormField>
 
-              <FormField label="Phân khúc áp dụng (BR-03)" required>
+              <FormField label="Phân khúc áp dụng" required>
                 <select
                   name="customer_segment"
                   defaultValue={priceList.customer_segment}
@@ -129,7 +129,7 @@ export default async function PriceListDetailPage({
                   className="select"
                 >
                   <option value="ALL">Áp dụng toàn bộ (ALL)</option>
-                  <option value="SMB">Doanh nghiệp vừa & nhỏ (SMB &lt; 200 nhân sự)</option>
+                  <option value="SMB">Doanh nghiệp vừa và nhỏ (SMB &lt; 200 nhân sự)</option>
                   <option value="ENTERPRISE">Doanh nghiệp lớn (Enterprise ≥ 200 nhân sự)</option>
                 </select>
               </FormField>
@@ -200,7 +200,7 @@ export default async function PriceListDetailPage({
 
         {/* Danh mục sản phẩm & Đơn giá trong bảng giá */}
         <Card
-          title="Đơn giá & Thuế suất từng mặt hàng (FR-27, BR-22)"
+          title="Đơn giá và Thuế suất từng mặt hàng"
           actions={<span className="text-xs text-ink-3">{items.length} mục giá</span>}
         >
           <p className="mb-4 text-xs text-ink-2">

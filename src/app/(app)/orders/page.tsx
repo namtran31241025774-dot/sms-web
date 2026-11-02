@@ -42,8 +42,8 @@ export default async function OrdersPage(props: {
 
       <PageTitle
         icon="order"
-        title="Quản lý Đơn hàng (FR-56 → FR-63)"
-        subtitle="Theo dõi đơn hàng, khóa giá thương mại (BR-22), tiến độ triển khai (DEC-10), và lịch thanh toán (BR-11)"
+        title="Quản lý Đơn hàng"
+        subtitle="Theo dõi đơn hàng, khóa giá thương mại, tiến độ triển khai, và lịch thanh toán"
       />
 
       {/* Bộ lọc & Tìm kiếm */}

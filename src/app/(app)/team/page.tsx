@@ -30,11 +30,11 @@ import {
 export const metadata: Metadata = { title: "Quản lý đội ngũ Sales" };
 
 const TABS = [
-  { key: "employees", label: "Hồ sơ nhân sự (FR-75 → 78)" },
-  { key: "pods", label: "Sale Pods & Nhóm (FR-79 → 81)" },
-  { key: "tasks", label: "Công việc & Lịch hẹn (FR-83)" },
-  { key: "targets", label: "Chỉ tiêu & Hiệu suất (FR-85 → 87)" },
-  { key: "assignments", label: "Phân bổ & Điều phối (FR-82, 84)" },
+  { key: "employees", label: "Hồ sơ nhân sự (→ 78)" },
+  { key: "pods", label: "Sale Pods và Nhóm (→ 81)" },
+  { key: "tasks", label: "Công việc và Lịch hẹn" },
+  { key: "targets", label: "Chỉ tiêu và Hiệu suất (→ 87)" },
+  { key: "assignments", label: "Phân bổ và Điều phối (84)" },
 ];
 
 export default async function TeamPage({
@@ -100,7 +100,7 @@ export default async function TeamPage({
         )}
         {canWriteTeam && tab === "assignments" && (
           <CommandLink href="/team?tab=assignments#handover" icon="arrowRight">
-            Điều phối & Bàn giao
+            Điều phối và Bàn giao
           </CommandLink>
         )}
         <CommandLink href={`/team?tab=${tab}&period=${period}`} icon="refresh">
@@ -112,7 +112,7 @@ export default async function TeamPage({
 
       <PageTitle
         title="Quản lý đội ngũ Sales"
-        subtitle="Hồ sơ nhân sự nghiệp vụ · Sale Pods · Phân công & Điều phối · Lịch hẹn & Chỉ tiêu (Module 6.0)"
+        subtitle="Hồ sơ nhân sự nghiệp vụ · Sale Pods · Phân công và Điều phối · Lịch hẹn và Chỉ tiêu (Module 6.0)"
         icon="people"
       />
 
@@ -169,7 +169,7 @@ export default async function TeamPage({
                         <th className="px-4 py-3">Họ và tên</th>
                         <th className="px-4 py-3">Chức danh nghiệp vụ</th>
                         <th className="px-4 py-3">Vai trò</th>
-                        <th className="px-4 py-3">Email & SĐT</th>
+                        <th className="px-4 py-3">Email và SĐT</th>
                         <th className="px-4 py-3">Tình trạng</th>
                         <th className="px-4 py-3 text-right">Thao tác</th>
                       </tr>
@@ -198,7 +198,7 @@ export default async function TeamPage({
                                 href={`/team/employees/${e.id}`}
                                 className="text-xs font-semibold text-brand hover:underline"
                               >
-                                Chi tiết & Sửa
+                                Chi tiết và Sửa
                               </Link>
                             )}
                           </td>
@@ -258,7 +258,7 @@ export default async function TeamPage({
                       href={`/team/pods/${t.id}`}
                       className="text-xs font-semibold text-brand hover:underline inline-flex items-center gap-1"
                     >
-                      Quản lý thành viên & Phạm vi →
+                      Quản lý thành viên và Phạm vi →
                     </Link>
                   </div>
                 </div>
@@ -273,7 +273,7 @@ export default async function TeamPage({
             <div className="lg:col-span-2 space-y-4">
               <div className="overflow-hidden rounded-lg border border-stroke bg-surface shadow-[var(--shadow-4)]">
                 <div className="p-4 border-b border-stroke flex items-center justify-between">
-                  <h3 className="font-semibold text-sm text-ink">Danh sách Công việc & Lịch hẹn (FR-83)</h3>
+                  <h3 className="font-semibold text-sm text-ink">Danh sách Công việc và Lịch hẹn</h3>
                   <div className="flex items-center gap-2">
                     <Link
                       href="/team?tab=tasks"
@@ -357,7 +357,7 @@ export default async function TeamPage({
 
             {/* Form tạo việc / lịch hẹn nhanh */}
             <div id="new-task">
-              <Card title="Giao việc & Lập lịch hẹn mới">
+              <Card title="Giao việc và Lập lịch hẹn mới">
                 <form action={createWorkItemAction} className="space-y-4 text-xs">
                   <div>
                     <label className="label">Loại nhiệm vụ</label>
@@ -372,7 +372,7 @@ export default async function TeamPage({
                       type="text"
                       name="title"
                       required
-                      placeholder="vd: Họp demo giải pháp CPQ & AI cho CIO"
+                      placeholder="vd: Họp demo giải pháp CPQ và AI cho CIO"
                       className="input"
                     />
                   </div>
@@ -452,12 +452,12 @@ export default async function TeamPage({
                   {formatVnd(performanceSummary.actualRevenue)}
                 </div>
                 <div className="text-xs text-green-600 mt-1 font-semibold">
-                  Tỷ lệ hoàn thành: {performanceSummary.completionPct}% (BR-14)
+                  Tỷ lệ hoàn thành: {performanceSummary.completionPct}%
                 </div>
               </div>
 
               <div className="rounded-lg border border-stroke bg-surface p-4">
-                <span className="text-xs text-ink-3">Dự báo Pipeline (BR-14)</span>
+                <span className="text-xs text-ink-3">Dự báo Pipeline</span>
                 <div className="text-xl font-bold text-brand mt-1">
                   {formatVnd(performanceSummary.pipelineForecastAmount)}
                 </div>
@@ -482,7 +482,7 @@ export default async function TeamPage({
               <div className="lg:col-span-2 space-y-6">
                 <div className="overflow-hidden rounded-lg border border-stroke bg-surface shadow-[var(--shadow-4)]">
                   <div className="p-4 border-b border-stroke flex items-center justify-between">
-                    <h3 className="font-semibold text-sm text-ink">Bảng Chỉ tiêu Doanh số (FR-85)</h3>
+                    <h3 className="font-semibold text-sm text-ink">Bảng Chỉ tiêu Doanh số</h3>
                     <div className="text-xs text-ink-3">Kỳ: {period}</div>
                   </div>
                   {targets.length === 0 ? (
@@ -530,7 +530,7 @@ export default async function TeamPage({
                 {/* Bảng Đánh giá Hiệu suất (FR-87) */}
                 <div className="overflow-hidden rounded-lg border border-stroke bg-surface shadow-[var(--shadow-4)]">
                   <div className="p-4 border-b border-stroke">
-                    <h3 className="font-semibold text-sm text-ink">Lịch sử Đánh giá Hiệu suất Bán hàng (FR-87)</h3>
+                    <h3 className="font-semibold text-sm text-ink">Lịch sử Đánh giá Hiệu suất Bán hàng</h3>
                     <p className="text-xs text-ink-3 mt-0.5">
                       Đánh giá thực tế của Quản lý kinh doanh (không áp dụng cho AI Agent)
                     </p>
@@ -567,7 +567,7 @@ export default async function TeamPage({
               {/* Form Thiết lập Chỉ tiêu & Đánh giá */}
               {canWriteTeam && (
                 <div className="space-y-6">
-                  <Card title="Thiết lập Chỉ tiêu Doanh số (FR-85)">
+                  <Card title="Thiết lập Chỉ tiêu Doanh số">
                     <form action={setSalesTargetAction} className="space-y-3 text-xs">
                       <div className="grid grid-cols-2 gap-2">
                         <div>
@@ -637,7 +637,7 @@ export default async function TeamPage({
                     </form>
                   </Card>
 
-                  <Card title="Ghi Đánh giá Hiệu suất (FR-87)">
+                  <Card title="Ghi Đánh giá Hiệu suất">
                     <form action={createPerformanceReviewAction} className="space-y-3 text-xs">
                       <div>
                         <label className="label">Nhân viên được đánh giá</label>
@@ -677,7 +677,7 @@ export default async function TeamPage({
                       </div>
 
                       <div>
-                        <label className="label">Nhận xét & Góp ý</label>
+                        <label className="label">Nhận xét và Góp ý</label>
                         <textarea
                           name="feedback"
                           rows={3}
@@ -701,7 +701,7 @@ export default async function TeamPage({
             <div className="lg:col-span-2 space-y-4">
               <div className="overflow-hidden rounded-lg border border-stroke bg-surface shadow-[var(--shadow-4)]">
                 <div className="p-4 border-b border-stroke">
-                  <h3 className="font-semibold text-sm text-ink">Lịch sử Phân công & Điều phối (FR-82, FR-84)</h3>
+                  <h3 className="font-semibold text-sm text-ink">Lịch sử Phân công và Điều phối</h3>
                   <p className="text-xs text-ink-3 mt-0.5">
                     Toàn bộ thay đổi người phụ trách, bàn giao và lưu vết trách nhiệm
                   </p>
@@ -757,7 +757,7 @@ export default async function TeamPage({
             {/* Form Điều phối & Bàn giao (FR-84) */}
             {canWriteTeam && (
               <div id="handover">
-                <Card title="Điều phối & Bàn giao Hàng loạt (FR-84)">
+                <Card title="Điều phối và Bàn giao Hàng loạt">
                   <form action={handoverWorkAction} className="space-y-4 text-xs">
                     <div>
                       <label className="label">Nhân sự bàn giao (Hiện tại)</label>
@@ -796,7 +796,7 @@ export default async function TeamPage({
                     </div>
 
                     <div>
-                      <label className="label">Lý do bàn giao (Bắt buộc theo FR-84)</label>
+                      <label className="label">Lý do bàn giao (bắt buộc)</label>
                       <textarea
                         name="reason"
                         required
@@ -822,7 +822,7 @@ export default async function TeamPage({
                       </label>
                     </div>
 
-                    <SubmitButton className="w-full">Xác nhận Điều phối & Bàn giao</SubmitButton>
+                    <SubmitButton className="w-full">Xác nhận Điều phối và Bàn giao</SubmitButton>
                   </form>
                 </Card>
               </div>

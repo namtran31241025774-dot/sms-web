@@ -125,7 +125,7 @@ export default async function QuoteDetailPage(props: {
               {QUOTE_STATUS[activeVersion.status] || activeVersion.status}
             </Badge>
             {isExpired && activeVersion.status !== "ACCEPTED" && (
-              <Badge tone="danger">Đã hết hiệu lực (BR-09)</Badge>
+              <Badge tone="danger">Đã hết hiệu lực</Badge>
             )}
           </div>
         }
@@ -167,7 +167,7 @@ export default async function QuoteDetailPage(props: {
           {(configValidation.warnings.length > 0 || configValidation.errors.length > 0) && (
             <div className="rounded-lg border border-warning/30 bg-warning/5 p-4 text-sm text-ink">
               <div className="font-semibold text-warning flex items-center gap-2">
-                <span>Kiểm tra cấu hình gói & quyền sử dụng (FR-50):</span>
+                <span>Kiểm tra cấu hình gói và quyền sử dụng:</span>
               </div>
               <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-ink-3">
                 {configValidation.errors.map((err, i) => (
@@ -188,7 +188,7 @@ export default async function QuoteDetailPage(props: {
           <Card
             title={
               <div className="flex items-center justify-between">
-                <span>Dòng sản phẩm & Dịch vụ (Phiên bản v{activeVersion.version_no})</span>
+                <span>Dòng sản phẩm và Dịch vụ (Phiên bản v{activeVersion.version_no})</span>
                 <span className="text-xs font-normal text-ink-3">
                   {lines.length} sản phẩm
                 </span>
@@ -268,7 +268,7 @@ export default async function QuoteDetailPage(props: {
             {/* Form thêm sản phẩm nếu đang ở trạng thái DRAFT */}
             {isDraft && canWrite && (
               <div className="mt-6 rounded-lg border border-stroke bg-surface-subtle p-4">
-                <div className="text-xs font-semibold text-ink">Thêm sản phẩm từ bảng giá #{activeVersion.price_list_id} (FR-49)</div>
+                <div className="text-xs font-semibold text-ink">Thêm sản phẩm từ bảng giá #{activeVersion.price_list_id}</div>
                 <form action={addLineAction} className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-6">
                   <input type="hidden" name="versionId" value={activeVersion.id} />
                   <input type="hidden" name="quoteId" value={quote.id} />
@@ -341,13 +341,13 @@ export default async function QuoteDetailPage(props: {
           </Card>
 
           {/* Điều khoản thương mại & Ghi chú */}
-          <Card title="Ghi chú & Điều khoản thương mại">
+          <Card title="Ghi chú và Điều khoản thương mại">
             {isDraft && canWrite ? (
               <form action={updateQuoteDetailsAction} className="space-y-3">
                 <input type="hidden" name="versionId" value={activeVersion.id} />
                 <input type="hidden" name="quoteId" value={quote.id} />
                 <div>
-                  <label className="text-xs text-ink-3">Hiệu lực đến ngày (BR-09)</label>
+                  <label className="text-xs text-ink-3">Hiệu lực đến ngày</label>
                   <input
                     type="date"
                     name="validUntil"
@@ -356,7 +356,7 @@ export default async function QuoteDetailPage(props: {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-ink-3">Nội dung ghi chú & điều khoản</label>
+                  <label className="text-xs text-ink-3">Nội dung ghi chú và điều khoản</label>
                   <textarea
                     name="notes"
                     defaultValue={activeVersion.notes || ""}
@@ -384,7 +384,7 @@ export default async function QuoteDetailPage(props: {
 
           {/* Lịch sử phản hồi của khách hàng (FR-54) */}
           {responses.length > 0 && (
-            <Card title="Lịch sử phản hồi của khách hàng (FR-54)">
+            <Card title="Lịch sử phản hồi của khách hàng">
               <div className="divide-y divide-stroke">
                 {responses.map((resp) => (
                   <div key={resp.id} className="py-2.5 text-sm">
@@ -439,7 +439,7 @@ export default async function QuoteDetailPage(props: {
           </Card>
 
           {/* Thao tác chuyển bước & Duyệt giá (HG7, BR-05) */}
-          <Card title="Hành động & Phê duyệt (HG7)">
+          <Card title="Hành động và Phê duyệt">
             <div className="space-y-3">
               {/* Bước 1: Trình duyệt từ DRAFT */}
               {isDraft && canWrite && (
@@ -452,7 +452,7 @@ export default async function QuoteDetailPage(props: {
                     disabled={lines.length === 0}
                   >
                     {activeVersion.max_discount_pct > 10
-                      ? "Trình Quản lý duyệt giá (HG7)"
+                      ? "Trình Quản lý duyệt giá"
                       : "Duyệt báo giá (Trong thẩm quyền)"}
                   </button>
                   <p className="mt-1 text-[11px] text-ink-3">
@@ -467,7 +467,7 @@ export default async function QuoteDetailPage(props: {
               {isPendingApproval && canApprove && (
                 <div className="rounded border border-warning/30 bg-warning/5 p-3">
                   <div className="text-xs font-semibold text-warning">
-                    Quản lý kinh doanh duyệt chiết khấu (HG7)
+                    Quản lý kinh doanh duyệt chiết khấu
                   </div>
                   <div className="mt-2 flex gap-2">
                     <form action={decideQuoteDiscountAction} className="flex-1">
@@ -496,7 +496,7 @@ export default async function QuoteDetailPage(props: {
                   <input type="hidden" name="versionId" value={activeVersion.id} />
                   <input type="hidden" name="quoteId" value={quote.id} />
                   <button type="submit" className="btn btn-primary w-full text-sm">
-                    Gửi khách hàng (Email & PDF)
+                    Gửi khách hàng (Email và PDF)
                   </button>
                   <p className="mt-1 text-[11px] text-ink-3">
                     Sau khi gửi, phiên bản báo giá này sẽ được khóa (không chỉnh sửa trực tiếp).
@@ -508,7 +508,7 @@ export default async function QuoteDetailPage(props: {
               {isSent && canWrite && (
                 <div className="space-y-2 rounded border border-brand/20 bg-brand-tint/20 p-3">
                   <div className="text-xs font-semibold text-brand">
-                    Ghi nhận phản hồi của khách hàng (FR-54)
+                    Ghi nhận phản hồi của khách hàng
                   </div>
                   <form action={recordCustomerResponseAction} className="space-y-2">
                     <input type="hidden" name="versionId" value={activeVersion.id} />
@@ -551,7 +551,7 @@ export default async function QuoteDetailPage(props: {
           </Card>
 
           {/* Theo dõi Ký điện tử (FR-55, DEC-13) */}
-          <Card title="Ký điện tử E-Signature (FR-55)">
+          <Card title="Ký điện tử E-Signature">
             <div className="space-y-3">
               {signatures.length === 0 ? (
                 <div>

@@ -12,7 +12,7 @@ const STATUS_LABELS: Record<string, string> = {
   PENDING_REVIEW: "Chờ duyệt",
   APPROVED: "Đã duyệt",
   REJECTED: "Đã từ chối",
-  EDITED: "Đã chỉnh sửa & duyệt",
+  EDITED: "Đã chỉnh sửa và duyệt",
 };
 
 export default async function AiReviewPage({ searchParams }: PageProps<"/ai-review">) {
@@ -34,17 +34,17 @@ export default async function AiReviewPage({ searchParams }: PageProps<"/ai-revi
         <CommandLink href="/ai-review?status=REJECTED" icon="dismissCircle">Đã từ chối</CommandLink>
         <CommandLink href="/ai-review?status=ALL" icon="filter">Tất cả trạng thái</CommandLink>
         <CommandSep />
-        <CommandLink href="/ai-review?kind=EMAIL_DRAFT" icon="chat">Email nháp (HG1)</CommandLink>
+        <CommandLink href="/ai-review?kind=EMAIL_DRAFT" icon="chat">Email nháp</CommandLink>
         <CommandLink href="/ai-review?kind=BANT_SCORE" icon="star">BANT Score</CommandLink>
-        <CommandLink href="/ai-review?kind=DISQUALIFY" icon="dismissCircle">Đề xuất loại (HG2)</CommandLink>
-        <CommandLink href="/ai-review?kind=CONVERSION" icon="lead">Chuyển đổi (HG3)</CommandLink>
+        <CommandLink href="/ai-review?kind=DISQUALIFY" icon="dismissCircle">Đề xuất loại</CommandLink>
+        <CommandLink href="/ai-review?kind=CONVERSION" icon="lead">Chuyển đổi</CommandLink>
       </CommandBar>
 
       <Flash sp={sp} />
 
       <PageTitle
         title="Kiểm duyệt đề xuất AI (AI Review Inbox)"
-        subtitle="Điểm kiểm duyệt con người (Human-in-the-loop): Duyệt email nháp (HG1), duyệt loại Lead (HG2), xác nhận chuyển đổi (HG3)"
+        subtitle="Điểm kiểm duyệt con người (Human-in-the-loop): Duyệt email nháp, duyệt loại Lead, xác nhận chuyển đổi"
         icon="sparkle"
       />
 
@@ -182,7 +182,7 @@ function SuggestionCard({ suggestion: s }: { suggestion: Suggestion }) {
                 })}
               </div>
               <div className="pt-2 text-ink-2">
-                <span className="font-semibold text-ink-3">Đánh giá & căn cứ:</span> {String(payload.rationale || "")}
+                <span className="font-semibold text-ink-3">Đánh giá và căn cứ:</span> {String(payload.rationale || "")}
               </div>
               {payload.confidence !== undefined && (
                 <div className="text-xs text-ink-3">
@@ -284,7 +284,7 @@ function SuggestionCard({ suggestion: s }: { suggestion: Suggestion }) {
                   type="submit"
                   className="rounded bg-accent px-4 py-1 font-medium text-xs text-white hover:bg-accent-hover transition-colors shadow-sm"
                 >
-                  Duyệt & Gửi Email (HG1)
+                  Duyệt và Gửi Email
                 </button>
               )}
               {s.kind === "DISQUALIFY" && (
@@ -292,7 +292,7 @@ function SuggestionCard({ suggestion: s }: { suggestion: Suggestion }) {
                   type="submit"
                   className="rounded bg-danger px-4 py-1 font-medium text-xs text-white hover:bg-red-700 transition-colors shadow-sm"
                 >
-                  Duyệt Loại Lead (HG2)
+                  Duyệt Loại Lead
                 </button>
               )}
               {s.kind === "CONVERSION" && (
@@ -300,7 +300,7 @@ function SuggestionCard({ suggestion: s }: { suggestion: Suggestion }) {
                   href={`/leads/${s.entity_id}`}
                   className="rounded bg-success px-4 py-1 font-medium text-xs text-white hover:bg-green-700 transition-colors shadow-sm"
                 >
-                  Đến trang Lead để Chuyển đổi (HG3)
+                  Đến trang Lead để Chuyển đổi
                 </Link>
               )}
               {s.kind !== "EMAIL_DRAFT" && s.kind !== "DISQUALIFY" && s.kind !== "CONVERSION" && (
@@ -308,7 +308,7 @@ function SuggestionCard({ suggestion: s }: { suggestion: Suggestion }) {
                   type="submit"
                   className="rounded bg-accent px-4 py-1 font-medium text-xs text-white hover:bg-accent-hover transition-colors shadow-sm"
                 >
-                  Duyệt & Áp dụng
+                  Duyệt và Áp dụng
                 </button>
               )}
             </form>

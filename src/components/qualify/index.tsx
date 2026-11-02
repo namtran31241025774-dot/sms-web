@@ -8,7 +8,7 @@ export async function QualificationPanel({ leadId }: { leadId: number }) {
   const assessment = getLeadAssessment(leadId);
 
   return (
-    <Card title="Khảo sát sơ bộ nhu cầu khách hàng (FR-30)">
+    <Card title="Khảo sát sơ bộ nhu cầu khách hàng">
       <form action={saveSurveyAction} className="space-y-3">
         <input type="hidden" name="lead_id" value={leadId} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

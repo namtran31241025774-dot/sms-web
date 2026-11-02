@@ -38,7 +38,7 @@ export default async function NewQuotePage(props: {
 
       <PageTitle
         icon="quote"
-        title="Lập Báo giá Mới (FR-49)"
+        title="Lập Báo giá Mới"
         subtitle="Khởi tạo hồ sơ báo giá và phiên bản v1 từ Cơ hội bán hàng"
       />
 
@@ -60,7 +60,7 @@ export default async function NewQuotePage(props: {
               </select>
             </FormField>
 
-            <FormField label="Thời hạn hiệu lực (ngày)" hint="Mặc định theo quy tắc nghiệp vụ BR-09 (30 ngày)">
+            <FormField label="Thời hạn hiệu lực (ngày)" hint="Mặc định 30 ngày">
               <input
                 type="number"
                 name="validDays"
@@ -71,7 +71,7 @@ export default async function NewQuotePage(props: {
               />
             </FormField>
 
-            <FormField label="Ghi chú & Điều khoản thương mại ban đầu">
+            <FormField label="Ghi chú và Điều khoản thương mại ban đầu">
               <textarea
                 name="notes"
                 rows={3}

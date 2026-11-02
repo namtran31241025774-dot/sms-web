@@ -10,12 +10,12 @@ import { RoleBadge, UserStatusBadge } from "@/components/admin/badges";
 import { RbacMatrixView } from "@/components/admin/rbac-matrix";
 import { setUserStatusAction, updateSettingAction } from "./actions";
 
-export const metadata: Metadata = { title: "Quản trị hệ thống & Phân quyền" };
+export const metadata: Metadata = { title: "Quản trị hệ thống và Phân quyền" };
 
 const TABS = [
-  { key: "users", label: "Tài khoản người dùng (FR-96)" },
-  { key: "rbac", label: "Ma trận phân quyền & Phạm vi (FR-98)" },
-  { key: "audit", label: "Nhật ký kiểm toán (FR-100)" },
+  { key: "users", label: "Tài khoản người dùng" },
+  { key: "rbac", label: "Ma trận phân quyền và Phạm vi" },
+  { key: "audit", label: "Nhật ký kiểm toán" },
   { key: "settings", label: "Cấu hình hệ thống (Settings)" },
 ];
 
@@ -70,11 +70,11 @@ export default async function AdminPage({
       <CommandBar>
         {canManageUsers && (
           <CommandLink href="/admin/users/new" icon="add">
-            Thêm tài khoản mới (FR-96)
+            Thêm tài khoản mới
           </CommandLink>
         )}
         <CommandLink href="/reports" icon="opportunity">
-          Xem báo cáo phễu & Dự báo (FR-99)
+          Xem báo cáo phễu và Dự báo
         </CommandLink>
         <CommandLink href={`/admin?tab=${tab}`} icon="refresh">
           Làm mới
@@ -84,8 +84,8 @@ export default async function AdminPage({
       <Flash sp={sp} />
 
       <PageTitle
-        title="Quản trị hệ thống & Phân quyền"
-        subtitle="Quản lý tài khoản người dùng · Phân quyền RBAC & Phạm vi dữ liệu · Kiểm toán hệ thống"
+        title="Quản trị hệ thống và Phân quyền"
+        subtitle="Quản lý tài khoản người dùng · Phân quyền RBAC và Phạm vi dữ liệu · Kiểm toán hệ thống"
         icon="settings"
       />
 
@@ -154,9 +154,9 @@ export default async function AdminPage({
                   <table className="w-full text-left text-sm border-collapse">
                     <thead className="bg-[#fcfcfc] border-b border-stroke text-xs font-semibold text-ink-2">
                       <tr>
-                        <th className="px-4 py-2.5">Họ tên & Email</th>
+                        <th className="px-4 py-2.5">Họ tên và Email</th>
                         <th className="px-4 py-2.5">Vai trò hệ thống</th>
-                        <th className="px-4 py-2.5">Hồ sơ nhân viên (FR-75)</th>
+                        <th className="px-4 py-2.5">Hồ sơ nhân viên</th>
                         <th className="px-4 py-2.5">Nhóm Sale Pod</th>
                         <th className="px-4 py-2.5">Trạng thái</th>
                         <th className="px-4 py-2.5 text-right">Thao tác</th>
@@ -245,7 +245,7 @@ export default async function AdminPage({
         {/* TAB 2: MA TRẬN PHÂN QUYỀN RBAC (FR-98) */}
         {tab === "rbac" && (
           <div className="space-y-4">
-            <Card title="Ma trận Phân quyền & Kiểm soát truy cập (RBAC)">
+            <Card title="Ma trận Phân quyền và Kiểm soát truy cập (RBAC)">
               <RbacMatrixView />
             </Card>
           </div>
@@ -255,7 +255,7 @@ export default async function AdminPage({
         {tab === "audit" && (
           <div className="space-y-4">
             {/* Bộ lọc nhật ký */}
-            <Card title="Bộ lọc nhật ký kiểm toán (FR-100)">
+            <Card title="Bộ lọc nhật ký kiểm toán">
               <form method="GET" action="/admin" className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
                 <input type="hidden" name="tab" value="audit" />
 
@@ -317,7 +317,7 @@ export default async function AdminPage({
                         <th className="px-3 py-2.5">Hành động</th>
                         <th className="px-3 py-2.5">Đối tượng</th>
                         <th className="px-3 py-2.5">Chuyển trạng thái</th>
-                        <th className="px-3 py-2.5">Lý do & Chi tiết</th>
+                        <th className="px-3 py-2.5">Lý do và Chi tiết</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stroke">

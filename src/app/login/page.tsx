@@ -100,7 +100,7 @@ export default function LoginPage() {
         </details>
 
         <div className="mt-6 border-t border-stroke pt-4 text-[11px] text-ink-3">
-          Đăng nhập sử dụng mã hoá mật khẩu scrypt (DEC-14), phiên được ký HMAC SHA-256. Kiểm quyền RBAC chặt chẽ ở server.
+          Đăng nhập sử dụng mã hoá mật khẩu scrypt, phiên được ký HMAC SHA-256. Kiểm quyền RBAC chặt chẽ ở server.
         </div>
       </div>
     </div>
