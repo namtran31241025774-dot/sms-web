@@ -8,6 +8,15 @@ import { approveSuggestionAction, rejectSuggestionAction } from "./actions";
 
 export const metadata: Metadata = { title: "Kiểm duyệt đề xuất AI (AI Review Inbox)" };
 
+// Màu theo mức điểm BANT 0/8/15/25: xám, cam, xanh, xanh lá.
+const BANT_TONE = {
+  none: { label: "Chưa có", bg: "#f5f7fa", border: "#e1e8f3", ink: "#667085", bar: "#a4acb9" },
+  low: { label: "Sơ bộ", bg: "#fff7ec", border: "#f6d9ad", ink: "#9a5b06", bar: "#c97d0e" },
+  mid: { label: "Khá", bg: "#eef5fd", border: "#c9dff7", ink: "#0f5aa3", bar: "#0f6cbd" },
+  high: { label: "Đạt", bg: "#eefaf0", border: "#bfe5c4", ink: "#0e700e", bar: "#107c10" },
+};
+const BANT_LABEL = { budget: "Ngân sách", authority: "Thẩm quyền", need: "Nhu cầu", timeline: "Thời gian" } as const;
+
 const STATUS_LABELS: Record<string, string> = {
   PENDING_REVIEW: "Chờ duyệt",
   APPROVED: "Đã duyệt",
@@ -170,13 +179,20 @@ function SuggestionCard({ suggestion: s }: { suggestion: Suggestion }) {
 
           {s.kind === "BANT_SCORE" && (
             <div className="space-y-2">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {["budget", "authority", "need", "timeline"].map((key) => {
-                  const scores = (payload.scores as Record<string, number>) || {};
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {(["budget", "authority", "need", "timeline"] as const).map((key) => {
+                  const score = ((payload.scores as Record<string, number>) || {})[key] ?? 0;
+                  const tone = score >= 25 ? BANT_TONE.high : score >= 15 ? BANT_TONE.mid : score >= 8 ? BANT_TONE.low : BANT_TONE.none;
                   return (
-                    <div key={key} className="rounded bg-surface p-2 border border-edge text-center">
-                      <div className="text-[10px] text-ink-3 uppercase font-semibold">{key}</div>
-                      <div className="text-base font-bold text-ink">{scores[key] ?? 0}<span className="text-xs font-normal text-ink-3">/25</span></div>
+                    <div key={key} className="rounded-xl border p-3" style={{ borderColor: tone.border, background: tone.bg }}>
+                      <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide" style={{ color: tone.ink }}>
+                        {BANT_LABEL[key]}
+                        <span className="rounded-full bg-white/70 px-1.5 text-[10px] normal-case">{tone.label}</span>
+                      </div>
+                      <div className="mt-1 text-[22px] font-bold leading-7 text-brand-ink">{score}<span className="text-xs font-normal text-ink-3">/25</span></div>
+                      <div className="mt-2 h-1.5 rounded-full bg-white/80">
+                        <div className="h-1.5 rounded-full" style={{ width: `${(score / 25) * 100}%`, background: tone.bar }} />
+                      </div>
                     </div>
                   );
                 })}
@@ -227,14 +243,14 @@ function SuggestionCard({ suggestion: s }: { suggestion: Suggestion }) {
           <div className="space-y-1.5 pt-1">
             <span className="font-semibold text-xs text-ink-3">Căn cứ trích dẫn chứng minh (Grounding):</span>
             <div className="flex flex-wrap gap-2">
-              {evidence.map((ev, idx) => {
+              {evidence.filter((ev, idx, arr) => arr.findIndex((x) => (x.ref || x.source) === (ev.ref || ev.source) && (x.quote || x.detail) === (ev.quote || ev.detail)) === idx).map((ev, idx) => {
                 const ref = ev.ref || ev.source || "";
                 const detail = ev.quote || ev.detail || "";
                 return (
                   <span
                     key={idx}
                     title={detail}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface border border-edge text-[11px] text-ink-2"
+                    className="inline-flex items-center gap-1 rounded-full border border-[#cfe0f6] bg-brand-tint px-2.5 py-0.5 text-[11px] text-ink-2"
                   >
                     <strong className="text-ink">{ref}</strong>
                     {detail && <span className="text-ink-3 truncate max-w-[200px]">: &quot;{detail}&quot;</span>}

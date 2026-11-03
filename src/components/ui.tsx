@@ -109,7 +109,7 @@ export function Tabs({ base, current, tabs }: { base: string; current: string; t
             href={`${base}?tab=${t.key}`}
             className={cx(
               "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-1.5 text-[13.5px] transition-colors",
-              active ? "bg-brand font-semibold text-white shadow-[0_2px_6px_rgba(15,108,189,0.25)]" : "text-ink-2 hover:bg-brand-tint hover:text-brand-ink",
+              active ? "bg-night font-semibold text-white shadow-[0_0_14px_rgba(15,108,189,0.45)]" : "text-ink-2 hover:bg-brand-tint hover:text-brand-ink",
             )}
           >
             {t.label}
@@ -130,7 +130,7 @@ export function Card({ title, actions, children, className, pad = true }: { titl
       {(title || actions) && (
         <header className="flex min-h-13 items-center justify-between gap-2 border-b border-[#eef1f5] px-5 py-3">
           <h2 className="flex items-center gap-2 text-[15px] font-bold text-brand-ink">
-            <span className="h-4 w-1 rounded-full bg-brand" aria-hidden="true" />
+            <span className="h-4 w-1 rounded-full bg-gradient-to-b from-[#5aa9ff] to-brand" aria-hidden="true" />
             {title}
           </h2>
           {actions && <div className="flex items-center gap-1">{actions}</div>}
@@ -290,7 +290,7 @@ export function Empty({ icon = "info", children }: { icon?: IconName; children: 
 export function Kpi({ label, value, sub, icon, href }: { label: string; value: ReactNode; sub?: ReactNode; icon: IconName; href?: string }) {
   const body = (
     <div className="flex h-full items-start gap-4 rounded-2xl border border-stroke bg-surface p-5 shadow-[var(--shadow-4)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-16)]">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-tint text-brand">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-night text-[#8fc4ff] shadow-[0_0_16px_rgba(15,108,189,0.35)]">
         <Icon name={icon} size={22} />
       </div>
       <div className="min-w-0">

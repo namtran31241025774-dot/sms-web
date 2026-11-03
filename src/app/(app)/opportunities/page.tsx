@@ -9,6 +9,14 @@ import { CommandBar, CommandLink, CommandSep, Empty, Flash, Grid, PageTitle, Per
 export const metadata: Metadata = { title: "Cơ hội bán hàng (Opportunities)" };
 
 const COLUMNS = ["DEVELOP", "PROPOSE", "CLOSE", "WON", "LOST"] as const;
+// Mỗi giai đoạn một tông nhạt cùng bộ màu với hệ thống; chấm màu và chữ cho biết giai đoạn, không chỉ dựa vào màu nền.
+const STAGE_COLOR: Record<string, { bg: string; border: string; ink: string; dot: string }> = {
+  DEVELOP: { bg: "#eef5fd", border: "#d3e5f8", ink: "#0f5aa3", dot: "#0f6cbd" },
+  PROPOSE: { bg: "#f2f2fd", border: "#dcdcf7", ink: "#3f4fc7", dot: "#4f6bed" },
+  CLOSE: { bg: "#fff7ec", border: "#f6dfbd", ink: "#9a5b06", dot: "#c97d0e" },
+  WON: { bg: "#eefaf0", border: "#cde9d1", ink: "#0e700e", dot: "#107c10" },
+  LOST: { bg: "#f5f7fa", border: "#e1e8f3", ink: "#667085", dot: "#a4acb9" },
+};
 
 export default async function OpportunitiesPage({ searchParams }: PageProps<"/opportunities">) {
   const user = await requirePermission('opp.read');
@@ -42,17 +50,20 @@ export default async function OpportunitiesPage({ searchParams }: PageProps<"/op
       />
 
       {view === "board" ? (
-        <div className="grid grid-cols-1 gap-4 px-6 pb-8 md:grid-cols-3 xl:grid-cols-5">
+        <div className="flex gap-4 overflow-x-auto px-6 pb-8">
           {COLUMNS.map((stage) => {
             const items = rows.filter((o) => o.stage === stage);
             const total = items.reduce((s, o) => s + o.amount, 0);
+            const c = STAGE_COLOR[stage] ?? STAGE_COLOR.LOST;
             return (
-              <section key={stage} className="rounded-lg bg-[#ebebeb]/60 p-2 flex flex-col min-w-[220px]">
-                <header className="flex items-center justify-between px-2 py-1.5 border-b border-[#dedede] mb-2">
-                  <span className="font-semibold text-xs uppercase tracking-wide">
-                    {OPP_STAGE[stage]} <span className="font-normal text-ink-3">({items.length})</span>
-                  </span>
-                  <span className="text-xs font-semibold text-ink-2 tabular-nums">{formatVnd(total)}</span>
+              <section key={stage} className="flex w-[264px] shrink-0 flex-col rounded-2xl border p-2 xl:w-auto xl:min-w-[230px] xl:flex-1" style={{ background: c.bg, borderColor: c.border }}>
+                <header className="mb-2 rounded-xl bg-white/70 px-3 py-2">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide" style={{ color: c.ink }}>
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: c.dot }} />
+                    <span className="truncate">{OPP_STAGE[stage]}</span>
+                    <span className="ml-auto rounded-full bg-white px-1.5 text-[11px] font-semibold text-ink-2">{items.length}</span>
+                  </div>
+                  <div className="mt-0.5 text-sm font-bold tabular-nums text-brand-ink">{formatVnd(total)}</div>
                 </header>
                 <div className="space-y-2 flex-1 overflow-y-auto max-h-[70vh]">
                   {items.map((o) => (

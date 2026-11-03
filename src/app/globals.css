@@ -9,13 +9,13 @@
   --brand-tint-2: #cfe4fa;
   --brand-ink: #0b2a55;
   --header: #ffffff;
-  --bg: #f4f6fb;
+  --bg: #f1f5fb;
   --surface: #ffffff;
-  --surface-2: #f8fafd;
-  --surface-hover: #f1f4f9;
-  --surface-pressed: #e4e9f1;
-  --stroke: #e4e8ef;
-  --stroke-strong: #cfd6e0;
+  --surface-2: #f5f8fd;
+  --surface-hover: #eef3fb;
+  --surface-pressed: #e1e9f5;
+  --stroke: #e1e8f3;
+  --stroke-strong: #cbd5e4;
   --stroke-accessible: #8a94a6;
   --text: #1b2430;
   --text-2: #3d4757;
@@ -45,6 +45,26 @@
   --color-surface-2: var(--surface-2);
   --color-stroke: var(--stroke);
   --color-ink: var(--text);
+  --color-ink-1: var(--text);
+  --color-edge: var(--stroke);
+  --color-danger-ink: var(--danger);
+  --color-success-ink: var(--success);
+  --color-warning-ink: var(--warning);
+  --color-danger-tint: var(--danger-tint);
+  --color-warning-tint: var(--warning-tint);
+  --color-brand-strong: var(--brand-pressed);
+  --color-night: #050b1f;
+  --color-accent: var(--brand);
+  --color-accent-hover: var(--brand-hover);
+  --color-accent-tint: var(--brand-tint);
+  /* Tên màu cũ còn dùng ở vài trang, trỏ về cùng bộ màu. */
+  --color-primary: var(--brand);
+  --color-primary-contrast: #ffffff;
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-subtle: var(--surface-2);
+  --color-ink-subtle: var(--text-3);
+  --color-danger-surface: var(--danger-tint);
+  --color-warning-contrast: #ffffff;
   --color-ink-2: var(--text-2);
   --color-ink-3: var(--text-3);
   --color-success: var(--success);
@@ -60,7 +80,9 @@ body {
 }
 
 body {
-  background: var(--bg);
+  /* Nền xanh rất nhạt, ngả cùng tông với dải tiêu đề và menu tối. */
+  background: radial-gradient(1200px 500px at 100% 0%, #e6eefb 0%, transparent 60%), var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -268,14 +290,14 @@ input[type="radio"] {
 .grid-table th {
   text-align: left;
   font-weight: 600;
-  color: var(--text-3);
+  color: #3b5583;
   font-size: 11.5px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   height: 40px;
   padding: 0 14px;
-  border-bottom: 1px solid var(--stroke);
-  background: var(--surface-2);
+  border-bottom: 1px solid #d9e3f2;
+  background: #eef3fb;
   position: sticky;
   top: 0;
   white-space: nowrap;
