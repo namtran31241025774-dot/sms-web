@@ -236,6 +236,81 @@ export function getPipelineFunnelReport(filter?: PipelineFilter): PipelineReport
   };
 }
 
+export interface ForecastDashboard {
+  quarter: string;
+  target: number | null;
+  targetSource: string;
+  wonInQuarter: number;
+  weightedInQuarter: number;
+  months: { month: string; won: number; weighted: number; count: number }[];
+  attention: { id: number; code: string; name: string; stage: string; amount: number; closeDate: string | null; openRisks: number; overdue: boolean }[];
+}
+
+/** Dự báo quý hiện tại so với chỉ tiêu, theo tháng chốt dự kiến, và cơ hội cần chú ý (FR-99, BR-14). */
+export function getForecastDashboard(filter?: PipelineFilter, today = new Date()): ForecastDashboard {
+  const prob: Record<string, number> = {
+    DEVELOP: settingNumber("forecast_prob_develop"), PROPOSE: settingNumber("forecast_prob_propose"), CLOSE: settingNumber("forecast_prob_close"), WON: 100,
+  };
+  const where = ["o.stage <> 'LOST'"];
+  const params: (string | number)[] = [];
+  if (filter?.team_id) { where.push("o.team_id = ?"); params.push(filter.team_id); }
+  if (filter?.owner_id) { where.push("o.owner_id = ?"); params.push(filter.owner_id); }
+  if (filter?.from_date) { where.push("o.created_at >= ?"); params.push(filter.from_date); }
+  if (filter?.to_date) { where.push("o.created_at <= ?"); params.push(`${filter.to_date} 23:59:59`); }
+  const rows = all<{ id: number; code: string; name: string; stage: string; amount: number; close_date: string | null; open_risks: number }>(
+    `SELECT o.id, o.code, o.name, o.stage, o.amount, o.close_date,
+       (SELECT COUNT(*) FROM opportunity_risks r WHERE r.opportunity_id = o.id AND r.status = 'OPEN') AS open_risks
+     FROM opportunities o WHERE ${where.join(" AND ")}`,
+    ...params,
+  );
+
+  const y = today.getFullYear();
+  const q = Math.floor(today.getMonth() / 3) + 1;
+  const quarter = `${y}-Q${q}`;
+  const inQuarter = (d: string | null) => !!d && Number(d.slice(0, 4)) === y && Math.floor((Number(d.slice(5, 7)) - 1) / 3) + 1 === q;
+  const weighted = (r: { stage: string; amount: number }) => Math.round((r.amount * (prob[r.stage] ?? 0)) / 100);
+
+  const byMonth = new Map<string, { won: number; weighted: number; count: number }>();
+  for (const r of rows) {
+    if (!r.close_date) continue;
+    const m = r.close_date.slice(0, 7);
+    const cur = byMonth.get(m) ?? { won: 0, weighted: 0, count: 0 };
+    if (r.stage === "WON") cur.won += r.amount;
+    else cur.weighted += weighted(r);
+    cur.count += 1;
+    byMonth.set(m, cur);
+  }
+
+  let target: number | null = null;
+  let targetSource = "Chưa đặt chỉ tiêu cho quý này";
+  const sumTarget = (sql: string, ...p: (string | number)[]) => all<{ s: number | null }>(sql, ...p)[0]?.s ?? null;
+  if (filter?.owner_id) {
+    target = sumTarget("SELECT SUM(target_amount) s FROM sales_targets WHERE period_type='QUARTER' AND period_name=? AND user_id=?", quarter, filter.owner_id);
+    if (target) targetSource = "Chỉ tiêu quý của nhân viên";
+  } else if (filter?.team_id) {
+    target = sumTarget("SELECT SUM(target_amount) s FROM sales_targets WHERE period_type='QUARTER' AND period_name=? AND team_id=?", quarter, filter.team_id);
+    if (target) targetSource = "Chỉ tiêu quý của Sale Pod";
+  } else {
+    target = sumTarget("SELECT SUM(target_amount) s FROM sales_targets WHERE period_type='QUARTER' AND period_name=? AND team_id IS NOT NULL", quarter);
+    if (target) targetSource = "Tổng chỉ tiêu quý của các Sale Pod";
+  }
+
+  const todayIso = today.toISOString().slice(0, 10);
+  return {
+    quarter,
+    target,
+    targetSource,
+    wonInQuarter: rows.filter((r) => r.stage === "WON" && inQuarter(r.close_date)).reduce((s, r) => s + r.amount, 0),
+    weightedInQuarter: rows.filter((r) => r.stage !== "WON" && inQuarter(r.close_date)).reduce((s, r) => s + weighted(r), 0),
+    months: [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, v]) => ({ month, ...v })),
+    attention: rows
+      .filter((r) => r.stage !== "WON" && (r.open_risks > 0 || (!!r.close_date && r.close_date < todayIso)))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5)
+      .map((r) => ({ id: r.id, code: r.code, name: r.name, stage: r.stage, amount: r.amount, closeDate: r.close_date, openRisks: r.open_risks, overdue: !!r.close_date && r.close_date < todayIso })),
+  };
+}
+
 /**
  * Trích xuất báo cáo cơ hội và dự báo doanh số ra tệp CSV (FR-99).
  */

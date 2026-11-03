@@ -3,7 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
-import { getPipelineFunnelReport } from "@/lib/services/reports";
+import { getForecastDashboard, getPipelineFunnelReport } from "@/lib/services/reports";
+import { CompareBars, Legend, SERIES, StackedColumns, TargetProgress } from "@/components/charts";
 import { all } from "@/lib/db";
 import { formatVnd } from "@/lib/domain";
 import { Card, CommandBar, CommandLink, PageTitle, Flash } from "@/components/ui";
@@ -40,6 +41,8 @@ export default async function ReportsPage({
     from_date: sp.from_date,
     to_date: sp.to_date,
   });
+
+  const dash = getForecastDashboard({ team_id: teamId, owner_id: ownerId, from_date: sp.from_date, to_date: sp.to_date });
 
   const teams = all<{ id: number; name: string; code: string }>(
     "SELECT id, name, code FROM teams WHERE active = 1 ORDER BY name ASC",
@@ -123,10 +126,10 @@ export default async function ReportsPage({
             </div>
 
             <div className="flex items-end gap-2">
-              <button type="submit" className="btn-secondary w-full">
+              <button type="submit" className="btn btn-primary w-full">
                 Xem báo cáo
               </button>
-              <Link href="/reports" className="btn-ghost text-xs">
+              <Link href="/reports" className="btn btn-subtle">
                 Đặt lại
               </Link>
             </div>
@@ -168,6 +171,88 @@ export default async function ReportsPage({
             <div className="mt-2 text-2xl font-bold text-ink">{report.winRatePct}%</div>
             <div className="mt-1 text-xs text-ink-3">Trên các cơ hội đã đóng</div>
           </div>
+        </div>
+
+        {/* DẢI KẾT LUẬN: dự báo quý so với chỉ tiêu */}
+        <section className="rounded-2xl border border-stroke bg-surface p-6 shadow-[var(--shadow-4)]">
+          <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand">Dự báo quý {dash.quarter.replace("-Q", " · Quý ")}</div>
+          <div className="mt-2 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_420px] lg:items-end">
+            <div>
+              <h2 className="text-[28px] font-bold leading-9 text-brand-ink">
+                {dash.target
+                  ? `Dự kiến đạt ${Math.round(((dash.wonInQuarter + dash.weightedInQuarter) / dash.target) * 100)}% chỉ tiêu quý`
+                  : "Chưa có chỉ tiêu quý để so sánh"}
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm text-ink-2">
+                Đã thắng <b>{formatVnd(dash.wonInQuarter)}</b> và dự báo có trọng số <b>{formatVnd(dash.weightedInQuarter)}</b> từ các cơ hội có ngày chốt trong quý
+                {dash.target ? <>, so với {dash.targetSource.toLowerCase()} <b>{formatVnd(dash.target)}</b>.</> : "."}
+              </p>
+            </div>
+            {dash.target ? (
+              <div>
+                <Legend items={[{ color: SERIES.a, label: "Đã thắng" }, { color: SERIES.b, label: "Dự báo có trọng số" }]} />
+                <div className="mt-2">
+                  <TargetProgress a={dash.wonInQuarter} b={dash.weightedInQuarter} target={dash.target} aLabel="Đã thắng" bLabel="Dự báo có trọng số" />
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_1fr]">
+          <Card title="Doanh thu theo tháng chốt dự kiến">
+            {dash.months.length ? (
+              <>
+                <Legend items={[{ color: SERIES.a, label: "Đã thắng" }, { color: SERIES.b, label: "Dự báo có trọng số (cơ hội đang mở)" }]} />
+                <div className="mt-6">
+                  <StackedColumns
+                    data={dash.months.map((m) => ({ label: `${m.month.slice(5)}/${m.month.slice(2, 4)}`, a: m.won, b: m.weighted, note: `${m.count} cơ hội` }))}
+                    aLabel="Đã thắng"
+                    bLabel="Dự báo có trọng số"
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-ink-3">Chưa có cơ hội nào có ngày chốt dự kiến.</p>
+            )}
+            <p className="mt-4 text-xs text-ink-3">Nguồn: ngày chốt dự kiến và giá trị của từng cơ hội; dự báo = giá trị × trọng số theo giai đoạn (cài đặt dự báo). Cơ hội thất bại không tính.</p>
+          </Card>
+
+          <Card title="Phễu theo giai đoạn">
+            <CompareBars
+              rows={report.stages.filter((s) => s.stage !== "LOST").map((s) => ({ label: s.stageName, sub: `${s.count} cơ hội · ${s.probabilityPct}%`, total: s.totalAmount, part: s.weightedAmount }))}
+              totalLabel="Giá trị"
+              partLabel="Có trọng số"
+            />
+            <p className="mt-4 text-xs text-ink-3">Thanh viền là tổng giá trị, phần tô đậm là giá trị có trọng số của giai đoạn.</p>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <Card title="Theo Sale Pod">
+            <CompareBars rows={report.byTeam.map((t) => ({ label: t.teamName, sub: `${t.oppCount} cơ hội`, total: t.totalAmount, part: t.weightedForecast }))} totalLabel="Pipeline mở" partLabel="Dự báo" />
+          </Card>
+          <Card title="Theo nhân viên kinh doanh">
+            <CompareBars rows={report.byOwner.map((o) => ({ label: o.ownerName, sub: `${o.oppCount} cơ hội`, total: o.totalAmount, part: o.weightedForecast }))} totalLabel="Pipeline mở" partLabel="Dự báo" />
+          </Card>
+          <Card title="Cơ hội cần chú ý" pad={false}>
+            {dash.attention.length ? (
+              <ul className="divide-y divide-[#eef1f5]">
+                {dash.attention.map((a) => (
+                  <li key={a.id} className="px-5 py-3 text-sm">
+                    <Link href={`/opportunities/${a.id}`} className="link">{a.code} · {a.name}</Link>
+                    <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-ink-3">
+                      <span className="font-semibold text-ink-2">{formatVnd(a.amount)}</span>
+                      {a.openRisks > 0 && <span>{a.openRisks} rủi ro đang mở</span>}
+                      {a.overdue && <span className="text-[#bc4b09]">Quá ngày chốt {a.closeDate}</span>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="p-5 text-sm text-ink-3">Không có cơ hội nào còn rủi ro mở hoặc quá ngày chốt.</p>
+            )}
+          </Card>
         </div>
 
         {/* BẢNG 1: CHI TIẾT THEO GIAI ĐOẠN PHỄU (BR-14) */}

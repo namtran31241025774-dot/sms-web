@@ -9,6 +9,9 @@
 
 import Link from "next/link";
 import type { BantBreakdown } from "@/lib/services/sales-flow";
+import { runForWorkflow } from "@/lib/services/ai-review";
+import { AgentTerminal } from "./agent-terminal";
+import { terminalLines } from "./agent-terminal-lines";
 import { Icon } from "./icons";
 import { StatusBadge, cx } from "./ui";
 import { SubmitButton } from "./client";
@@ -156,6 +159,7 @@ export function BantQualificationView({
 
   // Lấy lần chạy Qualification Agent gần nhất
   const latestRun = runs[0];
+  const latestTrace = latestRun ? runForWorkflow(latestRun.id) : undefined;
   let toolCalls: { tool: string; ok: boolean; input?: unknown }[] = [];
   if (latestRun) {
     try {
@@ -247,6 +251,14 @@ export function BantQualificationView({
         model={latestRun?.model}
         steps={observationSteps}
       />
+
+      {latestTrace && (
+        <AgentTerminal
+          title="Sales Qualification Agent đang làm việc"
+          subtitle={`Lần chạy #${latestRun!.id}`}
+          lines={terminalLines(latestTrace, { savedLabel: "Lưu các đề xuất chờ duyệt (BANT, bổ sung thông tin, email nháp)" })}
+        />
+      )}
 
       {/* 2. BẢNG BANT 4 TIÊU CHÍ CHUẨN ĐỒ ÁN */}
       <section className="rounded-xl border border-stroke bg-surface p-4 shadow-[var(--shadow-4)]">

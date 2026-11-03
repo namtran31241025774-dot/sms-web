@@ -13,6 +13,8 @@
 
 import { formatDate, LEVEL } from "@/lib/domain";
 import { runForWorkflow } from "@/lib/services/ai-review";
+import { AgentTerminal } from "./agent-terminal";
+import { terminalLines } from "./agent-terminal-lines";
 import type { StageGateStatus } from "@/lib/services/approvals";
 import { TOOLS, type ToolName } from "@/lib/agents/tools";
 import { Icon, type IconName } from "./icons";
@@ -370,6 +372,18 @@ function ResearchCard({
         tokens={tokens}
         steps={observationSteps}
       />
+
+      {/* B2. NHẬT KÝ LẦN CHẠY DẠNG TERMINAL, DỰNG TỪ DẤU VẾT ĐÃ LƯU */}
+      {run && (
+        <AgentTerminal
+          title="Sales Opportunity Agent đang làm việc"
+          subtitle={`Lần chạy #${research.run_id}`}
+          lines={terminalLines(run, {
+            savedLabel: `Lưu bản nghiên cứu #${research.id} (${view.phaseLabel})`,
+            human: verified ? `Đã xác minh bởi ${research.reviewed_by_name ?? "nhân viên"}` : dismissed ? "Bản nghiên cứu đã bị bỏ qua" : "Đang chờ nhân viên kinh doanh xác minh",
+          })}
+        />
+      )}
 
       {/* C. TÓM TẮT TỔNG QUAN TỪ AGENT */}
       {research.summary && (

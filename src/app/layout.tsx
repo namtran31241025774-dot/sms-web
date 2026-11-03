@@ -8,7 +8,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="vi" className="h-full">
+    // Tiện ích trình duyệt có thể tự thêm class vào <html> (ví dụ mdl-js); bỏ cảnh báo lệch hiển thị riêng thẻ này.
+    <html lang="vi" className="h-full" suppressHydrationWarning>
       <body className="h-full">{children}</body>
     </html>
   );
