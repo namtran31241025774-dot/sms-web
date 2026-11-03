@@ -69,26 +69,30 @@ export function PageTitle({
   right?: ReactNode;
 }) {
   return (
-    <div className="mx-6 mb-4 mt-5 flex flex-wrap items-center justify-between gap-5 rounded-2xl border border-stroke bg-gradient-to-r from-[#eaf2fc] via-white to-white px-6 py-5 shadow-[var(--shadow-4)]">
-      <div className="flex min-w-0 items-center gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand text-white shadow-[0_4px_12px_rgba(15,108,189,0.3)]">
-          <Icon name={icon} size={24} />
+    <div className="relative mx-6 mb-5 mt-5 overflow-hidden rounded-2xl bg-[#050b1f] px-7 py-6 text-white shadow-[0_18px_40px_-18px_rgba(5,11,31,0.7)]">
+      <div className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(15,108,189,0.55),transparent_65%)]" />
+      <div className="pointer-events-none absolute -bottom-40 left-1/3 h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(79,107,237,0.22),transparent_65%)]" />
+      <div className="relative flex flex-wrap items-center justify-between gap-5">
+        <div className="flex min-w-0 items-center gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-[#8fc4ff] shadow-[0_0_24px_rgba(15,108,189,0.45)]">
+            <Icon name={icon} size={24} />
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-[26px] font-extrabold leading-8 tracking-tight">{title}</h1>
+            {subtitle && <div className="mt-1 truncate text-[13px] text-[#a9b8d6] [&_a]:text-[#8fc4ff]">{subtitle}</div>}
+          </div>
         </div>
-        <div className="min-w-0">
-          <h1 className="truncate text-[24px] font-bold leading-8 text-brand-ink">{title}</h1>
-          {subtitle && <div className="mt-0.5 truncate text-[13px] text-ink-3">{subtitle}</div>}
-        </div>
+        {right && <div className="flex flex-wrap items-center gap-3">{right}</div>}
       </div>
-      {right && <div className="flex flex-wrap items-center gap-3">{right}</div>}
     </div>
   );
 }
 
 export function HeaderField({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="min-w-[120px] rounded-xl border border-stroke bg-white/80 px-3.5 py-2">
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">{label}</div>
-      <div className="mt-0.5 text-[15px] font-semibold leading-5 text-brand-ink">{children}</div>
+    <div className="min-w-[124px] rounded-xl border border-white/12 bg-white/[0.06] px-3.5 py-2 backdrop-blur">
+      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8fa3c8]">{label}</div>
+      <div className="mt-0.5 text-[15px] font-semibold leading-5 text-white [&_.text-ink-3]:text-[#8fa3c8]">{children}</div>
     </div>
   );
 }
@@ -291,7 +295,7 @@ export function Kpi({ label, value, sub, icon, href }: { label: string; value: R
       </div>
       <div className="min-w-0">
         <div className="text-[11.5px] font-semibold uppercase tracking-wide text-ink-3">{label}</div>
-        <div className="mt-0.5 text-[26px] font-bold leading-8 text-brand-ink">{value}</div>
+        <div className="mt-0.5 whitespace-nowrap text-[22px] font-bold leading-8 tracking-tight text-brand-ink">{value}</div>
         {sub && <div className="text-xs text-ink-3">{sub}</div>}
       </div>
     </div>

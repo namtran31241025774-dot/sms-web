@@ -5,18 +5,19 @@ import { can } from "@/lib/rbac";
 import { listUsers, listSettings } from "@/lib/services/admin";
 import { listAuditLogs } from "@/lib/services/audit-view";
 import { formatDate, type Role } from "@/lib/domain";
-import { Card, CommandBar, CommandLink, Empty, Flash, PageTitle, Tabs } from "@/components/ui";
+import { Card, CommandBar, CommandLink, Empty, Flash, PageTitle } from "@/components/ui";
+import { Icon, type IconName } from "@/components/icons";
 import { RoleBadge, UserStatusBadge } from "@/components/admin/badges";
 import { RbacMatrixView } from "@/components/admin/rbac-matrix";
 import { setUserStatusAction, updateSettingAction } from "./actions";
 
 export const metadata: Metadata = { title: "Quản trị hệ thống và Phân quyền" };
 
-const TABS = [
-  { key: "users", label: "Tài khoản người dùng" },
-  { key: "rbac", label: "Ma trận phân quyền và Phạm vi" },
-  { key: "audit", label: "Nhật ký kiểm toán" },
-  { key: "settings", label: "Cấu hình hệ thống (Settings)" },
+const TABS: { key: string; label: string; hint: string; icon: IconName }[] = [
+  { key: "users", label: "Tài khoản người dùng", hint: "Tạo, khóa, đặt lại mật khẩu", icon: "people" },
+  { key: "rbac", label: "Phân quyền và phạm vi", hint: "Vai trò được làm gì, thấy gì", icon: "shield" },
+  { key: "audit", label: "Nhật ký kiểm toán", hint: "Ai đã làm gì, lúc nào", icon: "history" },
+  { key: "settings", label: "Tham số quy tắc", hint: "Ngưỡng, trọng số, giới hạn AI", icon: "settings" },
 ];
 
 export default async function AdminPage({
@@ -89,8 +90,26 @@ export default async function AdminPage({
         icon="settings"
       />
 
-      <div className="px-6 pb-12 space-y-6">
-        <Tabs base="/admin" current={tab} tabs={TABS} />
+      <div className="grid grid-cols-1 gap-6 px-6 pb-12 lg:grid-cols-[250px_1fr]">
+        {/* Điều hướng cài đặt dạng cột dọc */}
+        <aside className="h-fit rounded-2xl border border-stroke bg-surface p-2 shadow-[var(--shadow-4)] lg:sticky lg:top-16">
+          {TABS.map((t) => (
+            <Link
+              key={t.key}
+              href={`/admin?tab=${t.key}`}
+              className={`flex items-start gap-3 rounded-xl px-3 py-2.5 transition-colors ${tab === t.key ? "bg-brand-tint" : "hover:bg-surface-2"}`}
+            >
+              <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${tab === t.key ? "bg-brand text-white" : "bg-surface-2 text-ink-3"}`}>
+                <Icon name={t.icon} size={16} />
+              </span>
+              <span className="min-w-0">
+                <span className={`block text-sm ${tab === t.key ? "font-semibold text-brand-ink" : "text-ink"}`}>{t.label}</span>
+                <span className="block text-xs text-ink-3">{t.hint}</span>
+              </span>
+            </Link>
+          ))}
+        </aside>
+        <div className="min-w-0 space-y-6">
 
         {/* TAB 1: TÀI KHOẢN NGƯỜI DÙNG (FR-96, FR-97) */}
         {tab === "users" && (
@@ -381,55 +400,47 @@ export default async function AdminPage({
         {/* TAB 4: CẤU HÌNH HỆ THỐNG (SETTINGS) */}
         {tab === "settings" && (
           <div className="space-y-4">
-            <Card title="Cấu hình tham số quy tắc nghiệp vụ (BUSINESS-RULES.md)">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-[#fcfcfc] border-b border-stroke text-ink-2 font-semibold">
-                    <tr>
-                      <th className="px-4 py-2.5">Tham số</th>
-                      <th className="px-4 py-2.5">Mô tả quy tắc</th>
-                      <th className="px-4 py-2.5">Giá trị hiện tại</th>
-                      {canManageSettings && <th className="px-4 py-2.5 text-right">Lưu thay đổi</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stroke">
-                    {settingsList.map((st) => (
-                      <tr key={st.key} className="hover:bg-[#fafafa]">
-                        <td className="px-4 py-2.5 font-mono font-semibold text-ink">
-                          {st.key}
-                        </td>
-                        <td className="px-4 py-2.5 text-ink-2 max-w-sm">
-                          {st.description || "—"}
-                        </td>
-                        {canManageSettings ? (
-                          <td colSpan={2} className="px-4 py-2.5">
-                            <form action={updateSettingAction} className="flex items-center gap-2 justify-end">
-                              <input type="hidden" name="key" value={st.key} />
-                              <input
-                                type="text"
-                                name="value"
-                                defaultValue={st.value}
-                                className="input max-w-xs font-mono text-xs"
-                              />
-                              <button type="submit" className="btn-secondary py-1 px-3 text-xs">
-                                Lưu
-                              </button>
-                            </form>
-                          </td>
-                        ) : (
-                          <td className="px-4 py-2.5 font-mono font-bold text-ink">
-                            {st.value}
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+            {settingGroups(settingsList).map(([group, items]) => (
+              <Card key={group} title={group} pad={false}>
+                <ul className="divide-y divide-[#eef1f5]">
+                  {items.map((st) => (
+                    <li key={st.key} className="grid grid-cols-1 gap-3 px-5 py-4 md:grid-cols-[1fr_320px] md:items-center">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-ink">{st.description || st.key}</div>
+                        <code className="text-[11px] text-ink-3">{st.key}</code>
+                      </div>
+                      {canManageSettings ? (
+                        <form action={updateSettingAction} className="flex items-center gap-2">
+                          <input type="hidden" name="key" value={st.key} />
+                          <input type="text" name="value" defaultValue={st.value} className="input font-mono text-xs" />
+                          <button type="submit" className="btn btn-sm">Lưu</button>
+                        </form>
+                      ) : (
+                        <span className="font-mono text-sm font-semibold text-ink">{st.value}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            ))}
           </div>
         )}
+        </div>
       </div>
     </>
   );
+}
+
+const GROUPS: [string, string][] = [
+  ["ai_", "AI Agent"], ["llm_", "AI Agent"], ["opp_", "AI Agent"], ["bant", "Đánh giá khách hàng"], ["lead_", "Đánh giá khách hàng"],
+  ["importance", "Phát triển cơ hội"], ["manager_gate", "Phát triển cơ hội"], ["expert_review", "Phát triển cơ hội"], ["forecast_", "Dự báo doanh thu"],
+  ["discount", "Báo giá và chiết khấu"], ["quote", "Báo giá và chiết khấu"], ["order", "Đơn hàng"], ["invoice", "Hóa đơn và thanh toán"], ["payment", "Hóa đơn và thanh toán"], ["dunning", "Hóa đơn và thanh toán"],
+];
+function settingGroups<T extends { key: string }>(list: T[]): [string, T[]][] {
+  const map = new Map<string, T[]>();
+  for (const st of list) {
+    const g = GROUPS.find(([prefix]) => st.key.startsWith(prefix))?.[1] ?? "Khác";
+    map.set(g, [...(map.get(g) ?? []), st]);
+  }
+  return [...map.entries()];
 }

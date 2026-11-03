@@ -14,10 +14,10 @@ export function NavLink({ href, icon, children, badge }: { href: string; icon: I
       href={href}
       aria-current={active ? "page" : undefined}
       className={`relative flex h-10 items-center gap-3 rounded-xl px-3 text-[13.5px] transition-colors ${
-        active ? "bg-brand font-semibold text-white shadow-[0_3px_8px_rgba(15,108,189,0.28)]" : "text-ink-2 hover:bg-brand-tint hover:text-brand-ink"
+        active ? "bg-brand font-semibold text-white shadow-[0_0_18px_rgba(15,108,189,0.55)]" : "text-[#b4c3df] hover:bg-white/8 hover:text-white"
       }`}
     >
-      <Icon name={icon} size={19} className={active ? "text-white" : "text-ink-3"} />
+      <Icon name={icon} size={19} className={active ? "text-white" : "text-[#7f93bb]"} />
       <span className="flex-1 truncate">{children}</span>
       {!!badge && <span className={`rounded-full px-1.5 text-[11px] font-semibold leading-4 ${active ? "bg-white text-brand" : "bg-brand text-white"}`}>{badge}</span>}
     </Link>

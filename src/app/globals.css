@@ -81,7 +81,11 @@ h3 {
 }
 
 /* ---------- Buttons ---------- */
-.btn {
+/* btn-secondary, btn-ghost, btn-outline: tên cũ còn dùng ở nhiều trang, cho cùng kiểu với .btn. */
+.btn,
+.btn-secondary,
+.btn-outline,
+.btn-ghost {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -99,9 +103,25 @@ h3 {
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.btn:hover {
+.btn:hover,
+.btn-secondary:hover,
+.btn-outline:hover {
   background: var(--surface-hover);
   border-color: var(--stroke-accessible);
+}
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  font-weight: 500;
+}
+.btn-ghost:hover {
+  background: var(--surface-hover);
+}
+.btn-secondary:disabled,
+.btn-outline:disabled,
+.btn-ghost:disabled {
+  color: #a4acb9;
+  cursor: not-allowed;
 }
 .btn:active {
   background: var(--surface-pressed);
