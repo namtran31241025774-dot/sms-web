@@ -9,7 +9,7 @@ import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { all, get } from "@/lib/db";
 import { discoverySurvey } from "@/lib/services/discovery";
-import { opportunityFlow, proposeFlow } from "@/lib/services/sales-flow";
+import { opportunityFlow, proposeFlow, researchView } from "@/lib/services/sales-flow";
 import { formatDate, formatVnd, LEVEL, LOST_REASONS_BR27, OPP_STAGE, QUOTE_STATUS, RISK_STATUS, STAKEHOLDER_ROLE } from "@/lib/domain";
 import { can } from "@/lib/rbac";
 import { listRuns } from "@/lib/services/ai-review";
@@ -41,6 +41,7 @@ import {
   Badge, Card, CommandAction, CommandBar, CommandLink, CommandSep, Empty, Flash, FormField, Grid, HeaderField, MessageBar, PageTitle, Persona, ProcessFlow, StatusBadge, Tabs,
 } from "@/components/ui";
 import {
+  actOnRuleEvaluationAction,
   addOppActivityAction,
   advanceAction,
   checklistAction,
@@ -964,9 +965,11 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
               opportunity={o}
               researchList={research}
               getRuleEvals={ruleEvaluationsOf}
+              getView={(researchId) => researchView(researchId, user)}
               gateStatus={gateStatus}
               canVerify={open && can(user.role, "ai.review")}
               verifyAction={verifyResearchAction}
+              ruleAction={actOnRuleEvaluationAction}
             />
             <AgentRuns runs={listRuns({ entityType: "opportunity", entityId: o.id })} />
           </div>

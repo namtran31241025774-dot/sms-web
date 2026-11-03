@@ -19,7 +19,7 @@ import { Icon, type IconName } from "./icons";
 import { StatusBadge, cx } from "./ui";
 import { SubmitButton } from "./client";
 import { RuleEvaluationTable } from "./rule-evaluation-table";
-import { OpportunityNextActions } from "./opportunity-next-actions";
+import type { ResearchView } from "@/lib/services/sales-flow";
 import { AgentObservationFlow, type AgentObservationStep } from "./agent-observation-flow";
 
 export interface ResearchRecord {
@@ -59,6 +59,8 @@ export interface RuleEvalRow {
   human_gate: string | null;
 }
 
+type Action = (formData: FormData) => Promise<void>;
+
 interface OpportunityResearchViewProps {
   opportunity: {
     id: number;
@@ -68,32 +70,43 @@ interface OpportunityResearchViewProps {
   };
   researchList: ResearchRecord[];
   getRuleEvals: (researchId: number) => RuleEvalRow[];
+  getView: (researchId: number) => ResearchView;
   gateStatus?: StageGateStatus;
   canVerify: boolean;
-  verifyAction: (formData: FormData) => Promise<void>;
+  verifyAction: Action;
+  ruleAction: Action;
 }
 
-// Bảng ánh xạ các mục nhận định sang tiếng Việt theo chuẩn bài làm
-const INSIGHT_SECTIONS: { key: string; label: string; icon: IconName }[] = [
-  { key: "account_overview", label: "Bối cảnh doanh nghiệp", icon: "account" },
-  { key: "opportunity_info", label: "Thông tin cơ hội", icon: "opportunity" },
-  { key: "bant_result", label: "Kết quả BANT", icon: "checkCircle" },
-  { key: "health", label: "Lịch sử tương tác và sức khỏe cơ hội", icon: "history" },
-  { key: "pain_need", label: "Nhu cầu và điểm chưa rõ", icon: "sparkle" },
-  { key: "product", label: "Sản phẩm và giải pháp liên quan", icon: "product" },
-  { key: "stakeholder", label: "Bên liên quan (Stakeholders)", icon: "people" },
-  { key: "competitor", label: "Đối thủ cạnh tranh", icon: "shield" },
-  { key: "budget_risk", label: "Rủi ro ngân sách", icon: "money" },
-  { key: "missing_info", label: "Thông tin còn thiếu cần khai thác", icon: "info" },
-];
+// Biểu tượng cho 10 mục nhận định; tên mục lấy từ researchView (RESEARCH_SECTION_TITLES).
+const SECTION_ICON: Record<string, IconName> = {
+  account_overview: "account",
+  opportunity_info: "opportunity",
+  bant_result: "checkCircle",
+  interaction_history: "history",
+  pain_need: "sparkle",
+  scope_summary: "info",
+  product: "product",
+  stakeholder: "people",
+  competitor: "shield",
+  budget_check: "money",
+};
+
+const RULE_ACTION_LABEL: Record<string, string> = {
+  ACKNOWLEDGED: "Đã ghi nhận và cho qua",
+  FLAGGED: "Đã gắn cờ",
+  RISK: "Đã chuyển thành rủi ro",
+  TASK: "Đã tạo việc cần làm",
+};
 
 export function OpportunityResearchView({
   opportunity,
   researchList,
   getRuleEvals,
+  getView,
   gateStatus,
   canVerify,
   verifyAction,
+  ruleAction,
 }: OpportunityResearchViewProps) {
   if (!researchList.length) {
     return (
@@ -123,9 +136,12 @@ export function OpportunityResearchView({
           oppAmount={opportunity.amount}
           research={latest}
           evals={getRuleEvals(latest.id)}
+          view={getView(latest.id)}
           gateStatus={gateStatus}
           canVerify={canVerify}
+          canAct={canVerify && opportunity.stage === "DEVELOP" && latest.status !== "DISMISSED"}
           verifyAction={verifyAction}
+          ruleAction={ruleAction}
         />
       </section>
 
@@ -168,9 +184,12 @@ export function OpportunityResearchView({
                     oppAmount={opportunity.amount}
                     research={r}
                     evals={getRuleEvals(r.id)}
+                    view={getView(r.id)}
                     gateStatus={gateStatus}
                     canVerify={false}
+                    canAct={canVerify && opportunity.stage === "DEVELOP" && r.status !== "DISMISSED"}
                     verifyAction={verifyAction}
+                    ruleAction={ruleAction}
                   />
                 </div>
               </details>
@@ -186,19 +205,27 @@ function ResearchCard({
   oppId,
   research,
   evals,
+  view,
   gateStatus,
   canVerify,
+  canAct,
   verifyAction,
+  ruleAction,
 }: {
   isLatest?: boolean;
   oppId: number;
   oppAmount?: number;
   research: ResearchRecord;
   evals: RuleEvalRow[];
+  view: ResearchView;
   gateStatus?: StageGateStatus;
   canVerify: boolean;
-  verifyAction: (formData: FormData) => Promise<void>;
+  canAct: boolean;
+  verifyAction: Action;
+  ruleAction: Action;
 }) {
+  const verifyFormId = `verify-research-${research.id}`;
+  const actionable = view.evaluations.filter((e) => e.status === "WARNING" || e.status === "HIT");
   const run = research.run_id ? runForWorkflow(research.run_id) : undefined;
   const calls = JSON.parse(run?.tool_calls_json ?? "[]") as { tool: string; ok: boolean; input?: unknown }[];
   const reads = calls.filter((c) => TOOLS[c.tool as ToolName]?.access === "READ" && c.tool !== "evaluate_opportunity_rules");
@@ -209,19 +236,12 @@ function ResearchCard({
   const pending = research.status === "PENDING_REVIEW";
   const tokens = (run?.input_tokens ?? 0) + (run?.output_tokens ?? 0);
 
-  // Phân tích insights_json
-  let insights: Record<string, { text?: string; status?: string; reason?: string; sources?: { ref: string; detail?: string }[] }> = {};
-  try {
-    insights = JSON.parse(research.insights_json || "{}");
-  } catch {
-    insights = {};
-  }
-
-  // Xác định Agent lần 1 hay lần 2
-  const isInitial = research.research_phase === "INITIAL" || !research.research_phase;
-  const phaseTitle = isInitial
-    ? "Agent lần 1: Nghiên cứu bối cảnh ban đầu (Bước 1.1)"
-    : "Agent lần 2: Phân tích sau khảo sát và kiểm ngân sách (Bước 2.2 – 5.2)";
+  const phaseTitle =
+    view.phase === "INITIAL"
+      ? `${view.phaseLabel}: Nghiên cứu bối cảnh ban đầu`
+      : view.phase === "POST_SURVEY"
+        ? `${view.phaseLabel}: Phân tích sau khảo sát và kiểm ngân sách`
+        : view.phaseLabel;
 
   // Đếm quy tắc
   const hitCount = evals.filter((e) => e.status === "HIT").length;
@@ -371,11 +391,10 @@ function ResearchCard({
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {INSIGHT_SECTIONS.map((sec) => {
-            const data = insights[sec.key];
-            const hasText = !!data?.text;
-            const isNoInsight = data?.status === "NO_INSIGHT" || (!hasText && !data);
-            const reason = data?.reason || (isNoInsight ? "Chưa có thông tin hoặc tài liệu phục vụ mục này" : "");
+          {view.sections.map((data) => {
+            const sec = { key: data.key, label: data.title, icon: SECTION_ICON[data.key] ?? "info" };
+            const hasText = data.status === "INSIGHT" && !!data.text;
+            const reason = data.reason ?? "Chưa có thông tin hoặc tài liệu phục vụ mục này";
 
             return (
               <div
@@ -408,7 +427,7 @@ function ResearchCard({
                       {data.sources && data.sources.length > 0 && (
                         <div className="rounded bg-[#f9f9f9] border border-[#f0f0f0] p-1.5 text-[11px] text-ink-3">
                           <span className="font-medium text-ink-2">Căn cứ:</span>{" "}
-                          {data.sources.map((s) => s.ref + (s.detail ? ` (${s.detail})` : "")).join("; ")}
+                          {data.sources.map((s) => s.ref).join("; ")}
                         </div>
                       )}
                     </div>
@@ -422,6 +441,20 @@ function ResearchCard({
             );
           })}
         </div>
+      </div>
+
+      {/* D2. THÔNG TIN CÒN THIẾU ĐỂ NHÂN VIÊN KINH DOANH HỎI KHÁCH */}
+      <div className="rounded-lg border border-stroke bg-surface p-4">
+        <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink">
+          <Icon name="info" size={14} className="text-brand" /> Thông tin còn thiếu cần hỏi khách ({view.missingInfo.length})
+        </h3>
+        {view.missingInfo.length ? (
+          <ul className="list-disc space-y-1 pl-5 text-xs text-ink-1">
+            {view.missingInfo.map((m, i) => <li key={i}>{m}</li>)}
+          </ul>
+        ) : (
+          <p className="text-xs italic text-ink-3">Agent không ghi nhận thông tin còn thiếu.</p>
+        )}
       </div>
 
       {/* E. RỦI RO PHÁT HIỆN KÈM DÒNG "VÌ SAO" */}
@@ -465,7 +498,7 @@ function ResearchCard({
 
                 {pending && canVerify && (
                   <label className="flex items-center gap-1.5 shrink-0 cursor-pointer pt-1 sm:pt-0">
-                    <input type="checkbox" name="risk" value={i} defaultChecked className="accent-[var(--brand)]" />
+                    <input type="checkbox" name="risk" value={i} defaultChecked form={verifyFormId} className="accent-[var(--brand)]" />
                     <span className="text-[11px] text-ink-2 font-medium">Áp dụng vào cơ hội</span>
                   </label>
                 )}
@@ -483,8 +516,81 @@ function ResearchCard({
           <span>Tối đa 3 hành động ưu tiên đề xuất</span>
           <span className="text-[11px] font-normal text-ink-3 lowercase">có người phụ trách và lý do</span>
         </h3>
-        <OpportunityNextActions serialized={research.next_actions_json} />
+        {view.recommendations.length ? (
+          <ol className="space-y-2.5 text-xs">
+            {view.recommendations.slice(0, 3).map((a, i) => (
+              <li key={i} className="rounded-md border border-[#f0f0f0] bg-[#fafafa] p-2.5">
+                <div className="font-semibold text-ink">{i + 1}. {a.action}</div>
+                <div className="mt-0.5 text-ink-3">
+                  {a.owner_role && <>Người làm: {a.owner_role}</>}
+                  {a.rule_id && <> · Quy tắc <code className="text-[11px]">{a.rule_id}</code></>}
+                </div>
+                {a.why && <div className="mt-1 text-ink-2"><span className="font-semibold text-brand">Vì sao:</span> {a.why}</div>}
+                <div className="mt-1 text-ink-3">
+                  <span className="font-medium text-ink-2">Căn cứ:</span>{" "}
+                  {a.evidence_refs?.length ? a.evidence_refs.map((e) => e.ref).join("; ") : "Chưa có căn cứ riêng"}
+                </div>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="text-xs italic text-ink-3">Agent không đề xuất hành động nào.</p>
+        )}
       </div>
+
+      {/* F2. KẾT QUẢ QUY TẮC CẦN NGƯỜI XỬ LÝ: cảnh báo thì ghi nhận cho qua, vi phạm thì gắn cờ hoặc xử lý */}
+      {actionable.length > 0 && (
+        <div className="rounded-lg border border-stroke bg-surface p-4">
+          <h3 className="mb-2.5 border-b border-[#f0f0f0] pb-2 text-xs font-semibold uppercase tracking-wider text-ink">
+            Kết quả quy tắc cần xử lý ({actionable.length})
+          </h3>
+          <ul className="space-y-2.5 text-xs">
+            {actionable.map((e) => {
+              const hit = e.status === "HIT";
+              const canStillAct = canAct && (!e.human_action || (e.human_action === "FLAGGED" && hit));
+              return (
+                <li key={e.id} className="rounded-md border border-[#f0f0f0] p-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={cx("rounded px-1.5 py-0.5 text-[10px] font-semibold", hit ? "bg-[#fde7e9] text-[#b10e1c]" : "bg-[#fff4ce] text-[#8a5300]")}>
+                      {hit ? "Vi phạm" : "Cảnh báo"}
+                    </span>
+                    <code className="text-[11px]">{e.rule_id}</code>
+                    <span className="text-ink-1">{e.rationale}</span>
+                  </div>
+                  <div className="mt-1 text-ink-3">
+                    Căn cứ: {e.evidenceRefs.length ? e.evidenceRefs.join("; ") : "không có"}
+                    {e.raw_value && <> · Quan sát: {e.raw_value}</>}
+                    {e.threshold && <> · Ngưỡng: {e.threshold}</>}
+                  </div>
+                  {e.human_action && (
+                    <div className="mt-1 text-ink-2">
+                      <span className="font-semibold">{RULE_ACTION_LABEL[e.human_action] ?? e.human_action}</span>
+                      {e.acted_at && ` lúc ${formatDate(e.acted_at, true)}`}{e.action_note && `: ${e.action_note}`}
+                    </div>
+                  )}
+                  {canStillAct && (
+                    <form action={ruleAction} className="mt-2 flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="id" value={oppId} />
+                      <input type="hidden" name="evaluation_id" value={e.id} />
+                      <input name="note" required className="input flex-1 !h-8 min-w-48" placeholder={hit ? "Lý do gắn cờ hoặc cách xử lý…" : "Ghi chú khi cho qua…"} />
+                      {hit ? (
+                        <>
+                          {!e.human_action && <button name="action" value="FLAGGED" className="btn btn-sm">Gắn cờ</button>}
+                          <button name="action" value="RISK" className="btn btn-sm">Chuyển thành rủi ro</button>
+                          <button name="action" value="TASK" className="btn btn-sm">Tạo việc cần làm</button>
+                        </>
+                      ) : (
+                        <button name="action" value="ACKNOWLEDGED" className="btn btn-sm">Ghi nhận và cho qua</button>
+                      )}
+                    </form>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-2 text-[11px] text-ink-3">Vi phạm đã gắn cờ sẽ hiện cho Quản lý kinh doanh khi rà soát chuyển giai đoạn.</p>
+        </div>
+      )}
 
       {/* G. BẢNG 10 QUY TẮC ĐẦY ĐỦ (THU GỌN, BẤM MỚI MỞ) */}
       <div className="rounded-lg border border-stroke overflow-hidden bg-surface">
@@ -530,7 +636,7 @@ function ResearchCard({
 
       {/* I. THAO TÁC XÁC MINH CỦA CON NGƯỜI (KHI CHỜ DUYỆT) */}
       {pending && canVerify && (
-        <form action={verifyAction} className="rounded-xl border border-brand/30 bg-brand-tint/20 p-4 space-y-3">
+        <form id={verifyFormId} action={verifyAction} className="rounded-xl border border-brand/30 bg-brand-tint/20 p-4 space-y-3">
           <input type="hidden" name="id" value={oppId} />
           <input type="hidden" name="research_id" value={research.id} />
 
