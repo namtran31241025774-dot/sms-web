@@ -518,10 +518,12 @@ export default async function QuoteDetailPage(props: {
                       <option value="REVISION_REQUESTED">Khách yêu cầu điều chỉnh giá/cấu hình</option>
                       <option value="REJECTED">Khách từ chối báo giá</option>
                     </select>
+                    <input type="text" name="respondent_name" required placeholder="Người phản hồi phía khách hàng" className="input text-xs" />
+                    <input type="datetime-local" name="responded_at" className="input text-xs" title="Thời điểm khách phản hồi (để trống là bây giờ)" />
                     <input
                       type="text"
                       name="note"
-                      placeholder="Ghi chú ý kiến của khách hàng..."
+                      placeholder="Nội dung khách phản hồi..."
                       className="input text-xs"
                     />
                     <button type="submit" className="btn btn-primary w-full text-xs">

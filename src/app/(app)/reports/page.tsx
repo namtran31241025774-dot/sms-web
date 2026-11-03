@@ -69,6 +69,11 @@ export default async function ReportsPage({
         <CommandLink href="/reports" icon="refresh">
           Làm mới
         </CommandLink>
+        {can(user.role, "report.cashflow") && (
+          <CommandLink href="/reports/cashflow" icon="money">
+            Dòng tiền dự tính
+          </CommandLink>
+        )}
       </CommandBar>
 
       <Flash sp={sp} />

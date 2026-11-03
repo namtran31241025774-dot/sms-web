@@ -49,6 +49,7 @@ import {
   createDiscoveryAppointmentAction,
   createQuoteAction,
   saveDiscoverySurveyAction,
+  uploadDocumentAction,
   expertReviewDecisionAction,
   lostAction,
   oppItemAction,
@@ -663,6 +664,22 @@ export default async function OpportunityPage({ params, searchParams }: PageProp
                           <span>Ước tính công sức: <strong className="text-ink-1">{sol.estimated_effort_mandays} mandays</strong></span>
                           <span>Yêu cầu tích hợp: <strong className={sol.integration_required ? "text-brand" : "text-ink-3"}>{sol.integration_required ? "Có tích hợp hệ thống ngoài" : "Không"}</strong></span>
                           {sol.risks && <span>Rủi ro kỹ thuật: {sol.risks}</span>}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 text-xs">
+                          <span className="font-semibold text-ink-2">Tệp phương án:</span>
+                          {documents.filter((d) => d.solution_id === sol.id).map((d) => (
+                            <a key={d.id} className="link" href={`/api/documents/${d.id}`}>{d.name}</a>
+                          ))}
+                          {!documents.some((d) => d.solution_id === sol.id) && <span className="text-ink-3">Chưa có tệp</span>}
+                          {canSolution && (
+                            <form action={uploadDocumentAction} className="flex flex-wrap items-center gap-2">
+                              <input type="hidden" name="id" value={o.id} />
+                              <input type="hidden" name="document_kind" value="SOLUTION" />
+                              <input type="hidden" name="solution_id" value={sol.id} />
+                              <input name="file" type="file" required accept=".docx,.pdf" className="text-xs" />
+                              <SubmitButton icon="add">Tải tệp</SubmitButton>
+                            </form>
+                          )}
                         </div>
                       </div>
                     ))}

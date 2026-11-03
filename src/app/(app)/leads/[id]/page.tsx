@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { DISQUALIFY_REASONS, formatDate, LEAD_SOURCE, LEAD_STATUS } from "@/lib/domain";
 import { can } from "@/lib/rbac";
-import { listRuns, listSuggestions } from "@/lib/services/ai-review";
+import { leadEmailDrafts, listRuns, listSuggestions } from "@/lib/services/ai-review";
 import { activitiesFor, auditTrail, settingNumber, users } from "@/lib/services/core";
 import { conversionCandidates, findDuplicates, getLead, listTags } from "@/lib/services/leads";
 import { SubmitButton } from "@/components/client";
@@ -47,6 +47,7 @@ export default async function LeadPage({ params, searchParams }: PageProps<"/lea
   const open = (lead.status === "OPEN" || lead.status === "WORKING") && !lead.deleted_at;
   const canWrite = can(user.role, "lead.write");
   const threshold = settingNumber("bant_threshold") || 60;
+  const emailDrafts = leadEmailDrafts(lead.id, user);
   const dups = findDuplicates(lead, lead.id);
   const duplicateLeads = dups.filter((d) => d.kind === "LEAD");
   const suggestions = listSuggestions({ entityType: "lead", entityId: lead.id });
@@ -295,6 +296,35 @@ export default async function LeadPage({ params, searchParams }: PageProps<"/lea
                 canReviewAi={can(user.role, "ai.review")}
                 bantAction={bantAction}
               />
+
+              {/* Email nháp do Qualification Agent soạn: chỉ gửi sau khi người phụ trách duyệt */}
+              <section className="rounded-xl border border-stroke bg-surface p-4">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">Email nháp của Agent</h3>
+                  <Link className="link text-xs" href="/ai-review?kind=EMAIL_DRAFT">Mở Kiểm duyệt AI</Link>
+                </div>
+                {emailDrafts.length ? (
+                  <ul className="divide-y divide-[#f0f0f0] text-sm">
+                    {emailDrafts.map((d) => {
+                      const p = (() => { try { return JSON.parse(d.payload_json) as { subject?: string; body?: string; to?: string }; } catch { return {}; } })();
+                      return (
+                        <li key={d.id} className="py-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-medium">{p.subject ?? "(Không có tiêu đề)"}</span>
+                            <span className="text-xs text-ink-3">
+                              {d.status === "PENDING" ? "Chờ duyệt" : d.status === "REJECTED" ? "Đã từ chối" : d.delivery_status === "SENT" ? `Đã gửi${d.sent_at ? ` ${formatDate(d.sent_at, true)}` : ""}` : "Đã duyệt"}
+                            </span>
+                          </div>
+                          {p.body && <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs text-ink-2">{p.body}</p>}
+                          {d.review_note && <p className="mt-1 text-xs text-ink-3">Ghi chú duyệt: {d.review_note}</p>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-ink-3">Chưa có email nháp. Chạy Qualification Agent để Agent soạn email hỏi thông tin còn thiếu.</p>
+                )}
+              </section>
 
               {open && can(user.role, "lead.convert") && (
                 <Card title="Chuyển đổi (Qualify → Develop)">

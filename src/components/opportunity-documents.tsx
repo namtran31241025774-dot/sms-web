@@ -25,7 +25,7 @@ export function OpportunityDocuments({ opportunityId, documents, extraction, pen
   opportunityId: number;
   documents: OpportunityDocument[];
   extraction?: DocumentExtraction;
-  pendingSolution?: DocumentExtraction;
+  pendingSolution?: DocumentExtraction & { existingSolutionIds: number[]; requiresChoice: boolean };
   canWrite: boolean;
   canSolution: boolean;
   agentLive: boolean;
@@ -48,7 +48,21 @@ export function OpportunityDocuments({ opportunityId, documents, extraction, pen
               <input type="hidden" name="id" value={opportunityId} />
               <input type="hidden" name="extraction_id" value={pendingSolution.id} />
               {pendingSolution.fields.filter((f) => TECH_KEYS.includes(f.key)).map((f) => <FieldInput key={f.key} field={f} disabled={false} />)}
-              <SubmitButton variant="primary" icon="check">Xác nhận và tạo hồ sơ kỹ thuật</SubmitButton>
+              {pendingSolution.requiresChoice ? (
+                <div className="space-y-2 rounded border border-[#f0f0f0] bg-[#fafafa] p-3 text-sm">
+                  <p className="font-semibold">Cơ hội đã có hồ sơ kỹ thuật. Chọn cách xử lý tệp này:</p>
+                  <label className="flex items-center gap-2"><input type="radio" name="solution_choice" value="SKIP" defaultChecked /> Bỏ qua, giữ hồ sơ hiện có</label>
+                  <label className="flex items-center gap-2">
+                    <input type="radio" name="solution_choice" value="REPLACE" /> Thay thế hồ sơ
+                    <select name="solution_id" className="select !w-auto" defaultValue={pendingSolution.existingSolutionIds[0]}>
+                      {pendingSolution.existingSolutionIds.map((sid) => <option key={sid} value={sid}>Hồ sơ #{sid}</option>)}
+                    </select>
+                  </label>
+                  <SubmitButton variant="primary" icon="check">Xác nhận lựa chọn</SubmitButton>
+                </div>
+              ) : (
+                <SubmitButton variant="primary" icon="check">Xác nhận và tạo hồ sơ kỹ thuật</SubmitButton>
+              )}
             </form>
           ) : (
             <p className="text-sm text-ink-3">Phần này chờ Chuyên viên tư vấn giải pháp được phân công vào cơ hội xác nhận.</p>
@@ -190,6 +204,15 @@ export function OpportunityDocuments({ opportunityId, documents, extraction, pen
                   accept=".docx,.pdf"
                   className="block w-full cursor-pointer rounded border border-stroke text-sm text-ink-2 file:mr-3 file:cursor-pointer file:border-0 file:border-r file:border-stroke file:bg-[#f0f0f0] file:px-3 file:py-2 file:text-sm file:font-semibold hover:file:bg-[#e0e0e0]"
                 />
+              </FormField>
+              <FormField label="Loại tài liệu">
+                <select name="document_kind" className="select" defaultValue="SURVEY">
+                  <option value="SURVEY">Biên bản khảo sát</option>
+                  <option value="SCOPE">Biên bản xác nhận phạm vi</option>
+                  <option value="SOLUTION">Hồ sơ giải pháp kỹ thuật</option>
+                  <option value="COMPETITOR">Tài liệu đối thủ</option>
+                  <option value="OTHER">Khác</option>
+                </select>
               </FormField>
               <SubmitButton variant="primary" icon="add">Tải lên</SubmitButton>
             </form>
