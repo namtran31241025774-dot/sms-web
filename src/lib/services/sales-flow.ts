@@ -25,7 +25,9 @@ function flow(stage:string,steps:Array<Omit<ProcessStep,'status'> & {done:boolea
 /** Pass a scoped Opportunity from getOpportunity(id,user), or pass user for a server scope recheck. */
 export function opportunityFlow(o:Opportunity,user?:UserScope):ProcessFlow {
   if(user) assertRecordAccess(user,'opportunity',o.id);
-  const initial=get<{status:string}>("SELECT status FROM opportunity_research WHERE opportunity_id=? AND research_phase='INITIAL' ORDER BY id DESC LIMIT 1",o.id);
+  // Cơ hội đã có khảo sát trước lần chạy đầu tiên sẽ nhận bản POST_SURVEY, cơ hội cũ có bản LEGACY:
+  // bước nghiên cứu ban đầu coi là xong khi có bất kỳ bản chưa bỏ qua nào, ưu tiên bản đã xác minh.
+  const initial=get<{status:string}>("SELECT status FROM opportunity_research WHERE opportunity_id=? AND status!='DISMISSED' ORDER BY (status='VERIFIED') DESC,(research_phase='INITIAL') DESC,id DESC LIMIT 1",o.id);
   const after=get<{status:string}>("SELECT status FROM opportunity_research WHERE opportunity_id=? AND research_phase='POST_SURVEY' AND status!='DISMISSED' ORDER BY id DESC LIMIT 1",o.id);
   const appointment=get("SELECT t.id FROM tasks t JOIN work_participants p ON p.task_id=t.id WHERE t.entity_type='opportunity' AND t.entity_id=? AND t.type='APPOINTMENT' AND p.user_id=? AND p.status!='DECLINED'",o.id,o.presales_id ?? 0);
   const expert=isExpertReviewRequired(o), gate=gateState(o);

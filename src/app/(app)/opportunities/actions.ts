@@ -48,7 +48,7 @@ export async function saveDiscoverySurveyAction(fd:FormData) {
 }
 export async function createDiscoveryAppointmentAction(fd:FormData) {
   const oppId=id(fd);
-  await act(back(oppId,'activities'),async()=>{
+  await act(back(oppId),async()=>{
     const u=await requirePermission('opp.write');
     return createDiscoveryAppointment(userActor(u),oppId,{startsAt:str(fd,'starts_at'),method:str(fd,'meeting_method'),presalesId:id(fd,'presales_id'),contactIds:fd.getAll('contact_id').map(Number),note:optStr(fd,'note') ?? undefined});
   },'Đã hẹn khảo sát và phân công tư vấn');

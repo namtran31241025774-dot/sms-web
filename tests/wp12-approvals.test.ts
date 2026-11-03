@@ -5,6 +5,7 @@ import { all, db, get, run } from "@/lib/db";
 import { backfillQuoteAccounts, backfillQuoteVersions } from "@/lib/db/migrations/wp12_001_backfill_quote_versions";
 import { advanceStage, createSolution, expertReviewInfo, getOpportunity, listSolutions, reviewExpertSolution, submitExpertReview, updateSolution } from "@/lib/services/opportunities";
 import { approvalTarget, decideStageGate, pendingExpertReviews, stageGateStatus } from "@/lib/services/approvals";
+import { opportunityFlow } from "@/lib/services/sales-flow";
 import { applyDiscountDecision, getLatestQuoteVersion, getQuote } from "@/lib/services/quotes";
 import type { Actor } from "@/lib/services/core";
 
@@ -40,6 +41,18 @@ beforeEach(() => {
   run("INSERT OR IGNORE INTO users (id,name,email,role) VALUES (922,'Manager','appr-m@sms.local','SALES_MANAGER')");
   run("INSERT OR IGNORE INTO users (id,name,email,role) VALUES (923,'Manager khác','appr-o@sms.local','SALES_MANAGER')");
   team = get<{ id: number }>("SELECT id FROM teams WHERE leader_id = 922")?.id ?? run("INSERT INTO teams(code,name,leader_id,active) VALUES ('APPR-TEAM','Nhóm duyệt',922,1)").id;
+});
+
+describe("Luồng Develop trên giao diện", () => {
+  it("FR-36: bản nghiên cứu đầu tiên ghi lần 2 (đã khảo sát trước) vẫn tính là xong bước nghiên cứu ban đầu", () => {
+    const opp = opportunity();
+    const step = () => opportunityFlow(getOpportunity(opp)!).steps.find((s) => s.id === "initial_research")!.status;
+    expect(step()).toBe("CURRENT");
+    run("INSERT INTO opportunity_research(opportunity_id,importance,summary,status,research_phase) VALUES (?,'MEDIUM','x','VERIFIED','POST_SURVEY')", opp);
+    expect(step()).toBe("DONE");
+    run("UPDATE opportunity_research SET status='DISMISSED' WHERE opportunity_id=?", opp);
+    expect(step()).toBe("CURRENT");
+  });
 });
 
 describe("Cổng duyệt chuyên môn", () => {

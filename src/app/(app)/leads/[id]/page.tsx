@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/auth";
 import { DISQUALIFY_REASONS, formatDate, LEAD_SOURCE, LEAD_STATUS } from "@/lib/domain";
 import { can } from "@/lib/rbac";
 import { leadEmailDrafts, listRuns, listSuggestions } from "@/lib/services/ai-review";
+import { bantBreakdown } from "@/lib/services/sales-flow";
 import { activitiesFor, auditTrail, settingNumber, users } from "@/lib/services/core";
 import { conversionCandidates, findDuplicates, getLead, listTags } from "@/lib/services/leads";
 import { SubmitButton } from "@/components/client";
@@ -295,6 +296,7 @@ export default async function LeadPage({ params, searchParams }: PageProps<"/lea
                 canWrite={open && canWrite}
                 canReviewAi={can(user.role, "ai.review")}
                 bantAction={bantAction}
+                breakdown={bantBreakdown(lead.id, user)}
               />
 
               {/* Email nháp do Qualification Agent soạn: chỉ gửi sau khi người phụ trách duyệt */}

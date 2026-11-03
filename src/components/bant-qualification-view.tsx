@@ -5,9 +5,10 @@
 // - Khung quan sát Agent chuẩn 6 bước đồng bộ với Opportunity Agent.
 // - Hiển thị đề xuất Email nháp kèm căn cứ và nút duyệt.
 // - Dữ liệu bổ sung từ Agent (Enrichment) có nguồn dẫn.
-// TODO: Chuyển sang dùng bantBreakdown(leadId) khi Codex cung cấp theo mục 9 REBUILD-01.
+// Lý do và căn cứ từng tiêu chí lấy từ bantBreakdown (src/lib/services/sales-flow.ts).
 
 import Link from "next/link";
+import type { BantBreakdown } from "@/lib/services/sales-flow";
 import { Icon } from "./icons";
 import { StatusBadge, cx } from "./ui";
 import { SubmitButton } from "./client";
@@ -71,6 +72,7 @@ interface BantQualificationViewProps {
   canWrite: boolean;
   canReviewAi: boolean;
   bantAction: (formData: FormData) => Promise<void>;
+  breakdown: BantBreakdown;
 }
 
 // Bảng thang điểm chuẩn 4 mức của đồ án môn
@@ -125,6 +127,7 @@ export function BantQualificationView({
   canWrite,
   canReviewAi,
   bantAction,
+  breakdown,
 }: BantQualificationViewProps) {
   // Tìm đề xuất BANT từ Agent (nếu có)
   const bantSuggestion = suggestions.find((s) => s.kind === "BANT_SCORE");
@@ -162,8 +165,11 @@ export function BantQualificationView({
     }
   }
 
-  // Điều kiện đạt chuẩn BANT: Tổng >= threshold VÀ Authority >= 15 (đã có người quyết định/ảnh hưởng)
-  const hasDecisionMaker = lead.bant_authority >= 15;
+  // Điều kiện đạt chuẩn BANT: Tổng >= threshold VÀ Authority = 25 (đã gặp đúng người quyết định), theo bantBreakdown
+  const hasDecisionMaker = lead.bant_authority >= 25;
+  const detail = (key: string) => breakdown.criteria.find((c) => c.key === key);
+  const evidenceText = (e: unknown) =>
+    typeof e === "string" ? e : (e as { ref?: string; quote?: string })?.ref ?? JSON.stringify(e);
   const isScorePassed = lead.bant_score >= threshold;
   const isQualified = isScorePassed && hasDecisionMaker;
 
@@ -255,7 +261,7 @@ export function BantQualificationView({
               </h3>
             </div>
             <p className="mt-0.5 text-xs text-ink-3">
-              Ngưỡng đạt: Tổng điểm ≥ {threshold}/100 VÀ Tiêu chí Thẩm quyền (Authority) ≥ 15 (đã xác định người quyết định)
+              Ngưỡng đạt: Tổng điểm ≥ {threshold}/100 và Thẩm quyền đạt 25 (đã gặp đúng người quyết định)
             </p>
           </div>
 
@@ -291,7 +297,7 @@ export function BantQualificationView({
           </div>
 
           <div>
-            <span className="text-ink-3">Người ra quyết định (Authority ≥ 15):</span>
+            <span className="text-ink-3">Người ra quyết định (Thẩm quyền = 25):</span>
             <div className="text-sm font-semibold mt-1">
               {hasDecisionMaker ? (
                 <span className="text-success flex items-center gap-1">
@@ -375,23 +381,25 @@ export function BantQualificationView({
                         <div className="text-ink-1 font-medium">
                           {crit.levels[currentValue as keyof typeof crit.levels] ?? crit.levels[0]}
                         </div>
-                        {bantPayload?.rationale && (
+                        {detail(crit.key) && (
                           <div className="mt-1 text-[11px] text-ink-2 pl-2 border-l-2 border-brand/30">
-                            <span className="font-semibold text-brand">Ghi nhận:</span>{" "}
-                            {crit.key === "authority" && lead.contact_title
-                              ? `Chức danh: ${lead.contact_title}`
-                              : bantPayload.rationale}
+                            <span className="font-semibold text-brand">Vì sao:</span> {detail(crit.key)!.reason}
+                            {detail(crit.key)!.level.startsWith("Điểm lịch sử") && (
+                              <div className="text-[#bc4b09]">Điểm lịch sử ngoài thang 0/8/15/25, cần đánh giá lại.</div>
+                            )}
                           </div>
                         )}
                       </td>
 
                       <td className="py-3 px-3 text-ink-3">
-                        {lead.contact_title && crit.key === "authority" ? (
-                          <code className="text-[10px] font-mono bg-[#f5f5f5] px-1 py-0.5 rounded text-ink-1">
-                            lead.contact_title
-                          </code>
+                        {detail(crit.key)?.evidence.length ? (
+                          <ul className="space-y-0.5">
+                            {detail(crit.key)!.evidence.map((e, i) => (
+                              <li key={i}><code className="text-[10px] font-mono bg-[#f5f5f5] px-1 py-0.5 rounded text-ink-1">{evidenceText(e)}</code></li>
+                            ))}
+                          </ul>
                         ) : (
-                          <span className="text-[11px] italic">Từ khảo sát Lead</span>
+                          <span className="text-[11px] italic">Chưa có căn cứ</span>
                         )}
                       </td>
                     </tr>
