@@ -4,6 +4,8 @@ import type { NextConfig } from "next";
 // nên dùng mô hình render động truyền thống (không bật Cache Components).
 const nextConfig: NextConfig = {
   cacheComponents: false,
+  // Cho phép mở bản dev qua link tạm Cloudflare Tunnel khi demo cho người khác xem.
+  allowedDevOrigins: ["*.trycloudflare.com"],
   serverExternalPackages: ["pdf-parse"],
   experimental: {
     serverActions: { bodySizeLimit: "6mb" },
