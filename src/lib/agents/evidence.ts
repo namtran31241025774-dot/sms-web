@@ -33,12 +33,21 @@ export function validateEvidence(
   const opp = ctx.entityType === "opportunity"
     ? get<Record<string, unknown>>("SELECT * FROM opportunities WHERE id = ?", ctx.entityId)
     : null;
+  // So khớp nguyên văn; chỉ bỏ qua khoảng trắng, dạng Unicode và dấu câu ở hai đầu đoạn trích (PoC v2).
+  const norm = (s: string) => s.normalize("NFC").replace(/\s+/g, " ").trim();
+  const edges = /^[\s"'“”‘’.,;:!?…()-]+|[\s"'“”‘’.,;:!?…()-]+$/g;
   const verifyQuote = (quote: string | undefined, content: unknown) => {
-    if (quote && !String(content).replace(/\s+/g,' ').includes(quote.replace(/\s+/g,' '))) throw new InvalidEvidenceError("Trích dẫn không có trong nội dung nguồn");
+    const q = quote ? norm(quote).replace(edges, "") : "";
+    if (q && !norm(String(content)).includes(q)) throw new InvalidEvidenceError(`Trích dẫn "${q.slice(0, 80)}" không có trong nội dung nguồn`);
   };
 
+  // PoC v2: lỗi trả về cho model nêu rõ căn cứ nào sai và cách sửa, để model tự sửa thay vì gửi lại y nguyên.
+  // Quy tắc kiểm tra giữ nguyên, không nới lỏng.
+  let current = "";
+  try {
   for (const item of refs) {
     const ref = item.ref.trim();
+    current = ref;
     if (!ref) {
       throw new InvalidEvidenceError("Ref căn cứ không được để trống");
     }
@@ -148,8 +157,52 @@ export function validateEvidence(
     // Nếu không khớp định dạng nào cho phép
     throw new InvalidEvidenceError(`Căn cứ không hợp lệ hoặc không xác thực được: ${ref}`);
   }
+  } catch (e) {
+    if (e instanceof InvalidEvidenceError && current && !e.message.includes("Cách sửa:")) {
+      throw new InvalidEvidenceError(
+        `${e.message} (căn cứ "${current}"). Cách sửa: bỏ căn cứ này hoặc thay bằng ref đã đọc được trong lần chạy; ` +
+        `nếu ghi quote thì chép đúng nguyên văn từ nguồn hoặc bỏ quote; mục không có nguồn thì ghi NO_INSIGHT kèm lý do.`,
+      );
+    }
+    throw e;
+  }
 
   return refs;
+}
+
+export type RejectedRef = { ref: string; reason: string };
+
+/**
+ * PoC v3: kiểm từng căn cứ riêng. Căn cứ không xác thực được bị LOẠI và ghi lại (không lưu, không hiện như bằng chứng),
+ * thay vì từ chối cả đề xuất. Vẫn bắt buộc đủ `min` căn cứ hợp lệ; không đủ thì từ chối như trước.
+ */
+export function filterEvidence(
+  ctx: ToolContext,
+  refs: Ref[],
+  options: { min?: number; allowMissingSnapshot?: boolean } = {},
+): { valid: Ref[]; rejected: RejectedRef[] } {
+  const valid: Ref[] = [];
+  const rejected: RejectedRef[] = [];
+  for (const r of refs ?? []) {
+    try {
+      validateEvidence(ctx, [r], { allowMissingSnapshot: options.allowMissingSnapshot });
+      valid.push(r);
+    } catch (e) {
+      if (!(e instanceof InvalidEvidenceError)) throw e;
+      rejected.push({ ref: String(r?.ref ?? ""), reason: e.message.split(" (căn cứ")[0] });
+    }
+  }
+  const min = options.min ?? 0;
+  if (valid.length < min) {
+    throw new InvalidEvidenceError(
+      `Bắt buộc có ít nhất ${min} căn cứ hợp lệ (hợp lệ: ${valid.length}). Căn cứ bị loại: ` +
+      (rejected.map((x) => `${x.ref}: ${x.reason}`).join("; ") || "không có") +
+      `. Cách sửa: dùng ref đã đọc được trong lần chạy (activity:<id>, lead.<trường>, opportunity.<trường>, nguồn web của lần chạy), quote chép đúng nguyên văn hoặc bỏ quote.`,
+    );
+  }
+  if (ctx.rejectedEvidence) ctx.rejectedEvidence.push(...rejected);
+  else ctx.rejectedEvidence = [...rejected];
+  return { valid, rejected };
 }
 
 /**

@@ -17,7 +17,7 @@ import {
   EmailDraftSchema,
   OpportunityResearchSchema,
 } from "./schemas";
-import { validateEvidence, recordAiEvidence, InvalidEvidenceError } from "./evidence";
+import { validateEvidence, filterEvidence, recordAiEvidence, InvalidEvidenceError, type RejectedRef } from "./evidence";
 import { evaluateOpportunityRules, linkedInboundEmails, type RiskCategory, type RuleOutcome } from "./rules";
 
 export type AgentName = "QUALIFICATION" | "OPPORTUNITY";
@@ -31,9 +31,17 @@ export type ToolContext = {
   /** Kết quả bộ quy tắc trong lần chạy; Agent không ghi được hồ sơ nên tái dùng khi lưu nghiên cứu. */
   ruleOutcome?: RuleOutcome;
   researchPhase?: ResearchPhase;
+  /** PoC v3: căn cứ bị loại trong lần chạy (không lưu làm bằng chứng). */
+  rejectedEvidence?: RejectedRef[];
 };
 
 export class AgentPermissionError extends Error {}
+
+/** PoC v3: danh sách căn cứ bị loại (không trùng) trong lần chạy. */
+function uniqueRejected(ctx: ToolContext): RejectedRef[] {
+  const seen = new Set<string>();
+  return (ctx.rejectedEvidence ?? []).filter((r) => { const k = r.ref + "|" + r.reason; if (seen.has(k)) return false; seen.add(k); return true; });
+}
 
 type ToolDef<S extends z.ZodType> = {
   description: string;
@@ -180,7 +188,7 @@ export const TOOLS = {
       if (!Object.keys(fields).length) return { skipped: "Không có trường nào để đề xuất" };
 
       const normEvidence = normalizeRefs(input.evidence);
-      const verifiedEvidence = validateEvidence(ctx, normEvidence);
+      const verifiedEvidence = filterEvidence(ctx, normEvidence).valid;
 
       const id = createSuggestion({
         runId: ctx.runId, agent: ctx.agent, kind: "ENRICHMENT", entityType: "lead", entityId: ctx.entityId,
@@ -200,7 +208,7 @@ export const TOOLS = {
       const nestedEvidence=[input.budget,input.authority,input.need,input.timeline].flatMap(value=>typeof value==='number' ? [] : value.evidence ?? []);
       const normEvidence = normalizeRefs([...(input.evidence ?? []),...nestedEvidence]);
       // BUG-006 & BUG-007: Bắt buộc >= 1 căn cứ hợp lệ được xác thực ở server
-      const verifiedEvidence = validateEvidence(ctx, normEvidence, { min: 1, required: true });
+      const verifiedEvidence = filterEvidence(ctx, normEvidence, { min: 1 }).valid;
 
       // Trích xuất điểm
       const bScore = typeof input.budget === "number" ? input.budget : input.budget.score;
@@ -234,7 +242,7 @@ export const TOOLS = {
         breakdown:Object.fromEntries(['budget','authority','need','timeline'].map(key=>{
           const value=input[key as 'budget'];
           const refs=typeof value==='number' ? [] : normalizeRefs(value.evidence);
-          const evidence=refs.length ? validateEvidence(ctx,refs,{required:true,min:1}) : [];
+          const evidence=filterEvidence(ctx,refs).valid;
           return [key,{score:scores[key as 'budget'],reason:typeof value==='number' ? input.rationale : value.reason ?? input.rationale,evidence}];
         })),
       };
@@ -250,7 +258,8 @@ export const TOOLS = {
         evidence: verifiedEvidence,
       });
       recordAiEvidence({ runId: ctx.runId, suggestionId: id, refs: verifiedEvidence });
-      return { suggestion_id: id, total, outcome, confidence, status: "PENDING_REVIEW" };
+      const rejected = uniqueRejected(ctx);
+      return { suggestion_id: id, total, outcome, confidence, status: "PENDING_REVIEW", ...(rejected.length ? { rejected_evidence: rejected } : {}) };
     },
   }),
   draft_email: tool({
@@ -260,12 +269,12 @@ export const TOOLS = {
     input: EmailDraftSchema,
     run: (ctx, input) => {
       const l = leadOf(ctx);
-      const recipient = input.to || l.email;
+      const recipient = l.email;
       if (!recipient) return { error: "Lead chưa có email — không soạn được" };
 
       // BUG-008: Validate facts_used
       const factsUsed = normalizeRefs(input.facts_used);
-      const verifiedFacts = validateEvidence(ctx, factsUsed);
+      const verifiedFacts = filterEvidence(ctx, factsUsed).valid;
 
       const id = createSuggestion({
         runId: ctx.runId,
@@ -301,7 +310,7 @@ export const TOOLS = {
     run: (ctx, input) => {
       leadOf(ctx);
       const normEvidence = normalizeRefs(input.evidence);
-      const verifiedEvidence = validateEvidence(ctx, normEvidence, { min: 1, required: true });
+      const verifiedEvidence = filterEvidence(ctx, normEvidence, { min: 1 }).valid;
 
       const id = createSuggestion({
         runId: ctx.runId,
@@ -328,7 +337,7 @@ export const TOOLS = {
     run: (ctx, input) => {
       leadOf(ctx);
       const normEvidence = normalizeRefs(input.evidence);
-      const verifiedEvidence = validateEvidence(ctx, normEvidence, { min: 1, required: true });
+      const verifiedEvidence = filterEvidence(ctx, normEvidence, { min: 1 }).valid;
 
       const id = createSuggestion({
         runId: ctx.runId,
@@ -500,16 +509,32 @@ export const TOOLS = {
     input: OpportunityResearchSchema,
     run: (ctx, input) => tx(() => {
       const o = oppOf(ctx);
-      const actions = [...input.next_actions, ...(input.additional_actions ?? [])].map(a => {
+      // PoC v2: bỏ các hành động model chép lại từ bộ quy tắc TRƯỚC khi kiểm căn cứ; hành động quy tắc được backend
+      // kiểm riêng (allowMissingSnapshot). Trước đây căn cứ "chưa có dữ liệu" của chính quy tắc làm hỏng cả bản nghiên cứu.
+      const rulesFirst = ctx.ruleOutcome ?? evaluateOpportunityRules(o.id);
+      const ruleActionTexts = new Set(rulesFirst.next_actions.concat(rulesFirst.additional_actions).map((a) => a.action));
+      const actions = [...input.next_actions, ...(input.additional_actions ?? [])]
+        .filter(a => !ruleActionTexts.has(typeof a === 'string' ? a : a.action))
+        .map(a => {
         const normalized = typeof a === 'string' ? { action:a, evidence_refs: input.sources, rule_id:null } : a;
+        // FR-44 F5/F6: căn cứ riêng của từng hành động vẫn kiểm chặt, sai là từ chối cả bản (không nới ở v3).
         const refs = validateEvidence(ctx, normalized.evidence_refs ?? [], {required:true});
         return {...normalized,evidence_refs:refs};
       });
+      // PoC v3: insight có trích nguồn nhưng không nguồn nào xác thực được → chuyển thành NO_INSIGHT, rủi ro mất hết nguồn → loại.
+      for (const [key, item] of Object.entries(input.insights ?? {})) {
+        if (item && 'sources' in item && Array.isArray(item.sources) && item.sources.length) {
+          const ok = filterEvidence(ctx, normalizeRefs(item.sources)).valid;
+          if (!ok.length) (input.insights as Record<string, unknown>)[key] = { status: 'NO_INSIGHT', reason: 'Căn cứ model đưa ra không xác thực được nên không dùng nhận định này' };
+          else (item as { sources: unknown }).sources = ok;
+        }
+      }
+      input.risks = input.risks.filter(r => !r.sources?.length || filterEvidence(ctx, normalizeRefs(r.sources)).valid.length > 0);
       // Validate sources
       const insightSources=Object.values(input.insights ?? {}).flatMap(item=>item && 'sources' in item ? item.sources ?? [] : []);
       const riskSources=input.risks.flatMap(r=>r.sources ?? []);
       const normSources = normalizeRefs([...input.sources,...insightSources,...riskSources,...actions.flatMap(a=>a.evidence_refs)]);
-      const verifiedSources = validateEvidence(ctx, normSources);
+      const verifiedSources = filterEvidence(ctx, normSources).valid;
 
       // Chỉ giữ một bản nghiên cứu chờ duyệt mới nhất
       run("UPDATE opportunity_research SET status='DISMISSED' WHERE opportunity_id=? AND status='PENDING_REVIEW'", o.id);
@@ -550,7 +575,9 @@ export const TOOLS = {
         JSON.stringify(rules.next_actions),
         JSON.stringify([...rules.additional_actions, ...llmActions]),
         JSON.stringify(verifiedSources),
-        input.email_insight_status ?? "OK",
+        // PoC v2: luật NO_INSIGHT là bắt buộc nên backend tự xác định theo cùng bộ lọc email với OPP-R05,
+        // không dựa vào giá trị model gửi (schema mặc định "OK" khi model bỏ trống).
+        linkedInboundEmails(o, settingNumber("email_window_days")).rows.length ? (input.email_insight_status ?? "OK") : "NO_INSIGHT",
         rules.ruleset_version,
         rules.ruleset_hash,
         rules.confidence,
@@ -580,9 +607,12 @@ export const TOOLS = {
         details: {
           ruleset: `${rules.ruleset_version}#${rules.ruleset_hash}`,
           ...(input.importance !== rules.importance ? { llm_importance_overridden: `${input.importance}→${rules.importance}` } : {}),
+          ...(uniqueRejected(ctx).length ? { rejected_evidence: uniqueRejected(ctx) } : {}),
         },
       });
-      return { research_id: id, status: "PENDING_REVIEW", importance: rules.importance, confidence: rules.confidence, gates: rules.gates };
+      const rejected = uniqueRejected(ctx);
+      return { research_id: id, status: "PENDING_REVIEW", importance: rules.importance, confidence: rules.confidence, gates: rules.gates,
+        ...(rejected.length ? { rejected_evidence: rejected, note: "Các căn cứ trên không xác thực được nên đã bị loại khỏi bản nghiên cứu" } : {}) };
     }),
   }),
   notify_owner: tool({

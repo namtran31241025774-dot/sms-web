@@ -42,12 +42,15 @@ export const BantProposalSchema = z.object({
   confidence: z.number().min(0).max(1).optional(),
   missing_info: z.array(z.string()).optional(),
   rationale: z.string().max(2000),
-  evidence: z.array(RefSchema),
+  // PoC v2: căn cứ có thể nằm trong từng tiêu chí; tool gộp lại và vẫn bắt buộc ≥ 1 căn cứ hợp lệ.
+  evidence: z.array(RefSchema).default([]),
 });
 export type BantProposal = z.infer<typeof BantProposalSchema>;
 
 export const EmailDraftSchema = z.object({
-  to: z.string().email().optional(),
+  // PoC v2: người nhận luôn lấy từ hồ sơ Lead ở server. Model chỉ thấy email đã che ([REDACTED]) và không được
+  // tự chọn địa chỉ khác (chặn trường hợp câu chèn lệnh đổi người nhận). Giá trị model gửi bị bỏ qua.
+  to: z.unknown().optional().describe("Bỏ trống: hệ thống tự gửi tới email của Lead"),
   subject: z.string().min(3).max(200),
   greeting: z.string().max(200).optional(),
   value_proposition: z.string().max(1000).optional(),
