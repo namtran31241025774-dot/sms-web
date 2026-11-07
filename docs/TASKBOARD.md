@@ -43,3 +43,10 @@ Xem `docs/requirements/DECISIONS.md`, mục *Việc nhóm cần sửa trong bài
 - **DEC-21, DEC-23:** người liên hệ nhiều doanh nghiệp; báo giá – đơn 1:1, thanh toán từng phần.
 - **DEC-08:** ai phát hành hoá đơn.
 - **DEC-03:** Agent có tự chuyển đổi Lead không.
+
+## Đồng bộ mã nguồn GitHub — 08/11/2026
+
+- Người dùng giao Codex đồng bộ đầy đủ bản web local lên `namtran31241025774-dot/sms-web` và cập nhật `main` qua Pull Request.
+- Đã đối chiếu 10 tệp nguồn chưa commit, giữ toàn bộ lịch sử nhánh `rebuild/giao-dien`.
+- Kiểm tra bản sao riêng: `npm run check` xanh (269 test / 30 tệp), `npm ci` và `npm run build` thành công; chỉ chạy AI mock và DB trong bộ nhớ.
+- Không thay đổi phạm vi FR hay các quyết định đang chờ nhóm chốt. Chi tiết: `docs/handoff/GITHUB-SYNC-08-11.md`.

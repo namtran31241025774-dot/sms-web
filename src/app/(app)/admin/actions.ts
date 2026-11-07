@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import { userActor } from "@/lib/services/core";
 import {
@@ -38,6 +38,7 @@ export async function createUserAction(formData: FormData) {
       password,
     });
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : "Không thể tạo tài khoản";
     redirect(`/admin/users/new?error=${encodeURIComponent(msg)}`);
   }
@@ -67,6 +68,7 @@ export async function updateUserAction(formData: FormData) {
       team_id,
     });
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : "Không thể cập nhật tài khoản";
     redirect(`/admin/users/${id}?error=${encodeURIComponent(msg)}`);
   }
@@ -87,6 +89,7 @@ export async function setUserStatusAction(formData: FormData) {
   try {
     setUserStatus(actor, id, status);
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : "Không thể thay đổi trạng thái tài khoản";
     redirect(`${returnTo}?error=${encodeURIComponent(msg)}`);
   }
@@ -111,6 +114,7 @@ export async function resetPasswordAction(formData: FormData) {
     revalidatePath(`/admin/users/${id}`);
     redirect(`/admin/users/${id}?ok=${encodeURIComponent(msg)}`);
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : "Không thể đặt lại mật khẩu";
     redirect(`/admin/users/${id}?error=${encodeURIComponent(msg)}`);
   }
@@ -126,6 +130,7 @@ export async function updateSettingAction(formData: FormData) {
   try {
     setSetting(actor, key, value);
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : "Không thể lưu cài đặt";
     redirect(`/admin?tab=settings&error=${encodeURIComponent(msg)}`);
   }

@@ -60,9 +60,10 @@ export default async function InvoiceDetailPage(props: {
     }
   }
 
-  const isDraft = invoice.status === "DRAFT";
+  // Kiểm tra nháp xong, hóa đơn chuyển sang REVIEWED nhưng vẫn là bản nháp chờ phát hành.
+  const isDraft = invoice.status === "DRAFT" || invoice.status === "REVIEWED";
   const isReviewed = Boolean(invoice.reviewed_at);
-  const isIssued = invoice.status !== "DRAFT" && invoice.status !== "CANCELLED";
+  const isIssued = !isDraft && invoice.status !== "CANCELLED";
   const isOverdue = isOverdueInvoice(invoice);
   const unpaidBalance = Math.max(0, invoice.amount - invoice.paid_amount);
 

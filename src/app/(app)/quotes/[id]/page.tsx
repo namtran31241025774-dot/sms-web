@@ -28,6 +28,7 @@ import {
   submitQuoteAction,
   updateQuoteDetailsAction,
 } from "../actions";
+import { createOrderFromQuoteAction } from "../../orders/actions";
 
 export default async function QuoteDetailPage(props: {
   params: Promise<{ id: string }>;
@@ -81,6 +82,14 @@ export default async function QuoteDetailPage(props: {
   const canWrite = can(userRole, "quote.write");
   const canApprove = can(userRole, "quote.approve");
   const canSend = can(userRole, "quote.send");
+  const canCreateOrder = can(userRole, "order.create");
+  const isAccepted = activeVersion.status === "ACCEPTED";
+  const existingOrder = isAccepted
+    ? all<{ id: number; code: string }>(
+        "SELECT id, code FROM orders WHERE source_quote_version_id = ? LIMIT 1",
+        activeVersion.id,
+      )[0]
+    : undefined;
 
   return (
     <div className="flex flex-1 flex-col overflow-auto bg-surface">
@@ -99,6 +108,19 @@ export default async function QuoteDetailPage(props: {
         >
           Xuất PDF (v{activeVersion.version_no})
         </a>
+        {isAccepted && existingOrder && (
+          <CommandLink href={`/orders/${existingOrder.id}`} icon="order">
+            Xem đơn hàng {existingOrder.code}
+          </CommandLink>
+        )}
+        {isAccepted && !existingOrder && canCreateOrder && (
+          <form action={createOrderFromQuoteAction}>
+            <input type="hidden" name="quoteVersionId" value={activeVersion.id} />
+            <button type="submit" className="cmd font-semibold text-brand">
+              Tạo đơn hàng từ báo giá này
+            </button>
+          </form>
+        )}
       </CommandBar>
 
       <PageTitle

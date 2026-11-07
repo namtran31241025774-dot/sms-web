@@ -34,7 +34,9 @@ export async function runAgent(
   if(running) throw new DomainError('Hồ sơ đang có lần chạy Agent chưa hoàn thành');
   const phase=agent==='OPPORTUNITY' ? researchPhaseFor(entity.id,trigger) : null;
   const fingerprint=agent==='OPPORTUNITY' ? researchFingerprint(entity.id) : null;
-  const recent=get<{id:number;status:'SUCCEEDED'|'FAILED';summary:string|null}>("SELECT id,status,summary FROM ai_runs WHERE agent=? AND entity_type=? AND entity_id=? AND research_phase IS ? AND input_fingerprint IS ? AND status IN ('SUCCEEDED','FAILED') AND started_at>=datetime('now','-60 seconds') ORDER BY id DESC LIMIT 1",agent,entity.type,entity.id,phase,fingerprint);
+  // Chỉ gộp lần chạy lặp của CÙNG một trigger trong 60 giây. Trigger khác (vd. khách vừa phản hồi email)
+  // mang dữ liệu mới nên phải chạy, không được trả lại kết quả cũ.
+  const recent=get<{id:number;status:'SUCCEEDED'|'FAILED';summary:string|null}>("SELECT id,status,summary FROM ai_runs WHERE agent=? AND entity_type=? AND entity_id=? AND trigger=? AND research_phase IS ? AND input_fingerprint IS ? AND status IN ('SUCCEEDED','FAILED') AND started_at>=datetime('now','-60 seconds') ORDER BY id DESC LIMIT 1",agent,entity.type,entity.id,trigger,phase,fingerprint);
   if(recent && !trigger.startsWith('RETRY')) return {runId:recent.id,status:recent.status,summary:recent.summary ?? ''};
   const enabledKey = agent === "QUALIFICATION" ? "agent_qualification_enabled" : "agent_opportunity_enabled";
   if (!settingBool(enabledKey)) throw new DomainError("Agent đang bị Admin tắt");

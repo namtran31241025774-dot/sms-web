@@ -36,7 +36,9 @@ export class OpenAiProvider implements LlmProvider {
         ...(m.tool_call_id ? { tool_call_id: m.tool_call_id } : {}),
         ...(m.tool_calls ? { tool_calls: m.tool_calls } : {}),
       })),
-      max_tokens: options?.maxTokens ?? 4000,
+      // 4000 đôi khi cắt cụt lệnh save_opportunity_research (bản nghiên cứu 10 mục) → JSON hỏng,
+      // model thử lại nhiều lần và vượt trần token mỗi lần chạy. gpt-4o cho tối đa 16.384.
+      max_tokens: options?.maxTokens ?? 8000,
       temperature: options?.temperature ?? 0.2,
     };
 

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { userActor } from "@/lib/services/core";
 import { approveSuggestion, rejectSuggestion, editSuggestion } from "@/lib/services/ai-review";
@@ -35,6 +35,7 @@ export async function approveSuggestionAction(formData: FormData) {
     revalidatePath("/ai-review");
     redirect(`/ai-review?ok=${encodeURIComponent(result)}`);
   } catch (e) {
+    unstable_rethrow(e);
     const error = e instanceof Error ? e.message : String(e);
     redirect(`/ai-review?error=${encodeURIComponent(error)}`);
   }
@@ -54,6 +55,7 @@ export async function rejectSuggestionAction(formData: FormData) {
     revalidatePath("/ai-review");
     redirect(`/ai-review?ok=${encodeURIComponent(result)}`);
   } catch (e) {
+    unstable_rethrow(e);
     const error = e instanceof Error ? e.message : String(e);
     redirect(`/ai-review?error=${encodeURIComponent(error)}`);
   }
@@ -77,6 +79,7 @@ export async function editSuggestionAction(formData: FormData) {
     revalidatePath("/ai-review");
     redirect(`/ai-review?ok=${encodeURIComponent(result)}`);
   } catch (e) {
+    unstable_rethrow(e);
     const error = e instanceof Error ? e.message : String(e);
     redirect(`/ai-review?error=${encodeURIComponent(error)}`);
   }

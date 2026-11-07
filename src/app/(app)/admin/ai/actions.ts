@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { userActor } from "@/lib/services/core";
 import {
@@ -25,6 +25,7 @@ export async function toggleKillSwitchAction(formData: FormData) {
     revalidatePath("/admin/ai");
     redirect(`/admin/ai?ok=${encodeURIComponent(msg)}`);
   } catch (e) {
+    unstable_rethrow(e);
     const error = e instanceof Error ? e.message : String(e);
     redirect(`/admin/ai?error=${encodeURIComponent(error)}`);
   }
@@ -37,6 +38,7 @@ export async function cleanTimeoutRunsAction() {
     revalidatePath("/admin/ai");
     redirect(`/admin/ai?ok=${encodeURIComponent(`Đã quét và huỷ ${cleanedCount} lần chạy bị treo quá thời gian`)}`);
   } catch (e) {
+    unstable_rethrow(e);
     const error = e instanceof Error ? e.message : String(e);
     redirect(`/admin/ai?error=${encodeURIComponent(error)}`);
   }
@@ -58,6 +60,7 @@ export async function retryRunAction(formData: FormData) {
     revalidatePath("/admin/ai");
     redirect(`/admin/ai?ok=${encodeURIComponent(`Đã chạy lại thành công cho ${retryPlan.agent} #${runId}`)}`);
   } catch (e) {
+    unstable_rethrow(e);
     const error = e instanceof Error ? e.message : String(e);
     redirect(`/admin/ai?error=${encodeURIComponent(error)}`);
   }
@@ -72,6 +75,7 @@ export async function activateConfigAction(formData: FormData) {
     revalidatePath("/admin/ai");
     redirect(`/admin/ai?ok=${encodeURIComponent(msg)}`);
   } catch (e) {
+    unstable_rethrow(e);
     const error = e instanceof Error ? e.message : String(e);
     redirect(`/admin/ai?error=${encodeURIComponent(error)}`);
   }
@@ -87,6 +91,7 @@ export async function rollbackConfigAction(formData: FormData) {
     revalidatePath("/admin/ai");
     redirect(`/admin/ai?ok=${encodeURIComponent(msg)}`);
   } catch (e) {
+    unstable_rethrow(e);
     const error = e instanceof Error ? e.message : String(e);
     redirect(`/admin/ai?error=${encodeURIComponent(error)}`);
   }
@@ -109,6 +114,7 @@ export async function createConfigDraftAction(formData: FormData) {
     revalidatePath("/admin/ai");
     redirect(`/admin/ai?ok=${encodeURIComponent(`Đã tạo bản nháp cấu hình v${versionNo}`)}`);
   } catch (e) {
+    unstable_rethrow(e);
     const error = e instanceof Error ? e.message : String(e);
     redirect(`/admin/ai?error=${encodeURIComponent(error)}`);
   }
@@ -131,6 +137,7 @@ export async function submitAiFeedbackAction(formData: FormData) {
     revalidatePath("/admin/ai");
     redirect(`/admin/ai?ok=${encodeURIComponent("Đã gửi phản hồi chất lượng thành công")}`);
   } catch (e) {
+    unstable_rethrow(e);
     const error = e instanceof Error ? e.message : String(e);
     redirect(`/admin/ai?error=${encodeURIComponent(error)}`);
   }

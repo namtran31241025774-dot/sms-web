@@ -944,11 +944,16 @@ export function recordCustomerFeedback(actor:Actor,versionId:number,input:{respo
   const contact=input.contactId?get<{full_name:string}>('SELECT full_name FROM contacts WHERE id=?',input.contactId):undefined;
   const name=input.respondentName?.trim() || contact?.full_name;
   assert(name && input.content?.trim(),'Cần người phản hồi và nội dung phản hồi của khách');
-  const time=Date.parse(input.respondedAt);
+  // Ô thời điểm để trống thì lấy giờ hiện tại.
+  const time=input.respondedAt?.trim() ? Date.parse(input.respondedAt) : Date.now();
   assert(Number.isFinite(time) && time<=Date.now()+60000,'Thời điểm phản hồi không hợp lệ hoặc ở tương lai');
   const v=getQuoteVersion(versionId);
   assert(v,'Không tìm thấy phiên bản');
-  if(v.sent_at) assert(time>=Date.parse(v.sent_at.includes('T')?v.sent_at:v.sent_at.replace(' ','T')+'Z'),'Phản hồi phải sau thời điểm gửi báo giá');
+  // Ô datetime-local chỉ chính xác tới phút, nên so với thời điểm gửi đã làm tròn xuống phút.
+  if(v.sent_at) {
+    const sent=Date.parse(v.sent_at.includes('T')?v.sent_at:v.sent_at.replace(' ','T')+'Z');
+    assert(time>=Math.floor(sent/60000)*60000,'Phản hồi phải sau thời điểm gửi báo giá');
+  }
   return tx(()=>{
     recordCustomerResponse(actor,versionId,input.responseType,input.content.trim(),input.contactId);
     const r=get<{id:number}>('SELECT id FROM quote_responses WHERE quote_version_id=? ORDER BY id DESC LIMIT 1',versionId)!;

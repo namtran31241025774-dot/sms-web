@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { requirePermission } from "@/lib/auth";
 import {
   createEmployee,
@@ -57,6 +57,7 @@ export async function createEmployeeAction(formData: FormData) {
       actor.id,
     );
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     redirect(`/team?tab=employees&error=${encodeURIComponent(msg)}`);
   }
@@ -94,6 +95,7 @@ export async function updateEmployeeAction(formData: FormData) {
       actor.id,
     );
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     redirect(`/team/employees/${id}?error=${encodeURIComponent(msg)}`);
   }
@@ -114,6 +116,7 @@ export async function updateWorkStatusAction(formData: FormData) {
   try {
     updateEmployeeWorkStatus(id, status, can_accept_work, notes, actor.id);
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     redirect(`/team?tab=employees&error=${encodeURIComponent(msg)}`);
   }
@@ -147,6 +150,7 @@ export async function createTeamAction(formData: FormData) {
       actor.id,
     );
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     redirect(`/team?tab=pods&error=${encodeURIComponent(msg)}`);
   }
@@ -182,6 +186,7 @@ export async function updateTeamAction(formData: FormData) {
       actor.id,
     );
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     redirect(`/team/pods/${id}?error=${encodeURIComponent(msg)}`);
   }
@@ -201,6 +206,7 @@ export async function addTeamMemberAction(formData: FormData) {
   try {
     addTeamMember(teamId, userId, role, actor.id);
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     redirect(`/team/pods/${teamId}?error=${encodeURIComponent(msg)}`);
   }
@@ -219,6 +225,7 @@ export async function removeTeamMemberAction(formData: FormData) {
   try {
     removeTeamMember(teamId, userId, actor.id);
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     redirect(`/team/pods/${teamId}?error=${encodeURIComponent(msg)}`);
   }
@@ -247,6 +254,7 @@ export async function assignInitialAction(formData: FormData) {
       reason,
     });
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     redirect(`/team?tab=assignments&error=${encodeURIComponent(msg)}`);
   }
@@ -282,6 +290,7 @@ export async function handoverWorkAction(formData: FormData) {
     revalidatePath("/team");
     redirect(`/team?tab=assignments&ok=${encodeURIComponent(summary)}`);
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     redirect(`/team?tab=assignments&error=${encodeURIComponent(msg)}`);
   }
@@ -321,6 +330,7 @@ export async function createWorkItemAction(formData: FormData) {
       actor.id,
     );
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     redirect(`/team?tab=tasks&error=${encodeURIComponent(msg)}`);
   }
@@ -338,6 +348,7 @@ export async function completeWorkItemAction(formData: FormData) {
   try {
     completeWorkItem(id, outcome, actor.id);
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     redirect(`/team?tab=tasks&error=${encodeURIComponent(msg)}`);
   }
@@ -371,6 +382,7 @@ export async function setSalesTargetAction(formData: FormData) {
       actor.id,
     );
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     redirect(`/team?tab=targets&error=${encodeURIComponent(msg)}`);
   }
@@ -402,6 +414,7 @@ export async function createPerformanceReviewAction(formData: FormData) {
       actor.id,
     );
   } catch (err: unknown) {
+    unstable_rethrow(err);
     const msg = err instanceof Error ? err.message : String(err);
     redirect(`/team?tab=targets&error=${encodeURIComponent(msg)}`);
   }

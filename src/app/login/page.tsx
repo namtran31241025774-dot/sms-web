@@ -76,7 +76,7 @@ export default function LoginPage() {
             <Icon name="sparkle" size={15} className="text-[#5aa9ff]" /> Bán hàng B2B SaaS · 2 AI Agent · con người quyết định
           </span>
           <h1 className="mt-6 max-w-4xl text-[40px] font-extrabold leading-[1.08] tracking-tight sm:text-[56px]">
-            Quản lý bán hàng B2B, có AI Agent đồng hành ở từng bước
+            Quản lý bán hàng B2B, có AI Agent đồng hành
           </h1>
           <p className="mt-5 max-w-2xl text-[17px] leading-7 text-[#a9b8d6]">
             Từ đánh giá khách hàng tới thu tiền trong một hệ thống. Agent nghiên cứu và đề xuất có căn cứ, nhân viên xác minh, quản lý duyệt ở các cổng kiểm soát.
