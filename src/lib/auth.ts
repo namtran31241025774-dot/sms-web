@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { get } from "./db";
 import { DomainError, type Role } from "./domain";
 import { can, type Permission } from "./rbac";
+import { verifyPassword } from "./password";
 
 export type User = { id: number; name: string; email: string; role: Role; title: string | null };
 
@@ -45,6 +46,38 @@ export async function currentUser(): Promise<User | null> {
     return null;
   }
   return get<User>("SELECT id, name, email, role, title FROM users WHERE id = ? AND active = 1", Number(id)) ?? null;
+}
+
+/**
+ * Xác thực người dùng bằng Email và Mật khẩu (DEC-14, FR-97).
+ */
+export async function authenticateWithPassword(email: string, password: string): Promise<User | null> {
+  const normEmail = email.trim().toLowerCase();
+  const row = get<{
+    id: number;
+    name: string;
+    email: string;
+    role: Role;
+    title: string | null;
+    password_hash: string | null;
+    status: string;
+    active: number;
+  }>("SELECT id, name, email, role, title, password_hash, status, active FROM users WHERE LOWER(email) = ?", normEmail);
+
+  if (!row || row.active !== 1 || (row.status && row.status !== "ACTIVE")) {
+    return null;
+  }
+
+  // Xác thực mật khẩu qua scrypt
+  if (!row.password_hash || !verifyPassword(password, row.password_hash)) return null;
+
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    title: row.title,
+  };
 }
 
 /** Dùng trong page/layout: chưa đăng nhập thì chuyển về /login. */

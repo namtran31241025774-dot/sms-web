@@ -10,7 +10,7 @@ export function cx(...c: (string | false | null | undefined)[]) {
 /* ---------------- Command bar ---------------- */
 export function CommandBar({ children }: { children: ReactNode }) {
   return (
-    <div className="flex h-11 items-center gap-0.5 overflow-x-auto border-b border-stroke bg-surface px-3 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+    <div className="sticky top-0 z-10 flex h-12 items-center gap-1 overflow-x-auto border-b border-stroke bg-surface/95 px-5 backdrop-blur">
       {children}
     </div>
   );
@@ -69,26 +69,30 @@ export function PageTitle({
   right?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 px-6 pb-3 pt-5">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand-tint text-brand">
-          <Icon name={icon} size={22} />
+    <div className="relative mx-6 mb-5 mt-5 overflow-hidden rounded-2xl bg-[#050b1f] px-7 py-6 text-white shadow-[0_18px_40px_-18px_rgba(5,11,31,0.7)]">
+      <div className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(15,108,189,0.55),transparent_65%)]" />
+      <div className="pointer-events-none absolute -bottom-40 left-1/3 h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(79,107,237,0.22),transparent_65%)]" />
+      <div className="relative flex flex-wrap items-center justify-between gap-5">
+        <div className="flex min-w-0 items-center gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-[#8fc4ff] shadow-[0_0_24px_rgba(15,108,189,0.45)]">
+            <Icon name={icon} size={24} />
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-[26px] font-extrabold leading-8 tracking-tight">{title}</h1>
+            {subtitle && <div className="mt-1 truncate text-[13px] text-[#a9b8d6] [&_a]:text-[#8fc4ff]">{subtitle}</div>}
+          </div>
         </div>
-        <div className="min-w-0">
-          <h1 className="truncate text-[20px] font-semibold leading-7">{title}</h1>
-          {subtitle && <div className="truncate text-[13px] text-ink-3">{subtitle}</div>}
-        </div>
+        {right && <div className="flex flex-wrap items-center gap-3">{right}</div>}
       </div>
-      {right && <div className="flex flex-wrap items-center gap-6">{right}</div>}
     </div>
   );
 }
 
 export function HeaderField({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="min-w-[110px] border-l border-stroke pl-4">
-      <div className="text-[15px] font-semibold leading-5">{children}</div>
-      <div className="text-xs text-ink-3">{label}</div>
+    <div className="min-w-[124px] rounded-xl border border-white/12 bg-white/[0.06] px-3.5 py-2 backdrop-blur">
+      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#8fa3c8]">{label}</div>
+      <div className="mt-0.5 text-[15px] font-semibold leading-5 text-white [&_.text-ink-3]:text-[#8fa3c8]">{children}</div>
     </div>
   );
 }
@@ -96,7 +100,7 @@ export function HeaderField({ label, children }: { label: string; children: Reac
 /* ---------------- Tabs (điều hướng bằng query ?tab=) ---------------- */
 export function Tabs({ base, current, tabs }: { base: string; current: string; tabs: { key: string; label: string; count?: number }[] }) {
   return (
-    <div className="flex gap-1 border-b border-stroke px-6">
+    <div className="mx-6 flex gap-1 overflow-x-auto rounded-full border border-stroke bg-surface p-1 shadow-[var(--shadow-2)]">
       {tabs.map((t) => {
         const active = t.key === current;
         return (
@@ -104,13 +108,14 @@ export function Tabs({ base, current, tabs }: { base: string; current: string; t
             key={t.key}
             href={`${base}?tab=${t.key}`}
             className={cx(
-              "relative px-3 py-2.5 text-sm hover:text-ink",
-              active ? "font-semibold text-ink" : "text-ink-3",
+              "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-1.5 text-[13.5px] transition-colors",
+              active ? "bg-night font-semibold text-white shadow-[0_0_14px_rgba(15,108,189,0.45)]" : "text-ink-2 hover:bg-brand-tint hover:text-brand-ink",
             )}
           >
             {t.label}
-            {t.count !== undefined && <span className="ml-1.5 text-xs text-ink-3">({t.count})</span>}
-            {active && <span className="absolute inset-x-3 -bottom-px h-[3px] rounded-full bg-brand" />}
+            {t.count !== undefined && (
+              <span className={cx("rounded-full px-1.5 text-[11px] font-semibold leading-4", active ? "bg-white/25 text-white" : "bg-[#eef1f5] text-ink-3")}>{t.count}</span>
+            )}
           </Link>
         );
       })}
@@ -121,14 +126,17 @@ export function Tabs({ base, current, tabs }: { base: string; current: string; t
 /* ---------------- Card / Section ---------------- */
 export function Card({ title, actions, children, className, pad = true }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; pad?: boolean }) {
   return (
-    <section className={cx("rounded-lg bg-surface shadow-[var(--shadow-4)]", className)}>
+    <section className={cx("overflow-hidden rounded-2xl border border-stroke bg-surface shadow-[var(--shadow-4)]", className)}>
       {(title || actions) && (
-        <header className="flex min-h-11 items-center justify-between gap-2 border-b border-[#f0f0f0] px-4 py-2">
-          <h2 className="text-[14px] font-semibold">{title}</h2>
+        <header className="flex min-h-13 items-center justify-between gap-2 border-b border-[#eef1f5] px-5 py-3">
+          <h2 className="flex items-center gap-2 text-[15px] font-bold text-brand-ink">
+            <span className="h-4 w-1 rounded-full bg-gradient-to-b from-[#5aa9ff] to-brand" aria-hidden="true" />
+            {title}
+          </h2>
           {actions && <div className="flex items-center gap-1">{actions}</div>}
         </header>
       )}
-      <div className={pad ? "p-4" : ""}>{children}</div>
+      <div className={pad ? "p-5" : ""}>{children}</div>
     </section>
   );
 }
@@ -196,7 +204,7 @@ export function MessageBar({ intent = "info", title, children, action }: { inten
     error: { cls: "bg-[#fdf3f4] border-[#eeacb2]", icon: "dismissCircle" as IconName, color: "text-[#c50f1f]" },
   }[intent];
   return (
-    <div role={intent === "error" ? "alert" : "status"} className={cx("flex items-start gap-2 rounded-[4px] border px-3 py-2 text-sm", style.cls)}>
+    <div role={intent === "error" ? "alert" : "status"} className={cx("flex items-start gap-2.5 rounded-xl border px-4 py-2.5 text-sm", style.cls)}>
       <Icon name={style.icon} size={18} className={cx("mt-px shrink-0", style.color)} />
       <div className="min-w-0 flex-1">
         {title && <span className="mr-1 font-semibold">{title}</span>}
@@ -240,7 +248,7 @@ export function Persona({ name, sub, size = 32 }: { name: string | null | undefi
 export function ProcessFlow({ stages, current, lost }: { stages: { key: string; label: string; sub?: string }[]; current: string; lost?: boolean }) {
   const idx = stages.findIndex((s) => s.key === current);
   return (
-    <div className="mx-6 mb-3 flex items-stretch overflow-x-auto rounded-lg bg-surface shadow-[var(--shadow-2)]">
+    <div className="mx-6 mb-4 flex items-stretch overflow-x-auto rounded-2xl border border-stroke bg-surface shadow-[var(--shadow-2)]">
       {stages.map((s, i) => {
         const done = i < idx || (i === idx && s.key === "__done");
         const active = i === idx;
@@ -281,13 +289,13 @@ export function Empty({ icon = "info", children }: { icon?: IconName; children: 
 
 export function Kpi({ label, value, sub, icon, href }: { label: string; value: ReactNode; sub?: ReactNode; icon: IconName; href?: string }) {
   const body = (
-    <div className="flex h-full items-start gap-3 rounded-lg bg-surface p-4 shadow-[var(--shadow-4)] transition-shadow hover:shadow-[var(--shadow-16)]">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand-tint text-brand">
-        <Icon name={icon} size={20} />
+    <div className="flex h-full items-start gap-4 rounded-2xl border border-stroke bg-surface p-5 shadow-[var(--shadow-4)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-16)]">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-night text-[#8fc4ff] shadow-[0_0_16px_rgba(15,108,189,0.35)]">
+        <Icon name={icon} size={22} />
       </div>
       <div className="min-w-0">
-        <div className="text-xs text-ink-3">{label}</div>
-        <div className="text-[22px] font-semibold leading-8">{value}</div>
+        <div className="text-[11.5px] font-semibold uppercase tracking-wide text-ink-3">{label}</div>
+        <div className="mt-0.5 whitespace-nowrap text-[22px] font-bold leading-8 tracking-tight text-brand-ink">{value}</div>
         {sub && <div className="text-xs text-ink-3">{sub}</div>}
       </div>
     </div>

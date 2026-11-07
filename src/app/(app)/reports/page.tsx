@@ -1,0 +1,395 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { requireUser } from "@/lib/auth";
+import { can } from "@/lib/rbac";
+import { getForecastDashboard, getPipelineFunnelReport } from "@/lib/services/reports";
+import { CompareBars, Legend, SERIES, StackedColumns, TargetProgress } from "@/components/charts";
+import { all } from "@/lib/db";
+import { formatVnd } from "@/lib/domain";
+import { Card, CommandBar, CommandLink, PageTitle, Flash } from "@/components/ui";
+
+export const metadata: Metadata = { title: "Báo cáo cơ hội và Dự báo doanh số" };
+
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    team_id?: string;
+    owner_id?: string;
+    from_date?: string;
+    to_date?: string;
+    ok?: string;
+    error?: string;
+  }>;
+}) {
+  const user = await requireUser();
+  const sp = await searchParams;
+
+  // Quyền xem báo cáo: SALES_MANAGER, SALES, ADMIN (FR-99)
+  const canView = can(user.role, "report.funnel") || user.role === "ADMIN";
+  if (!canView) {
+    redirect("/?error=" + encodeURIComponent("Bạn không có quyền truy cập báo cáo phễu cơ hội"));
+  }
+
+  const teamId = sp.team_id ? Number(sp.team_id) : undefined;
+  const ownerId = sp.owner_id ? Number(sp.owner_id) : undefined;
+
+  const report = getPipelineFunnelReport({
+    team_id: teamId,
+    owner_id: ownerId,
+    from_date: sp.from_date,
+    to_date: sp.to_date,
+  });
+
+  const dash = getForecastDashboard({ team_id: teamId, owner_id: ownerId, from_date: sp.from_date, to_date: sp.to_date });
+
+  const teams = all<{ id: number; name: string; code: string }>(
+    "SELECT id, name, code FROM teams WHERE active = 1 ORDER BY name ASC",
+  );
+
+  const owners = all<{ id: number; name: string; email: string }>(
+    "SELECT id, name, email FROM users WHERE role IN ('SALES', 'SALES_MANAGER') AND active = 1 ORDER BY name ASC",
+  );
+
+  // Link xuất CSV
+  const queryParams = new URLSearchParams();
+  if (sp.team_id) queryParams.set("team_id", sp.team_id);
+  if (sp.owner_id) queryParams.set("owner_id", sp.owner_id);
+  if (sp.from_date) queryParams.set("from_date", sp.from_date);
+  if (sp.to_date) queryParams.set("to_date", sp.to_date);
+  const exportHref = `/api/reports/funnel/export?${queryParams.toString()}`;
+
+  return (
+    <>
+      <CommandBar>
+        <CommandLink href={exportHref} icon="invoice">
+          Xuất báo cáo CSV
+        </CommandLink>
+        <CommandLink href="/admin?tab=rbac" icon="settings">
+          Xem phân quyền RBAC
+        </CommandLink>
+        <CommandLink href="/reports" icon="refresh">
+          Làm mới
+        </CommandLink>
+        {can(user.role, "report.cashflow") && (
+          <CommandLink href="/reports/cashflow" icon="money">
+            Dòng tiền dự tính
+          </CommandLink>
+        )}
+      </CommandBar>
+
+      <Flash sp={sp} />
+
+      <PageTitle
+        title="Báo cáo phễu cơ hội và Dự báo doanh thu"
+        subtitle="Tổng hợp giá trị thương vụ theo giai đoạn · Dự báo có trọng số theo giai đoạn · Phân bổ theo Sale Pod"
+        icon="opportunity"
+      />
+
+      <div className="px-6 pb-12 space-y-6">
+        {/* Bộ lọc báo cáo */}
+        <Card title="Bộ lọc phân tích phễu bán hàng">
+          <form method="GET" action="/reports" className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+            <div>
+              <label className="label">Sale Pod phụ trách</label>
+              <select name="team_id" defaultValue={sp.team_id ?? ""} className="select">
+                <option value="">-- Tất cả nhóm bán hàng --</option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="label">Nhân viên phụ trách</label>
+              <select name="owner_id" defaultValue={sp.owner_id ?? ""} className="select">
+                <option value="">-- Tất cả nhân viên --</option>
+                {owners.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name} ({o.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="label">Từ ngày</label>
+              <input
+                type="date"
+                name="from_date"
+                defaultValue={sp.from_date ?? ""}
+                className="input"
+              />
+            </div>
+
+            <div className="flex items-end gap-2">
+              <button type="submit" className="btn btn-primary w-full">
+                Xem báo cáo
+              </button>
+              <Link href="/reports" className="btn btn-subtle">
+                Đặt lại
+              </Link>
+            </div>
+          </form>
+        </Card>
+
+        {/* 5 Thẻ KPI Tổng hợp */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="p-4 bg-white border border-stroke rounded-lg shadow-sm">
+            <div className="text-[11px] font-medium text-ink-3 uppercase tracking-wider">Tổng số thương vụ</div>
+            <div className="mt-2 text-2xl font-bold text-ink">{report.totalOpportunities}</div>
+            <div className="mt-1 text-xs text-ink-3">Đang mở: {report.openOpportunities}</div>
+          </div>
+
+          <div className="p-4 bg-white border border-stroke rounded-lg shadow-sm">
+            <div className="text-[11px] font-medium text-ink-3 uppercase tracking-wider">Tổng giá trị Pipeline</div>
+            <div className="mt-2 text-xl font-bold text-blue-700">{formatVnd(report.totalPipelineValue)}</div>
+            <div className="mt-1 text-xs text-ink-3">Toàn bộ deal đang mở</div>
+          </div>
+
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg shadow-sm">
+            <div className="text-[11px] font-semibold text-emerald-900 uppercase tracking-wider">
+              Dự báo doanh thu
+            </div>
+            <div className="mt-2 text-xl font-bold text-emerald-700">
+              {formatVnd(report.weightedForecastRevenue)}
+            </div>
+            <div className="mt-1 text-xs text-emerald-800">Doanh thu có trọng số</div>
+          </div>
+
+          <div className="p-4 bg-white border border-stroke rounded-lg shadow-sm">
+            <div className="text-[11px] font-medium text-ink-3 uppercase tracking-wider">Doanh thu đã chốt (Won)</div>
+            <div className="mt-2 text-xl font-bold text-ink">{formatVnd(report.wonValue)}</div>
+            <div className="mt-1 text-xs text-ink-3">Thất bại: {formatVnd(report.lostValue)}</div>
+          </div>
+
+          <div className="p-4 bg-white border border-stroke rounded-lg shadow-sm">
+            <div className="text-[11px] font-medium text-ink-3 uppercase tracking-wider">Tỷ lệ chốt thắng</div>
+            <div className="mt-2 text-2xl font-bold text-ink">{report.winRatePct}%</div>
+            <div className="mt-1 text-xs text-ink-3">Trên các cơ hội đã đóng</div>
+          </div>
+        </div>
+
+        {/* DẢI KẾT LUẬN: dự báo quý so với chỉ tiêu */}
+        <section className="rounded-2xl border border-stroke bg-surface p-6 shadow-[var(--shadow-4)]">
+          <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-brand">Dự báo quý {dash.quarter.replace("-Q", " · Quý ")}</div>
+          <div className="mt-2 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_420px] lg:items-end">
+            <div>
+              <h2 className="text-[28px] font-bold leading-9 text-brand-ink">
+                {dash.target
+                  ? `Dự kiến đạt ${Math.round(((dash.wonInQuarter + dash.weightedInQuarter) / dash.target) * 100)}% chỉ tiêu quý`
+                  : "Chưa có chỉ tiêu quý để so sánh"}
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm text-ink-2">
+                Đã thắng <b>{formatVnd(dash.wonInQuarter)}</b> và dự báo có trọng số <b>{formatVnd(dash.weightedInQuarter)}</b> từ các cơ hội có ngày chốt trong quý
+                {dash.target ? <>, so với {dash.targetSource.toLowerCase()} <b>{formatVnd(dash.target)}</b>.</> : "."}
+              </p>
+            </div>
+            {dash.target ? (
+              <div>
+                <Legend items={[{ color: SERIES.a, label: "Đã thắng" }, { color: SERIES.b, label: "Dự báo có trọng số" }]} />
+                <div className="mt-2">
+                  <TargetProgress a={dash.wonInQuarter} b={dash.weightedInQuarter} target={dash.target} aLabel="Đã thắng" bLabel="Dự báo có trọng số" />
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_1fr]">
+          <Card title="Doanh thu theo tháng chốt dự kiến">
+            {dash.months.length ? (
+              <>
+                <Legend items={[{ color: SERIES.a, label: "Đã thắng" }, { color: SERIES.b, label: "Dự báo có trọng số (cơ hội đang mở)" }]} />
+                <div className="mt-6">
+                  <StackedColumns
+                    data={dash.months.map((m) => ({ label: `${m.month.slice(5)}/${m.month.slice(2, 4)}`, a: m.won, b: m.weighted, note: `${m.count} cơ hội` }))}
+                    aLabel="Đã thắng"
+                    bLabel="Dự báo có trọng số"
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-ink-3">Chưa có cơ hội nào có ngày chốt dự kiến.</p>
+            )}
+            <p className="mt-4 text-xs text-ink-3">Nguồn: ngày chốt dự kiến và giá trị của từng cơ hội; dự báo = giá trị × trọng số theo giai đoạn (cài đặt dự báo). Cơ hội thất bại không tính.</p>
+          </Card>
+
+          <Card title="Phễu theo giai đoạn">
+            <CompareBars
+              rows={report.stages.filter((s) => s.stage !== "LOST").map((s) => ({ label: s.stageName, sub: `${s.count} cơ hội · ${s.probabilityPct}%`, total: s.totalAmount, part: s.weightedAmount }))}
+              totalLabel="Giá trị"
+              partLabel="Có trọng số"
+            />
+            <p className="mt-4 text-xs text-ink-3">Thanh viền là tổng giá trị, phần tô đậm là giá trị có trọng số của giai đoạn.</p>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <Card title="Theo Sale Pod">
+            <CompareBars rows={report.byTeam.map((t) => ({ label: t.teamName, sub: `${t.oppCount} cơ hội`, total: t.totalAmount, part: t.weightedForecast }))} totalLabel="Pipeline mở" partLabel="Dự báo" />
+          </Card>
+          <Card title="Theo nhân viên kinh doanh">
+            <CompareBars rows={report.byOwner.map((o) => ({ label: o.ownerName, sub: `${o.oppCount} cơ hội`, total: o.totalAmount, part: o.weightedForecast }))} totalLabel="Pipeline mở" partLabel="Dự báo" />
+          </Card>
+          <Card title="Cơ hội cần chú ý" pad={false}>
+            {dash.attention.length ? (
+              <ul className="divide-y divide-[#eef1f5]">
+                {dash.attention.map((a) => (
+                  <li key={a.id} className="px-5 py-3 text-sm">
+                    <Link href={`/opportunities/${a.id}`} className="link">{a.code} · {a.name}</Link>
+                    <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-ink-3">
+                      <span className="font-semibold text-ink-2">{formatVnd(a.amount)}</span>
+                      {a.openRisks > 0 && <span>{a.openRisks} rủi ro đang mở</span>}
+                      {a.overdue && <span className="text-[#bc4b09]">Quá ngày chốt {a.closeDate}</span>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="p-5 text-sm text-ink-3">Không có cơ hội nào còn rủi ro mở hoặc quá ngày chốt.</p>
+            )}
+          </Card>
+        </div>
+
+        {/* BẢNG 1: CHI TIẾT THEO GIAI ĐOẠN PHỄU (BR-14) */}
+        <Card title="Phân tích cơ hội theo giai đoạn và Trọng số dự báo">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-[#fcfcfc] border-b border-stroke text-ink-2 font-semibold">
+                <tr>
+                  <th className="px-4 py-2.5">Giai đoạn bán hàng</th>
+                  <th className="px-4 py-2.5 text-center">Số lượng</th>
+                  <th className="px-4 py-2.5 text-right">Tổng giá trị (VND)</th>
+                  <th className="px-4 py-2.5 text-center">Xác suất chuyển đổi</th>
+                  <th className="px-4 py-2.5 text-right">Dự báo doanh thu có trọng số (VND)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stroke">
+                {report.stages.map((st) => (
+                  <tr key={st.stage} className="hover:bg-[#fafafa]">
+                    <td className="px-4 py-2.5 font-medium text-ink">
+                      <div>{st.stageName}</div>
+                      <span className="font-mono text-[10px] text-ink-3">{st.stage}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-center font-bold text-ink">{st.count}</td>
+                    <td className="px-4 py-2.5 text-right font-medium text-ink">
+                      {formatVnd(st.totalAmount)}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <span className="inline-block px-2 py-0.5 rounded font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                        {st.probabilityPct}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-bold text-emerald-700">
+                      {formatVnd(st.weightedAmount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-[#f8f9fa] border-t-2 border-stroke font-bold text-xs">
+                <tr>
+                  <td className="px-4 py-2.5 text-ink">TỔNG PIPELINE ĐANG MỞ</td>
+                  <td className="px-4 py-2.5 text-center text-ink">{report.openOpportunities}</td>
+                  <td className="px-4 py-2.5 text-right text-blue-700">
+                    {formatVnd(report.totalPipelineValue)}
+                  </td>
+                  <td className="px-4 py-2.5 text-center text-ink-3">—</td>
+                  <td className="px-4 py-2.5 text-right text-emerald-700">
+                    {formatVnd(report.weightedForecastRevenue)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </Card>
+
+        {/* BẢNG 2: PHÂN BỔ THEO SALE POD VÀ NHÂN VIÊN */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card title="Doanh thu phễu theo Sale Pod">
+            {report.byTeam.length === 0 ? (
+              <div className="text-zinc-500 text-xs italic">Chưa có dữ liệu theo nhóm</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-[#fcfcfc] border-b border-stroke text-ink-2 font-semibold">
+                    <tr>
+                      <th className="px-3 py-2">Sale Pod</th>
+                      <th className="px-3 py-2 text-center">Số deal</th>
+                      <th className="px-3 py-2 text-right">Pipeline</th>
+                      <th className="px-3 py-2 text-right">Dự báo</th>
+                      <th className="px-3 py-2 text-right">Đã thắng</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stroke">
+                    {report.byTeam.map((t) => (
+                      <tr key={t.teamCode} className="hover:bg-[#fafafa]">
+                        <td className="px-3 py-2 font-medium text-ink">
+                          <div>{t.teamName}</div>
+                          <span className="text-[10px] text-ink-3 font-mono">{t.teamCode}</span>
+                        </td>
+                        <td className="px-3 py-2 text-center font-bold">{t.oppCount}</td>
+                        <td className="px-3 py-2 text-right text-blue-700 font-medium">
+                          {formatVnd(t.totalAmount)}
+                        </td>
+                        <td className="px-3 py-2 text-right text-emerald-700 font-bold">
+                          {formatVnd(t.weightedForecast)}
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium text-ink">
+                          {formatVnd(t.wonAmount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
+          <Card title="Doanh thu phễu theo Nhân viên kinh doanh">
+            {report.byOwner.length === 0 ? (
+              <div className="text-zinc-500 text-xs italic">Chưa có dữ liệu nhân viên</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-[#fcfcfc] border-b border-stroke text-ink-2 font-semibold">
+                    <tr>
+                      <th className="px-3 py-2">Nhân viên</th>
+                      <th className="px-3 py-2 text-center">Số deal</th>
+                      <th className="px-3 py-2 text-right">Pipeline</th>
+                      <th className="px-3 py-2 text-right">Dự báo</th>
+                      <th className="px-3 py-2 text-right">Đã thắng</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stroke">
+                    {report.byOwner.map((o) => (
+                      <tr key={o.ownerId} className="hover:bg-[#fafafa]">
+                        <td className="px-3 py-2 font-medium text-ink">
+                          <div>{o.ownerName}</div>
+                          <span className="text-[10px] text-ink-3 font-mono">{o.ownerEmail}</span>
+                        </td>
+                        <td className="px-3 py-2 text-center font-bold">{o.oppCount}</td>
+                        <td className="px-3 py-2 text-right text-blue-700 font-medium">
+                          {formatVnd(o.totalAmount)}
+                        </td>
+                        <td className="px-3 py-2 text-right text-emerald-700 font-bold">
+                          {formatVnd(o.weightedForecast)}
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium text-ink">
+                          {formatVnd(o.wonAmount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+    </>
+  );
+}

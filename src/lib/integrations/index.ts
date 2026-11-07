@@ -95,12 +95,23 @@ export const email: EmailAdapter = {
 // ---------- F13 ERP / Finance ----------
 export interface ErpAdapter {
   pushInvoice(inv: { code: string; amount: number; orderCode: string }): { erpRef: string };
+  syncAccountingTransactions(since?: string): Array<{
+    externalTransactionId: string;
+    accountCode: string;
+    amount: number;
+    reference: string;
+    paidAt: string;
+  }>;
 }
 
 export const erp: ErpAdapter = {
   pushInvoice(inv) {
     console.info(`[erp-mock] invoice ${inv.code} (${inv.amount})`);
     return { erpRef: `ERP-${inv.code}` };
+  },
+  syncAccountingTransactions() {
+    console.info("[erp-mock] sync transactions");
+    return [];
   },
 };
 
@@ -115,3 +126,9 @@ export const provisioning: ProvisioningAdapter = {
     return { ticket: `PRV-${order.code}` };
   },
 };
+
+// ---------- F15 E-Signature (FR-55, DEC-13) ----------
+export * from "./esign";
+
+// ---------- F16 Payment Gateway (FR-70, DEC-13) ----------
+export * from "./payment-gateway";

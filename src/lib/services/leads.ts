@@ -1,9 +1,9 @@
-// Giai đoạn QUALIFY: tạo/chuẩn hóa Lead, kiểm tra trùng, BANT, chuyển đổi hoặc loại có lý do.
-import { all, get, nextCode, run, tx } from "../db";
+import { scoreBant, disqualifyLeadWithReason, convertLeadToOpportunity } from "./qualification";
+import { assertActorAccess } from "./access";
+// Giai đoạn QUALIFY: tạo/chuẩn hóa Lead, kiểm tra trùng, BANT, chuyển đổi hoặc loại có lý do (WP-01 & WP-03).
+import { all, get, run, tx } from "../db";
 import {
   assert,
-  bantScore,
-  clampBant,
   emailDomain,
   normalizeCompany,
   normalizeEmail,
@@ -11,7 +11,22 @@ import {
   type BantKey,
 } from "../domain";
 import { maps } from "../integrations";
-import { actorUserId, addActivity, audit, notify, settingBool, settingNumber, type Actor } from "./core";
+import { actorUserId, audit, settingNumber, type Actor } from "./core";
+import { findDuplicates, type DuplicateHit } from "./dedupe";
+import { findOrCreateAccount } from "./accounts";
+import { findOrCreateContact } from "./contacts";
+import { emitEvent } from "../events";
+import type { UserScope } from "../scope";
+import { recordVisible } from "./access";
+import {bantQualified} from '../bant-policy';
+import {requireVietnamAddress} from './address-validation';
+import {validateVietnamAddress} from './address-validation';
+import {assignmentTeam} from './assignment-team';
+
+export type { DuplicateHit };
+export { findDuplicates, findOrCreateAccount, findOrCreateContact };
+
+export type LeadRating = "HOT" | "WARM" | "COLD";
 
 export type Lead = {
   id: number;
@@ -26,7 +41,13 @@ export type Lead = {
   source: string;
   industry: string | null;
   notes: string | null;
+  topic: string | null;
   status: "OPEN" | "WORKING" | "CONVERTED" | "DISQUALIFIED";
+  rating: LeadRating | null;
+  account_id: number | null;
+  contact_id: number | null;
+  deleted_at: string | null;
+  merged_into_lead_id: number | null;
   bant_budget: number;
   bant_authority: number;
   bant_need: number;
@@ -43,6 +64,13 @@ export type Lead = {
   converted_at: string | null;
   created_at: string;
   updated_at: string;
+  tags?: Tag[];
+};
+
+export type Tag = {
+  id: number;
+  name: string;
+  color: string;
 };
 
 export type LeadInput = {
@@ -55,164 +83,469 @@ export type LeadInput = {
   source?: string;
   industry?: string | null;
   notes?: string | null;
+  topic?: string | null;
   owner_id?: number | null;
+  team_id?:number|null;
+  account_id?: number | null;
+  contact_id?: number | null;
+  tag_ids?: number[];
 };
 
-export function listLeads(filter: { status?: string; q?: string } = {}) {
+/**
+ * FR-10 & BR-02: Tính toán mức phân loại khách hàng tiềm năng.
+ * - NÓNG: đạt chuẩn BR-01 (tổng BANT >= 60 và authority > 0) và mua trong tháng hoặc cuối quý (timeline >= 18).
+ * - ẤM: tổng BANT 40-59, hoặc đạt chuẩn nhưng mua năm sau.
+ * - LẠNH: tổng BANT < 40 hoặc chưa rõ nhu cầu.
+ */
+export function calculateLeadRating(lead: {
+  bant_score?: number;
+  bant_authority?: number;
+  bant_timeline?: number;
+  bant_need?: number;
+}): LeadRating {
+  const score = lead.bant_score ?? 0;
+  const authority = lead.bant_authority ?? 0;
+  const timeline = lead.bant_timeline ?? 0;
+  const need = lead.bant_need ?? 0;
+
+  const threshold = settingNumber("bant_threshold");
+  const warmMin = settingNumber("lead_rating_warm_min");
+
+  if (bantQualified(score,authority,threshold) && timeline===25) {
+    return "HOT";
+  }
+
+  if (score >= warmMin && need > 0) {
+    return "WARM";
+  }
+
+  return "COLD";
+}
+
+/**
+ * FR-04: Danh sách và tìm kiếm lọc Lead đa tiêu chí.
+ */
+export function listLeads(filter: {
+  status?: string;
+  source?: string;
+  owner_id?: number;
+  rating?: string;
+  tag_id?: number;
+  q?: string;
+  view?: string; // "trash" để xem hồ sơ đã xoá mềm
+  user?: UserScope;
+} = {}) {
   const where: string[] = [];
-  const params: string[] = [];
-  if (filter.status) {
+  const params: (string | number)[] = [];
+
+  // Lọc theo trạng thái xoá mềm (FR-05, FR-18)
+  if (filter.view === "trash") {
+    where.push("l.deleted_at IS NOT NULL");
+  } else {
+    where.push("l.deleted_at IS NULL AND l.merged_into_lead_id IS NULL");
+  }
+
+  if (filter.status && filter.status !== "all") {
     where.push("l.status = ?");
     params.push(filter.status);
   }
-  if (filter.q) {
-    where.push("(l.company_norm LIKE ? OR l.contact_name LIKE ? OR l.email LIKE ?)");
-    params.push(`%${normalizeCompany(filter.q)}%`, `%${filter.q}%`, `%${filter.q}%`);
+  if (filter.source) {
+    where.push("l.source = ?");
+    params.push(filter.source);
   }
-  return all<Lead>(
-    `SELECT l.*, u.name AS owner_name FROM leads l LEFT JOIN users u ON u.id = l.owner_id
-     ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY l.updated_at DESC, l.id DESC`,
+  if (filter.owner_id) {
+    where.push("l.owner_id = ?");
+    params.push(filter.owner_id);
+  }
+  if (filter.rating) {
+    where.push("l.rating = ?");
+    params.push(filter.rating);
+  }
+  if (filter.tag_id) {
+    where.push("EXISTS (SELECT 1 FROM lead_tags lt WHERE lt.lead_id = l.id AND lt.tag_id = ?)");
+    params.push(filter.tag_id);
+  }
+
+  if (filter.q) {
+    where.push("(l.company_norm LIKE ? OR l.contact_name LIKE ? OR l.email LIKE ? OR l.phone LIKE ? OR l.topic LIKE ?)");
+    params.push(`%${normalizeCompany(filter.q)}%`, `%${filter.q}%`, `%${filter.q}%`, `%${filter.q}%`, `%${filter.q}%`);
+  }
+
+  const leads = all<Lead>(
+    `SELECT l.*, u.name AS owner_name FROM leads l
+     LEFT JOIN users u ON u.id = l.owner_id
+     ${where.length ? "WHERE " + where.join(" AND ") : ""}
+     ORDER BY l.updated_at DESC, l.id DESC`,
     ...params,
   );
+
+  return leads.filter(r=>!filter.user || recordVisible(filter.user,'lead',r.id));
 }
 
-export function getLead(id: number) {
-  return get<Lead>(
+export function getLead(id: number, user?: UserScope): Lead | undefined {
+  if(user && !recordVisible(user,'lead',id)) return undefined;
+  const lead = get<Lead>(
     "SELECT l.*, u.name AS owner_name FROM leads l LEFT JOIN users u ON u.id = l.owner_id WHERE l.id = ?",
     id,
   );
+  if (!lead) return undefined;
+
+  // Lấy danh sách tags gắn với lead
+  lead.tags = all<Tag>(
+    `SELECT t.* FROM tags t
+     JOIN lead_tags lt ON lt.tag_id = t.id
+     WHERE lt.lead_id = ?`,
+    id,
+  );
+
+  return lead;
 }
 
-export type DuplicateHit = { kind: "LEAD" | "ACCOUNT" | "CONTACT"; id: number; label: string; reason: string };
+/**
+ * FR-01 & FR-11: Tạo Lead thủ công, tự động điền khi chọn Account hoặc Contact có sẵn.
+ */
+export function createLead(actor: Actor, input: LeadInput): number {
+  requireVietnamAddress(input.address);
+  let companyName = input.company_name?.trim();
+  let contactName = input.contact_name?.trim();
+  let email = normalizeEmail(input.email);
+  let phone = normalizePhone(input.phone);
+  let address = input.address?.trim() || null;
+  let industry = input.industry?.trim() || null;
 
-/** Phát hiện trùng — chỉ gắn cờ, không bao giờ tự gộp bản ghi. */
-export function findDuplicates(input: { company_name: string; email?: string | null; phone?: string | null }, excludeLeadId?: number) {
-  const hits: DuplicateHit[] = [];
-  const norm = normalizeCompany(input.company_name);
-  const mail = normalizeEmail(input.email);
-  const phone = normalizePhone(input.phone);
-  const domain = emailDomain(input.email);
-
-  for (const l of all<{ id: number; company_name: string; contact_name: string; email: string | null; phone: string | null; company_norm: string }>(
-    "SELECT id, company_name, contact_name, email, phone, company_norm FROM leads WHERE id != ?",
-    excludeLeadId ?? 0,
-  )) {
-    const reasons: string[] = [];
-    if (mail && l.email === mail) reasons.push("trùng email");
-    if (phone && l.phone === phone) reasons.push("trùng số điện thoại");
-    if (norm && l.company_norm === norm) reasons.push("trùng tên công ty");
-    if (reasons.length) hits.push({ kind: "LEAD", id: l.id, label: `${l.company_name} – ${l.contact_name}`, reason: reasons.join(", ") });
-  }
-  for (const a of all<{ id: number; name: string; name_norm: string; email_domain: string | null }>(
-    "SELECT id, name, name_norm, email_domain FROM accounts",
-  )) {
-    const reasons: string[] = [];
-    if (norm && a.name_norm === norm) reasons.push("trùng tên công ty");
-    if (domain && a.email_domain === domain) reasons.push("trùng tên miền email");
-    if (reasons.length) hits.push({ kind: "ACCOUNT", id: a.id, label: a.name, reason: reasons.join(", ") });
-  }
-  if (mail || phone) {
-    for (const c of all<{ id: number; full_name: string; email: string | null; phone: string | null; account_name: string }>(
-      "SELECT c.id, c.full_name, c.email, c.phone, a.name AS account_name FROM contacts c JOIN accounts a ON a.id = c.account_id",
-    )) {
-      if ((mail && c.email === mail) || (phone && normalizePhone(c.phone) === phone)) {
-        hits.push({ kind: "CONTACT", id: c.id, label: `${c.full_name} (${c.account_name})`, reason: "trùng email/SĐT liên hệ" });
-      }
+  // FR-11: Tự động điền nếu có account_id
+  if (input.account_id) {
+    const acc = get<{ name: string; address: string | null; industry: string | null }>(
+      "SELECT name, address, industry FROM accounts WHERE id = ?",
+      input.account_id,
+    );
+    if (acc) {
+      if (!companyName) companyName = acc.name;
+      if (!address) address = acc.address;
+      if (!industry) industry = acc.industry;
     }
   }
-  return hits;
-}
 
-export function createLead(actor: Actor, input: LeadInput): number {
-  assert(input.company_name?.trim(), "Thiếu tên công ty");
-  assert(input.contact_name?.trim(), "Thiếu tên người liên hệ");
-  const email = normalizeEmail(input.email);
+  // FR-11: Tự động điền nếu có contact_id
+  if (input.contact_id) {
+    const con = get<{ full_name: string; title: string | null; email: string | null; phone: string | null }>(
+      "SELECT full_name, title, email, phone FROM contacts WHERE id = ?",
+      input.contact_id,
+    );
+    if (con) {
+      if (!contactName) contactName = con.full_name;
+      if (!email && con.email) email = normalizeEmail(con.email);
+      if (!phone && con.phone) phone = normalizePhone(con.phone);
+      if (!input.contact_title && con.title) input.contact_title = con.title;
+    }
+  }
+
+  assert(companyName, "Thiếu tên công ty");
+  assert(contactName, "Thiếu tên người liên hệ");
   assert(!email || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email), "Email không hợp lệ");
-  const addr = input.address?.trim() ? maps.normalizeAddress(input.address) : null;
-  const dups = findDuplicates({ company_name: input.company_name, email, phone: input.phone });
+
+  // FR-12: Chuẩn hoá địa chỉ
+  const addr = address ? maps.normalizeAddress(address) : null;
+
+  // FR-16: Kiểm tra trùng
+  const dups = findDuplicates({ company_name: companyName, email, phone });
+
+  // FR-10: Tính mức phân loại ban đầu
+  const initialRating = calculateLeadRating({
+    bant_score: 0,
+    bant_authority: 0,
+    bant_timeline: 0,
+    bant_need: 0,
+  });
 
   return tx(() => {
     const { id } = run(
       `INSERT INTO leads (company_name, company_norm, contact_name, contact_title, email, phone, address, address_normalized,
-         source, industry, notes, owner_id, duplicate_flag, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      input.company_name.trim(),
-      normalizeCompany(input.company_name),
-      input.contact_name.trim(),
+         source, industry, notes, topic, owner_id, account_id, contact_id, rating, duplicate_flag, created_by,team_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      companyName,
+      normalizeCompany(companyName),
+      contactName,
       input.contact_title?.trim() || null,
       email,
-      normalizePhone(input.phone),
-      input.address?.trim() || null,
+      phone,
+      address,
       addr?.normalized ?? null,
       input.source ?? "MANUAL",
-      input.industry?.trim() || null,
+      industry,
       input.notes?.trim() || null,
+      input.topic?.trim() || null,
       input.owner_id ?? actorUserId(actor),
+      input.account_id ?? null,
+      input.contact_id ?? null,
+      initialRating,
       dups.length ? 1 : 0,
       actorUserId(actor),
+      assignmentTeam(input.owner_id ?? actorUserId(actor),input.team_id),
     );
+
+    // Gắn nhãn nếu có (FR-07)
+    if (input.tag_ids && input.tag_ids.length > 0) {
+      for (const tid of input.tag_ids) {
+        run("INSERT OR IGNORE INTO lead_tags (lead_id, tag_id) VALUES (?, ?)", id, tid);
+      }
+    }
+
     audit(actor, "lead", id, "CREATE", { to: "OPEN", details: { duplicates: dups } });
+    emitEvent('lead.created',{leadId:id,actorUserId:actorUserId(actor)});
     return id;
   });
 }
 
-const EDITABLE = ["company_name", "contact_name", "contact_title", "email", "phone", "address", "industry", "notes", "owner_id"] as const;
+const EDITABLE = [
+  "company_name",
+  "contact_name",
+  "contact_title",
+  "email",
+  "phone",
+  "address",
+  "industry",
+  "notes",
+  "topic",
+  "owner_id",
+  "account_id",
+  "contact_id",
+  "rating",
+] as const;
 
 export function updateLead(actor: Actor, id: number, input: Partial<LeadInput>) {
+  assert(actor.type!=='AI','Agent chỉ được đề xuất cập nhật Lead');
+  if('address' in input) requireVietnamAddress(input.address);
+  assertActorAccess(actor, "lead", id);
   const lead = getLead(id);
   assert(lead, "Không tìm thấy Lead");
   assert(lead.status !== "CONVERTED", "Lead đã chuyển đổi, không sửa được");
+
   const next: Record<string, unknown> = {};
   for (const k of EDITABLE) if (k in input) next[k] = input[k as keyof LeadInput] ?? null;
   if ("email" in next) next.email = normalizeEmail(next.email as string);
   if ("phone" in next) next.phone = normalizePhone(next.phone as string);
   if ("company_name" in next) next.company_norm = normalizeCompany(String(next.company_name));
   if ("address" in next) next.address_normalized = next.address ? maps.normalizeAddress(String(next.address)).normalized : null;
+
   const keys = Object.keys(next);
-  if (!keys.length) return;
+  if (!keys.length && !input.tag_ids) return;
+
   tx(() => {
-    run(
-      `UPDATE leads SET ${keys.map((k) => `${k} = ?`).join(", ")}, updated_at = datetime('now') WHERE id = ?`,
-      ...keys.map((k) => next[k] as string | number | null),
-      id,
-    );
-    const dups = findDuplicates({ company_name: String(next.company_name ?? lead.company_name), email: (next.email as string) ?? lead.email, phone: (next.phone as string) ?? lead.phone }, id);
-    run("UPDATE leads SET duplicate_flag = ? WHERE id = ?", dups.length ? 1 : 0, id);
-    audit(actor, "lead", id, "UPDATE", { details: { fields: keys } });
+    if (keys.length > 0) {
+      run(
+        `UPDATE leads SET ${keys.map((k) => `${k} = ?`).join(", ")}, updated_at = datetime('now') WHERE id = ?`,
+        ...keys.map((k) => next[k] as string | number | null),
+        id,
+      );
+      const dups = findDuplicates(
+        {
+          company_name: String(next.company_name ?? lead.company_name),
+          email: (next.email as string) ?? lead.email,
+          phone: (next.phone as string) ?? lead.phone,
+        },
+        id,
+      );
+      run("UPDATE leads SET duplicate_flag = ? WHERE id = ?", dups.length ? 1 : 0, id);
+      audit(actor, "lead", id, "UPDATE", { details: { fields: keys } });
+    }
+
+    if (input.tag_ids) {
+      run("DELETE FROM lead_tags WHERE lead_id = ?", id);
+      for (const tid of input.tag_ids) {
+        run("INSERT OR IGNORE INTO lead_tags (lead_id, tag_id) VALUES (?, ?)", id, tid);
+      }
+    }
+  });
+}
+
+/**
+ * FR-05: Xoá mềm Lead (chuyển sang trạng thái Đã xoá).
+ */
+export function softDeleteLead(actor: Actor, id: number) {
+  assertActorAccess(actor, "lead", id);
+  const lead = getLead(id);
+  assert(lead, "Không tìm thấy Lead");
+  assert(!lead.deleted_at, "Lead này đã nằm trong thùng rác");
+
+  tx(() => {
+    run("UPDATE leads SET deleted_at = datetime('now') WHERE id = ?", id);
+    audit(actor, "lead", id, "DELETE_SOFT", { from: lead.status, to: "DELETED" });
+  });
+}
+
+/**
+ * FR-18: Khôi phục Lead đã xoá mềm.
+ */
+export function restoreLead(actor: Actor, id: number) {
+  assertActorAccess(actor, "lead", id);
+  const lead = getLead(id);
+  assert(lead, "Không tìm thấy Lead");
+  assert(lead.deleted_at, "Lead này không nằm trong thùng rác");
+
+  tx(() => {
+    run("UPDATE leads SET deleted_at = NULL WHERE id = ?", id);
+    audit(actor, "lead", id, "RESTORE", { from: "DELETED", to: lead.status });
+  });
+}
+
+/**
+ * FR-07: Quản lý nhãn (Tags) gắn với Lead.
+ */
+export function addLeadTags(leadId: number, tagIds: number[]) {
+  tx(() => {
+    for (const tid of tagIds) {
+      run("INSERT OR IGNORE INTO lead_tags (lead_id, tag_id) VALUES (?, ?)", leadId, tid);
+    }
+  });
+}
+
+export function removeLeadTag(leadId: number, tagId: number) {
+  run("DELETE FROM lead_tags WHERE lead_id = ? AND tag_id = ?", leadId, tagId);
+}
+
+export function setLeadTags(leadId: number, tagIds: number[]) {
+  tx(() => {
+    run("DELETE FROM lead_tags WHERE lead_id = ?", leadId);
+    for (const tid of tagIds) {
+      run("INSERT OR IGNORE INTO lead_tags (lead_id, tag_id) VALUES (?, ?)", leadId, tid);
+    }
+  });
+}
+
+export function listTags(): Tag[] {
+  return all<Tag>("SELECT * FROM tags ORDER BY name");
+}
+
+/**
+ * FR-03: Xem trước dữ liệu nhập hàng loạt từ tệp CSV (Preview).
+ */
+export type ImportPreviewRow = {
+  rowNumber: number;
+  data: LeadInput;
+  valid: boolean;
+  isValid: boolean;
+  errors: string[];
+  duplicateHits: DuplicateHit[];
+};
+
+export function parseCsvText(csvText: string): Record<string, string>[] {
+  const lines = csvText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+  const rows: Record<string, string>[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const values = lines[i].split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
+    const row: Record<string, string> = {};
+    headers.forEach((h, idx) => {
+      row[h] = values[idx] ?? "";
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+
+export function previewLeadImport(input: Record<string, string>[] | string): {
+  rows: ImportPreviewRow[];
+  total: number;
+  validCount: number;
+  errorCount: number;
+  duplicateCount: number;
+} {
+  const records = typeof input === "string" ? parseCsvText(input) : input;
+  const rows: ImportPreviewRow[] = [];
+  let validCount = 0;
+  let duplicateCount = 0;
+
+  records.forEach((raw, idx) => {
+    const rowNumber = idx + 1;
+    const errors: string[] = [];
+
+    const company_name = (raw.company_name || raw["Tên công ty"] || raw["Công ty"] || "").trim();
+    const contact_name = (raw.contact_name || raw["Họ tên"] || raw["Người liên hệ"] || "").trim();
+    const email = normalizeEmail(raw.email || raw["Email"] || null);
+    const phone = normalizePhone(raw.phone || raw["Số điện thoại"] || raw["SĐT"] || null);
+    const address = (raw.address || raw["Địa chỉ"] || "").trim() || null;
+    const topic = (raw.topic || raw["Nhu cầu"] || raw["Chủ đề"] || "").trim() || null;
+    const source = (raw.source || raw["Nguồn"] || "IMPORT").trim();
+    const notes = (raw.notes || raw["Ghi chú"] || "").trim() || null;
+
+    if (!company_name) errors.push("Thiếu tên công ty");
+    if (!contact_name) errors.push("Thiếu tên người liên hệ");
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) errors.push("Email không hợp lệ");
+
+    const dups = company_name ? findDuplicates({ company_name, email, phone }) : [];
+    if (dups.length > 0) duplicateCount++;
+
+    const addressCheck=validateVietnamAddress(address);if(!addressCheck.valid) errors.push(addressCheck.reason!);
+    const valid = errors.length === 0;
+    if (valid) validCount++;
+
+    rows.push({
+      rowNumber,
+      data: {
+        company_name,
+        contact_name,
+        email,
+        phone,
+        address,
+        topic,
+        source,
+        notes,
+      },
+      valid,
+      isValid: valid,
+      errors,
+      duplicateHits: dups,
+    });
+  });
+
+  return {
+    rows,
+    total: records.length,
+    validCount,
+    errorCount: records.length - validCount,
+    duplicateCount,
+  };
+}
+
+/**
+ * FR-03: Thực thi nhập Lead hàng loạt từ tệp.
+ * Phát sự kiện lead.imported kích hoạt Agent (theo thỏa thuận hợp đồng).
+ */
+export function executeLeadImport(actor: Actor, validRows: LeadInput[]): { importedIds: number[]; count: number; imported: number } {
+  return tx(() => {
+    const importedIds: number[] = [];
+
+    for (const r of validRows) {
+      const id = createLead(actor, {
+        ...r,
+        source: r.source || "IMPORT",
+      });
+      importedIds.push(id);
+    }
+
+    // Phát sự kiện lead.imported
+    emitEvent("lead.imported", {
+      leadIds: importedIds,
+      count: importedIds.length,
+      actorUserId: actorUserId(actor),
+    });
+
+    return { importedIds, count: importedIds.length, imported: importedIds.length };
   });
 }
 
 export function updateBant(actor: Actor, id: number, scores: Record<BantKey, number>, notes: string | null) {
-  const lead = getLead(id);
-  assert(lead, "Không tìm thấy Lead");
-  assert(lead.status === "OPEN" || lead.status === "WORKING", "Chỉ cập nhật BANT cho Lead đang mở");
-  const s = { budget: clampBant(scores.budget), authority: clampBant(scores.authority), need: clampBant(scores.need), timeline: clampBant(scores.timeline) };
-  const total = bantScore(s);
-  tx(() => {
-    run(
-      `UPDATE leads SET bant_budget=?, bant_authority=?, bant_need=?, bant_timeline=?, bant_score=?, bant_notes=?,
-         status = CASE WHEN status = 'OPEN' THEN 'WORKING' ELSE status END, updated_at = datetime('now') WHERE id = ?`,
-      s.budget, s.authority, s.need, s.timeline, total, notes, id,
-    );
-    audit(actor, "lead", id, "BANT_UPDATE", { from: lead.status, to: lead.status === "OPEN" ? "WORKING" : lead.status, details: { ...s, total } });
-  });
-  return total;
+  return scoreBant(actor,id,{...scores,notes:notes ?? undefined}).totalScore;
 }
 
 export function disqualifyLead(actor: Actor, id: number, reason: string) {
-  // Human gate: chỉ con người được loại Lead (Agent chỉ đề xuất).
-  assert(actor.type === "USER", "Chỉ nhân viên mới được loại Lead");
-  assert(reason?.trim(), "Phải nhập lý do loại Lead");
-  const lead = getLead(id);
-  assert(lead, "Không tìm thấy Lead");
-  assert(lead.status === "OPEN" || lead.status === "WORKING", "Lead không ở trạng thái mở");
-  tx(() => {
-    run("UPDATE leads SET status='DISQUALIFIED', disqualify_reason=?, updated_at=datetime('now') WHERE id=?", reason.trim(), id);
-    audit(actor, "lead", id, "DISQUALIFY", { from: lead.status, to: "DISQUALIFIED", reason });
-  });
+  return disqualifyLeadWithReason(actor,id,reason);
 }
 
 export function reactivateLead(actor: Actor, id: number, reason: string) {
+  assertActorAccess(actor, "lead", id);
   const lead = getLead(id);
   assert(lead, "Không tìm thấy Lead");
   assert(lead.status === "DISQUALIFIED", "Chỉ tái kích hoạt Lead đã loại");
@@ -227,102 +560,35 @@ export function conversionCandidates(lead: Lead) {
   const accounts = all<{ id: number; name: string; reason: string }>(
     `SELECT id, name, CASE WHEN name_norm = ? THEN 'trùng tên' ELSE 'trùng tên miền email' END AS reason
      FROM accounts WHERE name_norm = ? OR (? IS NOT NULL AND email_domain = ?)`,
-    lead.company_norm, lead.company_norm, domain, domain,
+    lead.company_norm,
+    lead.company_norm,
+    domain,
+    domain,
   );
   const contacts = all<{ id: number; full_name: string; account_id: number; account_name: string }>(
     `SELECT c.id, c.full_name, c.account_id, a.name AS account_name FROM contacts c JOIN accounts a ON a.id = c.account_id
      WHERE (? IS NOT NULL AND c.email = ?) OR (? IS NOT NULL AND c.phone = ?)`,
-    lead.email, lead.email, lead.phone, lead.phone,
+    lead.email,
+    lead.email,
+    lead.phone,
+    lead.phone,
   );
   return { accounts, contacts };
 }
 
 export type ConvertInput = {
-  accountId?: number | null; // dùng lại Account có sẵn; null = tạo mới
-  contactId?: number | null; // dùng lại Contact có sẵn; null = tạo mới
-  ownerId: number; // AE nhận Opportunity
+  accountId?: number | null;
+  contactId?: number | null;
+  ownerId: number;
   opportunityName?: string;
   amount?: number;
   closeDate?: string | null;
 };
 
-/**
- * ADR-04 (tạm theo đề xuất brief): chuyển đổi là MỘT transaction ở cuối Qualify,
- * tạo/dùng lại Account + Contact và tạo Opportunity ở stage DEVELOP.
- * ADR-03: mặc định chỉ con người được chuyển đổi; AI chỉ đề xuất (cờ ai_auto_convert).
- */
 export function convertLead(actor: Actor, id: number, input: ConvertInput) {
-  if (actor.type === "AI") assert(settingBool("ai_auto_convert"), "AI không được tự chuyển đổi Lead (ADR-03)");
-  const lead = getLead(id);
-  assert(lead, "Không tìm thấy Lead");
-  assert(lead.status === "OPEN" || lead.status === "WORKING", "Lead không ở trạng thái mở");
-  const threshold = settingNumber("bant_threshold");
-  assert(lead.bant_score >= threshold, `Điểm BANT ${lead.bant_score} chưa đạt ngưỡng ${threshold}`);
-  assert(get("SELECT id FROM users WHERE id = ? AND role IN ('SALES','SALES_MANAGER')", input.ownerId), "AE nhận Opportunity không hợp lệ");
-
-  return tx(() => {
-    let accountId = input.accountId ?? null;
-    if (accountId) {
-      assert(get("SELECT id FROM accounts WHERE id = ?", accountId), "Account không tồn tại");
-    } else {
-      accountId = run(
-        `INSERT INTO accounts (name, name_norm, industry, email_domain, address, owner_id) VALUES (?,?,?,?,?,?)`,
-        lead.company_name, lead.company_norm, lead.industry, emailDomain(lead.email), lead.address_normalized ?? lead.address, input.ownerId,
-      ).id;
-      audit(actor, "account", accountId, "CREATE", { reason: `Chuyển đổi từ Lead #${id}` });
-    }
-
-    let contactId = input.contactId ?? null;
-    if (contactId) {
-      const c = get<{ account_id: number }>("SELECT account_id FROM contacts WHERE id = ?", contactId);
-      assert(c && c.account_id === accountId, "Contact không thuộc Account đã chọn");
-    } else {
-      const hasPrimary = get("SELECT id FROM contacts WHERE account_id = ? AND is_primary = 1", accountId);
-      contactId = run(
-        "INSERT INTO contacts (account_id, full_name, title, email, phone, is_primary) VALUES (?,?,?,?,?,?)",
-        accountId, lead.contact_name, lead.contact_title, lead.email, lead.phone, hasPrimary ? 0 : 1,
-      ).id;
-    }
-
-    const priceList = get<{ id: number }>("SELECT id FROM price_lists WHERE active = 1 ORDER BY id LIMIT 1");
-    const code = nextCode("opportunities", "OPP");
-    const oppId = run(
-      `INSERT INTO opportunities (code, name, account_id, primary_contact_id, owner_id, lead_id, stage, amount, close_date, price_list_id, customer_need)
-       VALUES (?,?,?,?,?,?, 'DEVELOP', ?,?,?,?)`,
-      code,
-      input.opportunityName?.trim() || `${lead.company_name} – Sales Cloud`,
-      accountId,
-      contactId,
-      input.ownerId,
-      id,
-      input.amount ?? 0,
-      input.closeDate ?? null,
-      priceList?.id ?? null,
-      lead.bant_notes,
-    ).id;
-
-    run(
-      `UPDATE leads SET status='CONVERTED', converted_account_id=?, converted_contact_id=?, converted_opportunity_id=?,
-         converted_at=datetime('now'), updated_at=datetime('now') WHERE id=?`,
-      accountId, contactId, oppId, id,
-    );
-    // Bảo toàn lịch sử tương tác: liên kết hoạt động của Lead sang Opportunity bằng ghi chú bàn giao.
-    addActivity({
-      entityType: "opportunity",
-      entityId: oppId,
-      type: "NOTE",
-      subject: `Bàn giao từ Lead #${id} (BANT ${lead.bant_score}/100)`,
-      body: lead.bant_notes,
-      createdBy: actorUserId(actor),
-    });
-    audit(actor, "lead", id, "CONVERT", { from: lead.status, to: "CONVERTED", details: { accountId, contactId, opportunityId: oppId } });
-    audit(actor, "opportunity", oppId, "CREATE", { to: "DEVELOP", reason: `Chuyển đổi từ Lead #${id}` });
-    notify(input.ownerId, `Bạn được giao Opportunity ${code} (${lead.company_name})`, `/opportunities/${oppId}`);
-    return { accountId, contactId, opportunityId: oppId };
-  });
+  return convertLeadToOpportunity(actor,id,input);
 }
 
-/** Chuyển đổi hàng loạt — do nhân viên kích hoạt. Tự dùng lại Account trùng tên/tên miền nếu có. */
 export function bulkConvert(actor: Actor, ids: number[], ownerId: number) {
   assert(actor.type === "USER", "Chuyển đổi hàng loạt phải do nhân viên kích hoạt");
   const results: { id: number; ok: boolean; message: string }[] = [];

@@ -36,6 +36,8 @@ yarn-error.log*
 
 # SQLite data (local and test databases)
 /data/
+/.gemini/
+/_backup_day1/
 
 # playwright
 /test-results/

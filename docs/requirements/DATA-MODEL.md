@@ -80,6 +80,7 @@ Nguồn: mục 2.4.3 và tab *Phụ lục ERD* (mã Mermaid đầy đủ, 61 th�
 | AGENT_RUN | `ai_runs` | Có | WP-08 | Thêm `config_id`, `retry_of_run_id`, `idempotency_key`, `input_tokens`, `output_tokens`, `web_search_calls`, `latency_ms`, `cost` (tính theo BR-24, để trống khi chưa có đơn giá). Đúng một trong Lead hoặc cơ hội. Trạng thái FAILED kèm lý do, gồm cả "Quá thời gian" và "Hết ngân sách" (BR-23, BR-24) |
 | AI_RESULT | `ai_suggestions` + `opportunity_research` | Có | WP-08 | Gộp: đề xuất của Qualification Agent ở `ai_suggestions`; bản nghiên cứu của Opportunity Agent ở `opportunity_research`. Cả hai thêm trạng thái **EDITED** (người sửa rồi mới dùng) và lưu bản gốc của Agent (`payload_json`, `summary`) nguyên vẹn để tính tỷ lệ sửa (BR-26) |
 | AI_EVIDENCE | `ai_evidence` | Mới | WP-08 | Thay dần `evidence_json`, `sources_json`. Mỗi căn cứ có ít nhất email, tài liệu hoặc URL, và thời điểm lấy |
+| AI_RULE_EVALUATION | `ai_rule_evaluations` | Mới | WP-08 | BR-28. Một dòng cho mỗi quy tắc OPP-R01..R10 đã áp cho một bản nghiên cứu: `rule_id`, `br_ref`, `ruleset_version`, `ruleset_hash`, `status`, `severity`, `raw_value`, `threshold`, `rationale`, `limitation`, `evidence_refs_json`, `required_action`, `human_gate`. `opportunity_research` thêm `ruleset_version`, `ruleset_hash`, `confidence`, `confidence_band`, `llm_importance` (giá trị LLM đề xuất, giữ để đối chiếu), `gates_json` |
 | TOOL | `tools` | Mới | WP-08 | |
 | TOOL_GRANT | `tool_grants` | Mới | WP-08 | Công cụ được cấp cho từng `agent_configs`; ADMIN cấp quyền dữ liệu (FR-92) |
 | TOOL_CALL | `tool_calls` | Mới | WP-08 | Thay `ai_runs.tool_calls_json`. Cột `outcome` OK / ERROR / **DENIED** (bị chặn vì quyền, tách khỏi lỗi thường), `input_redacted`, `output_summary`, `duration_ms`, `authorization_snapshot`. Đầu vào và đầu ra đã che dữ liệu cá nhân, không bao giờ chứa khoá API (DEC-28) |
@@ -107,6 +108,7 @@ Nguồn: mục 2.4.3 và tab *Phụ lục ERD* (mã Mermaid đầy đủ, 61 th�
 |---|---|
 | `settings` | Siêu dữ liệu: giá trị BR (BUSINESS-RULES) |
 | `notifications` | Thông báo trong ứng dụng; nhóm có thể bổ sung vào ERD nếu muốn |
+| `integration_requests` | Sổ kỹ thuật idempotency cho webhook (hash đầu vào và kết quả, không lưu khóa API); không phải thực thể Sales mới. Migration `wp10_001`. |
 | `fulfillment_tasks` | Bỏ dần, thay bằng `handovers`, `handover_items` (WP-05) |
 
 ## Phạm vi demo

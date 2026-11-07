@@ -6,16 +6,21 @@ export function assert(cond: unknown, message: string): asserts cond {
   if (!cond) throw new DomainError(message);
 }
 
-export type Role = "SALES" | "PRESALES" | "SALES_MANAGER" | "FINANCE" | "LEGAL" | "DELIVERY" | "ADMIN";
+export type Role =
+  | "SALES"
+  | "PRESALES"
+  | "SALES_MANAGER"
+  | "FINANCE"
+  | "DELIVERY"
+  | "ADMIN";
 
 export const ROLE_LABEL: Record<Role, string> = {
-  SALES: "Sales (SDR/AE)",
-  PRESALES: "Presales / SE",
-  SALES_MANAGER: "Sales Manager",
-  FINANCE: "Finance / Kế toán",
-  LEGAL: "Legal / Deal Desk",
-  DELIVERY: "Delivery / Kỹ thuật",
-  ADMIN: "Admin",
+  SALES: "Nhân viên kinh doanh",
+  PRESALES: "Chuyên viên tư vấn giải pháp",
+  SALES_MANAGER: "Quản lý kinh doanh",
+  FINANCE: "Nhân viên Tài chính – Kế toán",
+  DELIVERY: "Nhân viên triển khai kỹ thuật",
+  ADMIN: "Người quản trị hệ thống",
 };
 
 export const LEAD_STATUS: Record<string, string> = {
@@ -33,12 +38,22 @@ export const LEAD_SOURCE: Record<string, string> = {
   REFERRAL: "Giới thiệu",
 };
 
+/** Nhãn giai đoạn cơ hội theo bài (DEC-19) */
 export const OPP_STAGE: Record<string, string> = {
-  DEVELOP: "Develop",
-  PROPOSE: "Propose",
-  CLOSE: "Close",
-  WON: "Closed – Won",
-  LOST: "Closed – Lost",
+  DEVELOP: "Phát triển cơ hội",
+  PROPOSE: "Đề xuất giải pháp",
+  CLOSE: "Tạo đơn hàng",
+  WON: "Thành công",
+  LOST: "Thất bại",
+};
+
+/** Quy trình 5 bước tổng thể (DEC-19) */
+export const PROCESS_STAGE: Record<string, string> = {
+  QUALIFY: "Đánh giá khách hàng",
+  DEVELOP: "Phát triển cơ hội",
+  PROPOSE: "Đề xuất giải pháp",
+  CLOSE: "Tạo đơn hàng",
+  FULFILL: "Theo dõi hóa đơn và thanh toán",
 };
 
 export const QUOTE_STATUS: Record<string, string> = {
@@ -48,7 +63,23 @@ export const QUOTE_STATUS: Record<string, string> = {
   SENT: "Đã gửi khách",
   ACCEPTED: "Khách chấp thuận",
   REJECTED: "Khách từ chối",
+  DECLINED: "Từ chối",
   SUPERSEDED: "Đã thay thế",
+  EXPIRED: "Hết hiệu lực",
+};
+
+export const PROPOSAL_STATUS: Record<string, string> = {
+  DRAFT: "Nháp",
+  SENT: "Đã gửi khách",
+  ACCEPTED: "Khách chấp thuận",
+  SUPERSEDED: "Đã thay thế",
+};
+
+export const SIGNATURE_STATUS: Record<string, string> = {
+  PENDING: "Chờ ký",
+  SIGNED: "Đã ký",
+  DECLINED: "Từ chối ký",
+  EXPIRED: "Hết hạn ký",
 };
 
 export const ORDER_STATUS: Record<string, string> = {
@@ -56,6 +87,32 @@ export const ORDER_STATUS: Record<string, string> = {
   IN_FULFILLMENT: "Đang thực hiện",
   FULFILLED: "Hoàn tất bàn giao",
   CANCELLED: "Đã hủy",
+};
+
+export const BILLING_MILESTONE_STATUS: Record<string, string> = {
+  PENDING: "Chờ xuất hóa đơn",
+  INVOICED: "Đã xuất hóa đơn",
+  PAID: "Đã thanh toán",
+};
+
+export const HANDOVER_STATUS: Record<string, string> = {
+  PENDING: "Chờ bàn giao",
+  IN_PROGRESS: "Đang bàn giao",
+  COMPLETED: "Đã bàn giao",
+};
+
+export const HANDOVER_ITEM_CATEGORY: Record<string, string> = {
+  LICENSE: "Bản quyền & Giấy phép",
+  DEPLOYMENT: "Triển khai & Cấu hình",
+  TRAINING: "Đào tạo & Hướng dẫn",
+  DOCUMENTATION: "Tài liệu bàn giao",
+};
+
+export const HANDOVER_ITEM_STATUS: Record<string, string> = {
+  PENDING: "Chưa nghiệm thu",
+  IN_PROGRESS: "Đang nghiệm thu",
+  ACCEPTED: "Đã nghiệm thu",
+  REJECTED: "Cần xử lý lại",
 };
 
 export const INVOICE_STATUS: Record<string, string> = {
@@ -84,6 +141,15 @@ export const STAKEHOLDER_ROLE: Record<string, string> = {
   CHAMPION: "Người ủng hộ",
   BLOCKER: "Người cản trở",
   USER: "Người dùng",
+  SPONSOR: "Nhà tài trợ ngân sách",
+  GATEKEEPER: "Người gác cổng",
+};
+
+export const RISK_STATUS: Record<string, string> = {
+  OPEN: "Chưa xử lý",
+  MITIGATED: "Đã giảm thiểu",
+  RESOLVED: "Đã giải quyết",
+  DISMISSED: "Bỏ qua",
 };
 
 export const LEVEL: Record<string, string> = { LOW: "Thấp", MEDIUM: "Trung bình", HIGH: "Cao" };
@@ -92,6 +158,7 @@ export const APPROVAL_KIND: Record<string, string> = {
   QUOTE_DISCOUNT: "Duyệt chiết khấu báo giá",
   OPP_STAGE_GATE: "Rà soát chuyển Develop → Propose",
   LEGAL_REVIEW: "Rà soát điều khoản",
+  EXPERT_REVIEW: "Rà soát chuyên môn giải pháp",
 };
 
 export const SUGGESTION_KIND: Record<string, string> = {
@@ -112,13 +179,22 @@ export const DISQUALIFY_REASONS = [
   "Khác",
 ];
 
+export const LOST_REASONS_BR27 = [
+  "Mất vào đối thủ",
+  "Không có ngân sách",
+  "Khách hoãn hoặc dừng dự án",
+  "Không đáp ứng yêu cầu",
+  "Bàn giao sai chuẩn từ bước đánh giá",
+  "Khác",
+] as const;
+
 export const LOST_REASONS = [
+  ...LOST_REASONS_BR27,
   "Thua đối thủ",
   "Giá không phù hợp",
   "Khách hoãn dự án",
   "Không đáp ứng yêu cầu kỹ thuật",
   "Mất liên lạc",
-  "Khác",
 ];
 
 // ===== Chuẩn hóa & kiểm tra trùng =====
@@ -161,6 +237,14 @@ export function emailDomain(email?: string | null): string | null {
 // Mỗi tiêu chí 0–25 điểm, tổng 0–100. Ngưỡng đạt chuẩn cấu hình trong settings (bant_threshold).
 export const BANT_KEYS = ["budget", "authority", "need", "timeline"] as const;
 export type BantKey = (typeof BANT_KEYS)[number];
+
+// Thang chấm BANT đã chốt (DEC-31, BR-01). Chọn mức gần nhất với thông tin đang có.
+export const BANT_SCALE: Record<BantKey, string> = {
+  budget: "0: không có thông tin · 8: có nói đến, chưa rõ số · 15: có khoảng ngân sách · 25: đã được duyệt",
+  authority: "0: chưa rõ người quyết định · 8: mới gặp người dùng cuối · 15: gặp người ảnh hưởng · 25: gặp đúng người quyết định",
+  need: "0: chưa rõ nhu cầu · 8: chung chung · 15: nêu được vấn đề cụ thể · 25: rõ vấn đề và phạm vi",
+  timeline: "0: chưa rõ · 8: năm sau · 15: trong năm nay · 25: trong tháng hoặc cuối quý",
+};
 export const BANT_LABEL: Record<BantKey, string> = {
   budget: "Budget – Ngân sách",
   authority: "Authority – Thẩm quyền",
@@ -186,7 +270,7 @@ export function lineTotal(quantity: number, unitPrice: number, discountPct: numb
 // theo các bước được mô tả: Nhu cầu, Giải pháp đề xuất, Stakeholders, Đối thủ.
 export const DEVELOP_CHECKLIST = [
   { key: "need_confirmed", label: "Customer Need đã khảo sát & xác nhận" },
-  { key: "solution_confirmed", label: "Proposed Solution đã được Presales xác nhận" },
+  { key: "solution_confirmed", label: "Proposed Solution đã được Chuyên viên tư vấn giải pháp xác nhận" },
   { key: "stakeholders_confirmed", label: "Đã xác định stakeholders (có người quyết định)" },
   { key: "competitors_confirmed", label: "Đã xác định đối thủ cạnh tranh" },
 ] as const;

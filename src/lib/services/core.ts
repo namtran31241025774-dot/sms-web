@@ -1,6 +1,7 @@
 import { all, get, run } from "../db";
 import type { Role } from "../domain";
 import { SETTING_DEFAULTS } from "../settings-defaults";
+import { emitEvent } from '../events';
 
 // Ai đang thực hiện thao tác — dùng cho audit log và kiểm tra quyền ghi của AI.
 export type Actor =
@@ -16,7 +17,7 @@ export function userActor(u: { id: number; name: string; role: Role }): Actor {
 function actorLabel(a: Actor): string {
   switch (a.type) {
     case "USER":
-      return a.name;
+      return a.name || (a.id ? `User #${a.id}` : "Người dùng");
     case "AI":
       return a.agent === "QUALIFICATION" ? "Sales Qualification Agent" : "Sales Opportunity Agent";
     case "INTEGRATION":
@@ -46,11 +47,13 @@ export function audit(
     opts.from ?? null,
     opts.to ?? null,
     actor.type,
-    actor.type === "USER" ? actor.id : actor.type === "AI" ? actor.runId : null,
+    actor.type === "USER" ? (actor.id ?? null) : actor.type === "AI" ? (actor.runId ?? null) : null,
     actorLabel(actor),
     opts.reason ?? null,
     opts.details === undefined ? null : JSON.stringify(opts.details),
   );
+  if(entityType==='opportunity' && ['UPDATE','DOCUMENT_UPLOAD','SOLUTION_CREATE','SOLUTION_UPDATE','STAKEHOLDER_ADD','STAKEHOLDER_REMOVE','COMPETITOR_ADD','COMPETITOR_REMOVE','ITEM_ADD','ITEM_UPDATE','ITEM_REMOVE','SCOPE_DOC_UPDATE'].includes(action)) emitEvent('opportunity.key_field_changed',{opportunityId:entityId,actorUserId:actorUserId(actor)});
+  if(entityType==='lead' && action==='BANT_SCORE') emitEvent('lead.bant_updated',{leadId:entityId,actorUserId:actorUserId(actor)});
 }
 
 export function auditTrail(entityType: string, entityId: number) {

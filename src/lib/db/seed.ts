@@ -1,6 +1,8 @@
 // Dữ liệu mẫu cho demo (tên doanh nghiệp/người là hư cấu).
 import type { DatabaseSync } from "node:sqlite";
+import { backfillQuoteAccounts, backfillQuoteVersions } from "./migrations/wp12_001_backfill_quote_versions";
 import { SETTING_DEFAULTS } from "../settings-defaults";
+import { runAllSeeds } from "./seeds";
 
 export function seed(db: DatabaseSync) {
   const ins = (sql: string, ...p: (string | number | null)[]) => Number(db.prepare(sql).run(...p).lastInsertRowid);
@@ -16,8 +18,9 @@ export function seed(db: DatabaseSync) {
     const presales = U("Lê Minh Châu", "chau.le@sms.local", "PRESALES", "Solution Engineer");
     const manager = U("Phạm Quốc Dũng", "dung.pham@sms.local", "SALES_MANAGER", "Sales Manager");
     U("Võ Thu Hà", "ha.vo@sms.local", "FINANCE", "Kế toán công nợ");
-    const delivery = U("Đặng Hải Long", "long.dang@sms.local", "DELIVERY", "Trưởng nhóm triển khai");
-    U("Bùi Mai Lan", "lan.bui@sms.local", "LEGAL", "Deal Desk");
+    const delivery = U("Đặng Hải Long", "long.dang@sms.local", "DELIVERY", "Nhân viên triển khai kỹ thuật");
+    const retired = U("Bùi Mai Lan", "lan.bui@sms.local", "SALES", "Nhân viên kinh doanh");
+    db.prepare("UPDATE users SET active = 0, status = 'INACTIVE' WHERE id = ?").run(retired); // giữ chỗ để không đổi ID dữ liệu mẫu
     U("Hoàng Gia Khánh", "khanh.hoang@sms.local", "ADMIN", "Quản trị hệ thống");
 
     for (const [k, v] of Object.entries(SETTING_DEFAULTS)) {
@@ -175,6 +178,11 @@ export function seed(db: DatabaseSync) {
     log("order", ord, "CREATE", "IN_FULFILLMENT");
     void manager;
 
+    // Chạy các seed mở rộng của từng WP (WP-00, WP-01, ...)
+    runAllSeeds(db);
+
+    backfillQuoteVersions(db);
+    backfillQuoteAccounts(db);
     db.exec("COMMIT");
   } catch (e) {
     db.exec("ROLLBACK");

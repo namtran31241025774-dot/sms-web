@@ -6,11 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "node scripts/run-test.mjs",
+    "test:watch": "node scripts/run-test.mjs --watch",
+    "test:e2e": "playwright test",
+    "db:reset": "node scripts/db-reset.mjs",
+    "fr:coverage": "node scripts/fr-coverage.mjs",
+    "check": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
-    "next": "16.4.0",
+    "next": "16.4.4",
+    "pdf-parse": "^1.1.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "^0.0.1",
@@ -22,8 +30,9 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.4.0",
+    "eslint-config-next": "16.4.4",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.5"
   }
 }

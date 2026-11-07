@@ -1,51 +1,74 @@
 @import "tailwindcss";
 
-/* Fluent 2 design tokens (Microsoft) — dùng cho giao diện kiểu Dynamics 365 Sales Hub */
+/* Tông màu Microsoft (Fluent 2, xanh #0f6cbd) với cách trình bày thoáng, bo tròn, tiêu đề đậm. */
 :root {
   --brand: #0f6cbd;
   --brand-hover: #115ea3;
   --brand-pressed: #0c3b5e;
-  --brand-tint: #ebf3fc;
+  --brand-tint: #eaf2fc;
   --brand-tint-2: #cfe4fa;
-  --header: #0f6cbd;
-  --bg: #f5f5f5;
+  --brand-ink: #0b2a55;
+  --header: #ffffff;
+  --bg: #f1f5fb;
   --surface: #ffffff;
-  --surface-2: #fafafa;
-  --surface-hover: #f0f0f0;
-  --surface-pressed: #e0e0e0;
-  --stroke: #e0e0e0;
-  --stroke-strong: #d1d1d1;
-  --stroke-accessible: #616161;
-  --text: #242424;
-  --text-2: #424242;
-  --text-3: #616161;
-  --text-4: #707070;
+  --surface-2: #f5f8fd;
+  --surface-hover: #eef3fb;
+  --surface-pressed: #e1e9f5;
+  --stroke: #e1e8f3;
+  --stroke-strong: #cbd5e4;
+  --stroke-accessible: #8a94a6;
+  --text: #1b2430;
+  --text-2: #3d4757;
+  --text-3: #667085;
+  --text-4: #7a8496;
   --success: #107c10;
-  --success-tint: #f1faf1;
+  --success-tint: #effaf0;
   --warning: #bc4b09;
-  --warning-tint: #fff9f5;
+  --warning-tint: #fff7f1;
   --danger: #c50f1f;
-  --danger-tint: #fdf3f4;
-  --info-tint: #f5f5f5;
-  --shadow-2: 0 0 2px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.14);
-  --shadow-4: 0 0 2px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.14);
-  --shadow-16: 0 0 2px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.14);
-  --radius: 4px;
-  --radius-lg: 8px;
+  --danger-tint: #fdf2f3;
+  --info-tint: #f4f6fb;
+  --shadow-2: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-4: 0 1px 3px rgba(16, 24, 40, 0.07), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-16: 0 14px 28px -8px rgba(16, 24, 40, 0.16);
+  --radius: 8px;
+  --radius-lg: 14px;
 }
 
 @theme inline {
   --color-brand: var(--brand);
   --color-brand-hover: var(--brand-hover);
   --color-brand-tint: var(--brand-tint);
+  --color-brand-ink: var(--brand-ink);
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-stroke: var(--stroke);
   --color-ink: var(--text);
+  --color-ink-1: var(--text);
+  --color-edge: var(--stroke);
+  --color-danger-ink: var(--danger);
+  --color-success-ink: var(--success);
+  --color-warning-ink: var(--warning);
+  --color-danger-tint: var(--danger-tint);
+  --color-warning-tint: var(--warning-tint);
+  --color-brand-strong: var(--brand-pressed);
+  --color-night: #050b1f;
+  --color-accent: var(--brand);
+  --color-accent-hover: var(--brand-hover);
+  --color-accent-tint: var(--brand-tint);
+  /* Tên màu cũ còn dùng ở vài trang, trỏ về cùng bộ màu. */
+  --color-primary: var(--brand);
+  --color-primary-contrast: #ffffff;
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-subtle: var(--surface-2);
+  --color-ink-subtle: var(--text-3);
+  --color-danger-surface: var(--danger-tint);
+  --color-warning-contrast: #ffffff;
   --color-ink-2: var(--text-2);
   --color-ink-3: var(--text-3);
   --color-success: var(--success);
+  --color-success-tint: var(--success-tint);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
   --font-sans: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif;
@@ -57,7 +80,9 @@ body {
 }
 
 body {
-  background: var(--bg);
+  /* Nền xanh rất nhạt, ngả cùng tông với dải tiêu đề và menu tối. */
+  background: radial-gradient(1200px 500px at 100% 0%, #e6eefb 0%, transparent 60%), var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -65,22 +90,32 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+h1,
+h2,
+h3 {
+  letter-spacing: -0.01em;
+}
+
 :focus-visible {
-  outline: 2px solid var(--text);
-  outline-offset: 1px;
-  border-radius: 2px;
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 /* ---------- Buttons ---------- */
-.btn {
+/* btn-secondary, btn-ghost, btn-outline: tên cũ còn dùng ở nhiều trang, cho cùng kiểu với .btn. */
+.btn,
+.btn-secondary,
+.btn-outline,
+.btn-ghost {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 32px;
-  min-width: 32px;
-  padding: 0 12px;
-  border-radius: var(--radius);
+  height: 36px;
+  min-width: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
   border: 1px solid var(--stroke-strong);
   background: var(--surface);
   color: var(--text);
@@ -88,25 +123,42 @@ body {
   font-size: 14px;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.1s;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.btn:hover {
+.btn:hover,
+.btn-secondary:hover,
+.btn-outline:hover {
   background: var(--surface-hover);
-  border-color: #c7c7c7;
+  border-color: var(--stroke-accessible);
+}
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  font-weight: 500;
+}
+.btn-ghost:hover {
+  background: var(--surface-hover);
+}
+.btn-secondary:disabled,
+.btn-outline:disabled,
+.btn-ghost:disabled {
+  color: #a4acb9;
+  cursor: not-allowed;
 }
 .btn:active {
   background: var(--surface-pressed);
 }
 .btn:disabled {
-  background: #f0f0f0;
-  border-color: #e0e0e0;
-  color: #bdbdbd;
+  background: #f1f3f6;
+  border-color: var(--stroke);
+  color: #a4acb9;
   cursor: not-allowed;
 }
 .btn-primary {
   background: var(--brand);
   border-color: transparent;
   color: #fff;
+  box-shadow: 0 2px 6px rgba(15, 108, 189, 0.25);
 }
 .btn-primary:hover {
   background: var(--brand-hover);
@@ -119,97 +171,98 @@ body {
   color: var(--danger);
 }
 .btn-sm {
-  height: 24px;
-  padding: 0 8px;
+  height: 28px;
+  padding: 0 12px;
   font-size: 12px;
-  font-weight: 400;
 }
 .btn-subtle {
   border-color: transparent;
   background: transparent;
-  font-weight: 400;
+  font-weight: 500;
 }
 .btn-subtle:hover {
   background: var(--surface-hover);
   border-color: transparent;
 }
 
-/* Command bar (thanh lệnh kiểu Dynamics 365) */
+/* Thanh lệnh */
 .cmd {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 36px;
-  padding: 0 10px;
-  border-radius: var(--radius);
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
   border: 0;
   background: transparent;
-  color: var(--text);
-  font-size: 14px;
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
 }
 .cmd:hover {
-  background: var(--surface-hover);
+  background: var(--brand-tint);
+  color: var(--brand-ink);
 }
 .cmd:active {
-  background: var(--surface-pressed);
+  background: var(--brand-tint-2);
 }
 .cmd svg {
   color: var(--brand);
 }
 .cmd:disabled {
-  color: #bdbdbd;
+  color: #a4acb9;
   cursor: not-allowed;
 }
 .cmd:disabled svg {
-  color: #bdbdbd;
+  color: #a4acb9;
 }
 
-/* ---------- Inputs (Fluent v9: viền dưới đậm, focus gạch xanh) ---------- */
+/* ---------- Inputs ---------- */
 .input,
 .select,
 .textarea {
   width: 100%;
-  min-height: 32px;
-  padding: 5px 10px;
+  min-height: 38px;
+  padding: 7px 12px;
   border: 1px solid var(--stroke-strong);
-  border-bottom-color: var(--stroke-accessible);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
   font-size: 14px;
   outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 .textarea {
-  min-height: 72px;
+  min-height: 80px;
   resize: vertical;
 }
 .input:hover,
 .select:hover,
 .textarea:hover {
-  border-color: #c7c7c7;
-  border-bottom-color: #575757;
+  border-color: var(--stroke-accessible);
 }
 .input:focus,
 .select:focus,
 .textarea:focus {
-  border-bottom: 2px solid var(--brand);
-  padding-bottom: 4px;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-tint-2);
 }
 .input:disabled,
 .select:disabled,
 .textarea:disabled {
-  background: #fafafa;
-  color: #9e9e9e;
-  border-color: #e0e0e0;
+  background: var(--surface-2);
+  color: #9aa3b2;
+  border-color: var(--stroke);
 }
 .label {
   display: block;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--text);
-  margin-bottom: 4px;
+  color: var(--text-2);
+  margin-bottom: 6px;
 }
 .label .req {
   color: var(--danger);
@@ -218,9 +271,10 @@ body {
 .hint {
   font-size: 12px;
   color: var(--text-3);
-  margin-top: 2px;
+  margin-top: 4px;
 }
-input[type="checkbox"] {
+input[type="checkbox"],
+input[type="radio"] {
   accent-color: var(--brand);
   width: 16px;
   height: 16px;
@@ -236,21 +290,26 @@ input[type="checkbox"] {
 .grid-table th {
   text-align: left;
   font-weight: 600;
-  color: var(--text-2);
-  font-size: 12px;
-  height: 36px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--stroke);
-  background: var(--surface);
+  color: #3b5583;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  height: 40px;
+  padding: 0 14px;
+  border-bottom: 1px solid #d9e3f2;
+  background: #eef3fb;
   position: sticky;
   top: 0;
   white-space: nowrap;
 }
 .grid-table td {
-  height: 42px;
-  padding: 6px 12px;
-  border-bottom: 1px solid #f0f0f0;
+  height: 48px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #eef1f5;
   vertical-align: middle;
+}
+.grid-table tbody tr:last-child td {
+  border-bottom: 0;
 }
 .grid-table tbody tr:hover td {
   background: var(--surface-hover);
@@ -258,6 +317,7 @@ input[type="checkbox"] {
 .grid-table a.link,
 a.link {
   color: var(--brand);
+  font-weight: 500;
 }
 a.link:hover {
   text-decoration: underline;

@@ -13,14 +13,13 @@ export function NavLink({ href, icon, children, badge }: { href: string; icon: I
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`relative flex h-9 items-center gap-3 rounded-[4px] px-3 text-sm ${
-        active ? "bg-[#ebf3fc] font-semibold text-ink" : "text-ink-2 hover:bg-[#f0f0f0]"
+      className={`relative flex h-10 items-center gap-3 rounded-xl px-3 text-[13.5px] transition-colors ${
+        active ? "bg-brand font-semibold text-white shadow-[0_0_18px_rgba(15,108,189,0.55)]" : "text-[#b4c3df] hover:bg-white/8 hover:text-white"
       }`}
     >
-      {active && <span className="absolute left-0 top-2 h-5 w-[3px] rounded-full bg-brand" />}
-      <Icon name={icon} size={20} className={active ? "text-brand" : "text-ink-3"} />
+      <Icon name={icon} size={19} className={active ? "text-white" : "text-[#7f93bb]"} />
       <span className="flex-1 truncate">{children}</span>
-      {!!badge && <span className="rounded-full bg-brand px-1.5 text-[11px] font-semibold leading-4 text-white">{badge}</span>}
+      {!!badge && <span className={`rounded-full px-1.5 text-[11px] font-semibold leading-4 ${active ? "bg-white text-brand" : "bg-brand text-white"}`}>{badge}</span>}
     </Link>
   );
 }
@@ -51,6 +50,20 @@ export function SubmitButton({
       ) : (
         icon && <Icon name={icon} size={size === "sm" ? 14 : 18} />
       )}
+      {children}
+    </button>
+  );
+}
+
+export function ConfirmSubmitButton({ children, message }: { children: ReactNode; message: string }) {
+  return (
+    <button
+      type="submit"
+      className="btn btn-sm"
+      onClick={(e) => {
+        if (!window.confirm(message)) e.preventDefault();
+      }}
+    >
       {children}
     </button>
   );
